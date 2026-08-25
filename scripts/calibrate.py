@@ -40,6 +40,7 @@ from interlock.core.policy import load_policy  # noqa: E402
 from interlock.eval.induce import TripleGenerator  # noqa: E402
 from interlock.retrieval import corpus_chunks, load_corpus  # noqa: E402
 from interlock.risk.calibration import (  # noqa: E402
+    MultiDefectCalibrator,
     SignalCalibrator,
     build_report,
 )
@@ -118,7 +119,16 @@ def write_reliability_diagram(report: Any, path: Path) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--items", type=int, default=2000)
+    parser.add_argument(
+        "--items",
+        type=int,
+        default=10000,
+        # At a 10% defect base rate this yields ~1,000 defective items, which is what the
+        # conformal bound needs -- a 1% guarantee at 90% confidence is unreachable below
+        # roughly 500, whatever the detector's quality. Generation is deterministic and
+        # takes seconds, so there is no reason to be stingy here.
+        help="how many triples to generate (default sized for the conformal bound)",
+    )
     parser.add_argument("--seed", type=int, default=20260825)
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--alpha", type=float, default=None, help="defaults to the policy's")
@@ -133,7 +143,7 @@ def main() -> int:
     delta = args.delta if args.delta is not None else round(1.0 - policy.guarantees.confidence, 10)
 
     print(f"building {args.items} labelled triples (seed {args.seed})")
-    features, labels, modes, _ = build_dataset(args.items, args.seed)
+    features, labels, modes, triples = build_dataset(args.items, args.seed)
     print(f"  {len(labels)} items, {int(labels.sum())} defective\n")
 
     signals = list(GROUNDING_SIGNALS)
@@ -144,6 +154,19 @@ def main() -> int:
 
     print("fitting the production calibrator on all items")
     calibrator.fit(features, labels)
+
+    # Per-defect, one-vs-rest. The objective needs P(d) per class, not one
+    # P(something is wrong): a contradiction and an ungrounded claim carry different
+    # impact multipliers and are removed by different actions at different efficacies.
+    labels_by_defect = {
+        defect: np.array([int(t.defect == defect) for t in triples])
+        for defect in sorted({t.defect for t in triples if t.defect})
+    }
+    per_defect = MultiDefectCalibrator(signals=signals, folds=args.folds)
+    per_defect.fit(features, labels_by_defect)
+    print(f"  per-defect calibrators: {sorted(per_defect.per_defect)}")
+    if per_defect.skipped:
+        print(f"  ! not fitted (too few positives): {per_defect.skipped}")
 
     report = build_report(
         probabilities=probabilities,
@@ -176,6 +199,7 @@ def main() -> int:
     out: Path = args.out
     out.mkdir(parents=True, exist_ok=True)
     calibrator.save(out / "calibrator.json")
+    per_defect.save(out / "calibrator_per_defect.json")
     (out / "report.json").write_text(report.to_json(), encoding="utf-8")
     result.save(out / "lambda.json")
     drawn = write_reliability_diagram(report, out / "reliability.png")

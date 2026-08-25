@@ -1,5 +1,5 @@
 {
-  "n_items": 2000,
+  "n_items": 10000,
   "n_positive": 1000,
   "folds": 5,
   "signals": [
@@ -10,46 +10,46 @@
     "grounding.context_conflict",
     "grounding.question_drift"
   ],
-  "ece": 0.045143653404706816,
-  "brier": 0.08630213378872781,
-  "auroc": 0.9204694999999999,
+  "ece": 0.0036838525358733358,
+  "brier": 0.0206065758324778,
+  "auroc": 0.8944391666666668,
   "signal_auroc": {
-    "grounding.unsupported_content": 0.835,
-    "grounding.numeric_unsupported": 0.7795000000000001,
+    "grounding.unsupported_content": 0.8340000000000001,
+    "grounding.numeric_unsupported": 0.782,
     "grounding.citation_unsupported": 0.6,
-    "grounding.overconfidence": 0.515,
-    "grounding.context_conflict": 0.577,
-    "grounding.question_drift": 0.5326405
+    "grounding.overconfidence": 0.5111111111111112,
+    "grounding.context_conflict": 0.579,
+    "grounding.question_drift": 0.5116137222222222
   },
   "mode_mean_probability": {
-    "clause_swapped": 0.993083523065271,
-    "clean": 0.19144546584594072,
-    "contradiction": 0.7102093007331998,
-    "number_corrupted": 0.9576170514814865,
-    "retrieval_dropped": 0.9751205855944994,
-    "unanswerable": 0.20329707742845926
+    "clause_swapped": 0.9961346469297832,
+    "clean": 0.02468225966128161,
+    "contradiction": 0.7109465271137582,
+    "number_corrupted": 0.9460578109354262,
+    "retrieval_dropped": 0.9735121535556631,
+    "unanswerable": 0.024649492497654548
   },
   "reliability": [
     {
       "bin_lower": 0.0,
       "bin_upper": 0.1,
-      "count": 0,
-      "mean_predicted": 0.0,
-      "observed_frequency": 0.0
+      "count": 9209,
+      "mean_predicted": 0.02468226443218112,
+      "observed_frequency": 0.022695189488543818
     },
     {
       "bin_lower": 0.1,
       "bin_upper": 0.2,
-      "count": 489,
-      "mean_predicted": 0.16601997001279198,
-      "observed_frequency": 0.0736196319018405
+      "count": 1,
+      "mean_predicted": 0.17226183417144142,
+      "observed_frequency": 1.0
     },
     {
       "bin_lower": 0.2,
       "bin_upper": 0.30000000000000004,
-      "count": 721,
-      "mean_predicted": 0.21219250729641614,
-      "observed_frequency": 0.24133148404993066
+      "count": 0,
+      "mean_predicted": 0.0,
+      "observed_frequency": 0.0
     },
     {
       "bin_lower": 0.30000000000000004,
@@ -89,19 +89,19 @@
     {
       "bin_lower": 0.8,
       "bin_upper": 0.9,
-      "count": 120,
-      "mean_predicted": 0.8792906008830812,
-      "observed_frequency": 1.0
+      "count": 0,
+      "mean_predicted": 0.0,
+      "observed_frequency": 0.0
     },
     {
       "bin_lower": 0.9,
       "bin_upper": 1.0,
-      "count": 670,
-      "mean_predicted": 0.9856578935226207,
+      "count": 790,
+      "mean_predicted": 0.9775799822317103,
       "observed_frequency": 1.0
     }
   ],
   "notes": [
-    "'unanswerable' scores 0.203 against a clean baseline of 0.191 -- these signals cannot see this failure mode; it needs the observer probe"
+    "'unanswerable' scores 0.025 against a clean baseline of 0.025 -- these signals cannot see this failure mode; it needs the observer probe"
   ]
 }

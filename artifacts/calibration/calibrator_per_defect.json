@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "kind": "multi_defect",
+  "signals": [
+    "grounding.unsupported_content",
+    "grounding.numeric_unsupported",
+    "grounding.citation_unsupported",
+    "grounding.overconfidence",
+    "grounding.context_conflict",
+    "grounding.question_drift"
+  ],
+  "per_defect": {
+    "contradicted": {
+      "version": 1,
+      "signals": [
+        "grounding.unsupported_content",
+        "grounding.numeric_unsupported",
+        "grounding.citation_unsupported",
+        "grounding.overconfidence",
+        "grounding.context_conflict",
+        "grounding.question_drift"
+      ],
+      "isotonic": {
+        "grounding.unsupported_content": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.016,
+            0.016
+          ]
+        },
+        "grounding.numeric_unsupported": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.016,
+            0.016
+          ]
+        },
+        "grounding.citation_unsupported": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.016000000000000004,
+            0.016000000000000004
+          ]
+        },
+        "grounding.overconfidence": {
+          "x": [
+            0.6666666666666667,
+            1.0
+          ],
+          "y": [
+            0.016,
+            0.016
+          ]
+        },
+        "grounding.context_conflict": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.003861003861003861,
+            0.7721518987341772
+          ]
+        },
+        "grounding.question_drift": {
+          "x": [
+            0.5,
+            0.6,
+            0.7272727272727273,
+            0.8,
+            0.8181818181818182,
+            0.8333333333333334,
+            0.9090909090909091,
+            1.0
+          ],
+          "y": [
+            0.0031446540880503146,
+            0.003236245954692557,
+            0.003236245954692557,
+            0.004909983633387889,
+            0.004909983633387889,
+            0.01454234388366125,
+            0.01454234388366125,
+            0.022596905962106728
+          ]
+        }
+      },
+      "fusion": {
+        "coefficients": [
+          -0.0649057408015581,
+          -0.0649057408015581,
+          -0.06490574080155802,
+          -0.0649057408015581,
+          8.076525224315,
+          0.03570546864065707
+        ],
+        "intercept": -5.344366800609375
+      }
+    },
+    "ungrounded": {
+      "version": 1,
+      "signals": [
+        "grounding.unsupported_content",
+        "grounding.numeric_unsupported",
+        "grounding.citation_unsupported",
+        "grounding.overconfidence",
+        "grounding.context_conflict",
+        "grounding.question_drift"
+      ],
+      "isotonic": {
+        "grounding.unsupported_content": {
+          "x": [
+            0.0,
+            0.04,
+            1.0
+          ],
+          "y": [
+            0.018431204457779682,
+            1.0,
+            1.0
+          ]
+        },
+        "grounding.numeric_unsupported": {
+          "x": [
+            0.0,
+            0.1111111111111111,
+            1.0
+          ],
+          "y": [
+            0.029249682068673167,
+            1.0,
+            1.0
+          ]
+        },
+        "grounding.citation_unsupported": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.0653061224489796,
+            1.0
+          ]
+        },
+        "grounding.overconfidence": {
+          "x": [
+            0.6666666666666667,
+            1.0
+          ],
+          "y": [
+            0.06884057971014493,
+            0.08642691415313225
+          ]
+        },
+        "grounding.context_conflict": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.08169071326966064,
+            0.22784810126582278
+          ]
+        },
+        "grounding.question_drift": {
+          "x": [
+            0.5,
+            0.8333333333333334,
+            0.9,
+            1.0
+          ],
+          "y": [
+            0.08124851084107695,
+            0.08124851084107695,
+            0.08599000516973979,
+            0.08599000516973979
+          ]
+        }
+      },
+      "fusion": {
+        "coefficients": [
+          7.03587469489168,
+          2.7113332528463303,
+          0.46493881260305214,
+          -0.1891971249910392,
+          -0.20724127214868,
+          -0.1739728327397574
+        ],
+        "intercept": -4.124520310795051
+      }
+    }
+  },
+  "skipped": {}
+}

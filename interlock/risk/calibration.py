@@ -45,6 +45,7 @@ from sklearn.model_selection import StratifiedKFold
 
 __all__ = [
     "CalibrationReport",
+    "MultiDefectCalibrator",
     "SignalCalibrator",
     "expected_calibration_error",
     "reliability_curve",
@@ -314,3 +315,97 @@ def build_report(
         reliability=reliability_curve(probabilities, labels, bins=bins),
         notes=notes,
     )
+
+
+@dataclass
+class MultiDefectCalibrator:
+    """One :class:`SignalCalibrator` per defect class, fitted one-vs-rest.
+
+    The objective needs ``P(d)`` **per defect**, not one P(anything is wrong): a
+    contradiction and an ungrounded claim carry different impact multipliers and are
+    removed by different actions at different efficacies. Collapsing them into a single
+    probability and splitting it afterwards by which signal fired hardest would be a
+    heuristic wearing calibration's clothes.
+
+    One-vs-rest keeps each map honest about its own class. A defect with few examples
+    gets a calibrator that says so -- flat, near the base rate -- rather than borrowing
+    confidence from a sibling class it has nothing to do with.
+    """
+
+    signals: list[str]
+    folds: int = 5
+    per_defect: dict[str, SignalCalibrator] = field(default_factory=dict, init=False)
+    #: Classes that had too few positives to fit. Recorded, not silently dropped.
+    skipped: dict[str, str] = field(default_factory=dict, init=False)
+
+    #: Below this many positives a one-vs-rest fit is noise. The calibrator is not
+    #: fitted at all rather than fitted badly, and the class falls back to a flat base
+    #: rate, which is at least honest about knowing nothing.
+    min_positives: int = 30
+
+    def fit(self, features: np.ndarray, labels_by_defect: dict[str, np.ndarray]) -> None:
+        for defect, labels in labels_by_defect.items():
+            positives = int(np.asarray(labels).sum())
+            if positives < self.min_positives:
+                self.skipped[defect] = f"only {positives} positives (need {self.min_positives})"
+                continue
+            calibrator = SignalCalibrator(signals=list(self.signals), folds=self.folds)
+            calibrator.fit(features, labels)
+            self.per_defect[defect] = calibrator
+
+    def predict(self, features: dict[str, float]) -> dict[str, float]:
+        """``{defect: probability}`` for every class that was fitted."""
+        return {
+            defect: calibrator.predict(features)
+            for defect, calibrator in self.per_defect.items()
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": 1,
+            "kind": "multi_defect",
+            "signals": list(self.signals),
+            "per_defect": {d: c.to_dict() for d, c in self.per_defect.items()},
+            "skipped": dict(self.skipped),
+        }
+
+    def save(self, path: Path | str) -> None:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
+
+    @classmethod
+    def load(cls, path: Path | str) -> MultiDefectCalibrator:
+        """Rebuild from the saved JSON.
+
+        The isotonic maps are reconstructed as interpolation over their stored
+        thresholds rather than by re-fitting -- what ships must be exactly what was
+        measured, not something re-derived from data that may have moved since.
+        """
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        if payload.get("kind") != "multi_defect":
+            raise ValueError(f"{path} is not a multi-defect calibrator")
+        instance = cls(signals=list(payload["signals"]))
+        for defect, blob in payload.get("per_defect", {}).items():
+            instance.per_defect[defect] = _calibrator_from_dict(blob)
+        instance.skipped = dict(payload.get("skipped", {}))
+        return instance
+
+
+def _calibrator_from_dict(payload: dict[str, Any]) -> SignalCalibrator:
+    """Reconstruct a fitted SignalCalibrator from saved thresholds and weights."""
+    calibrator = SignalCalibrator(signals=list(payload["signals"]))
+    for name, curve in payload["isotonic"].items():
+        model = IsotonicRegression(out_of_bounds="clip", y_min=0.0, y_max=1.0)
+        # sklearn's isotonic predict() only needs the fitted step function, which is
+        # exactly what was stored. Re-fitting on the knots reproduces it.
+        model.fit(np.asarray(curve["x"], dtype=float), np.asarray(curve["y"], dtype=float))
+        calibrator._isotonic[name] = model
+
+    fusion = LogisticRegression(max_iter=1000)
+    fusion.coef_ = np.array([payload["fusion"]["coefficients"]], dtype=float)
+    fusion.intercept_ = np.array([payload["fusion"]["intercept"]], dtype=float)
+    fusion.classes_ = np.array([0, 1])
+    calibrator._fusion = fusion
+    calibrator.fitted = True
+    return calibrator

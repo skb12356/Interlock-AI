@@ -21,10 +21,12 @@ Two properties this file exists to protect:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -57,6 +59,8 @@ from interlock.interlock_tools.streaming import ToolCallAccumulator
 from interlock.ledger.writer import Ledger, RequestBatch
 from interlock.retrieval.embedder import load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever
+from interlock.risk.calibration import MultiDefectCalibrator
+from interlock.risk.engine import RealRiskEngine, load_conformal
 from interlock.risk.stub import StubRiskEngine
 from interlock.signals.base import PreflightContext
 from interlock.signals.canary import CanaryDetector, CanaryRegistry
@@ -116,7 +120,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.canaries = canaries
         app.state.ledger = ledger
         app.state.providers = build_providers(settings, client)
-        app.state.risk_engine = StubRiskEngine(policy=policy)
+        app.state.risk_engine = _build_risk_engine(settings, policy, canaries)
         app.state.retriever = _open_retriever(settings)
         app.state.tool_interlock = ToolInterlock(policy=policy, ledger=ledger)
         app.state.lane_a = LaneA(
@@ -675,6 +679,54 @@ async def _resolve_hold(app: FastAPI, hold_id: str, request: Request, *, state: 
         status = 404 if "no pending hold" in why else 409
         return _error_response(why, status=status, code="hold_not_resolved")
     return {"hold_id": hold_id, "state": state}
+
+
+def _build_risk_engine(settings: Settings, policy: Any, canaries: Any) -> Any:
+    """The D3-B4 swap, in one place.
+
+    The plan budgets "30 minutes of pain" for this and predicts that if the contracts
+    were honoured it just works. They were: both engines satisfy the same Protocol, the
+    enforcement path calls neither by name, and the only thing that changes is which
+    object the gateway constructs.
+    """
+    if settings.risk_engine == "stub":
+        _log.warning(
+            "risk_engine=stub -- decisions are driven by the X-Interlock-Force header, "
+            "not by detectors. Never serve real traffic in this mode."
+        )
+        return StubRiskEngine(policy=policy)
+
+    calibrator = None
+    calib_version = "uncalibrated"
+    path = settings.calibration_dir / "calibrator_per_defect.json"
+    if path.exists():
+        try:
+            calibrator = MultiDefectCalibrator.load(path)
+            calib_version = _artefact_version(path)
+        except Exception as exc:
+            _log.warning("calibrator at %s unusable (%s); decisions will be degraded", path, exc)
+    else:
+        _log.warning(
+            "no calibrator at %s -- every decision will report no defect probabilities "
+            "and be marked degraded. Run scripts/calibrate.py.",
+            path,
+        )
+
+    conformal = load_conformal(settings.calibration_dir / "lambda.json")
+    return RealRiskEngine(
+        policy=policy,
+        calibrator=calibrator,
+        conformal=conformal,
+        canary_detector=CanaryDetector(registry=canaries),
+        conformal_filter=settings.conformal_filter,
+        calib_version=calib_version,
+    )
+
+
+def _artefact_version(path: Path) -> str:
+    """A short content hash, so a decision records WHICH calibration priced it."""
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+    return f"calib@sha256:{digest}"
 
 
 def _retrieval_health(retriever: Retriever | NullRetriever) -> dict[str, Any]:

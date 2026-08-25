@@ -38,19 +38,45 @@ from typing import Any
 from interlock.core.types import Defect, Fragment
 from interlock.retrieval.chunker import Chunk
 
-__all__ = ["FAILURE_MODES", "LabelledTriple", "TripleGenerator"]
+__all__ = [
+    "DEFECT_BASE_RATE",
+    "FAILURE_MODES",
+    "FAILURE_WEIGHTS",
+    "LabelledTriple",
+    "TripleGenerator",
+]
 
-#: The induced failure taxonomy. ``clean`` is deliberately the largest share: a
-#: calibration set where half the items are defective teaches a detector that defects
-#: are common, and the isotonic map it produces will over-predict on real traffic where
-#: they are not.
+#: What share of items carry a defect at all.
+#:
+#: **This number is load-bearing and was got wrong once.** An isotonic map is calibrated
+#: to the base rate of the set it was fitted on, so a 50/50 calibration set teaches the
+#: detector that half of everything is broken. The symptom was not subtle and was still
+#: easy to miss: a perfectly grounded sentence came back at P(ungrounded)=0.135, which at
+#: Rs.40,000 impact and a 2.5x reversibility multiplier is Rs.13,500 of expected harm --
+#: so the optimiser held a correct answer for human review, and did so *correctly*, given
+#: what it had been told a clean sentence looks like.
+#:
+#: 10% is a defensible figure for RAG-grounded support traffic and it is a stated
+#: assumption, not a measurement. When the seeded eval set (D3-B7) produces a real
+#: observed rate, this should move to match it -- and the calibration must be re-fitted,
+#: not merely re-thresholded.
+DEFECT_BASE_RATE = 0.10
+
+#: Relative weights **among the defective items**, normalised to ``DEFECT_BASE_RATE``.
+#: Kept separate from the base rate so that changing how common defects are does not
+#: silently change which defects they are.
+FAILURE_WEIGHTS: dict[str, float] = {
+    "retrieval_dropped": 0.24,
+    "number_corrupted": 0.24,
+    "clause_swapped": 0.20,
+    "unanswerable": 0.16,
+    "contradiction": 0.16,
+}
+
+#: The absolute taxonomy the generator samples from.
 FAILURE_MODES: dict[str, float] = {
-    "clean": 0.50,
-    "retrieval_dropped": 0.12,
-    "number_corrupted": 0.12,
-    "clause_swapped": 0.10,
-    "unanswerable": 0.08,
-    "contradiction": 0.08,
+    "clean": 1.0 - DEFECT_BASE_RATE,
+    **{mode: weight * DEFECT_BASE_RATE for mode, weight in FAILURE_WEIGHTS.items()},
 }
 
 #: Which defect class each failure mode produces, in the vocabulary the objective

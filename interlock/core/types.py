@@ -254,6 +254,17 @@ class Decision(_Frozen):
     runner_up: Action | None = None
     margin: float = 0.0  # how close the call was — shown in the console
     probs: dict[Defect, float] = Field(default_factory=dict)
+    #: The raw + calibrated detector readings behind ``probs``. The loss table is the
+    #: explanation of the *decision*; this is the evidence behind the *probabilities*,
+    #: and a console that shows one without the other can only say "we thought it was
+    #: 0.7" and never why. (Additive optional field, permitted by the Contract 1
+    #: change rule -- the same rule that added ``Fragment.domain``.)
+    signals: list[SignalReading] = Field(default_factory=list)
+    #: True when the decision was reached with fewer signals than usual: a dropped
+    #: detector, a missing calibrator, an unpriced defect class. A reviewer needs to
+    #: know the answer was checked less thoroughly than the trace otherwise implies.
+    #: (Additive optional field, as above.)
+    degraded: bool = False
     why: list[str] = Field(default_factory=list)  # ordered, human-readable
     hard_rule: str | None = None  # set when a deterministic rule fired
     repair_hint: RepairHint | None = None

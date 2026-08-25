@@ -68,6 +68,21 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
         yield test_client
 
 
+@pytest.fixture
+def forcing_client(tmp_path: Path) -> Iterator[TestClient]:
+    """A gateway wired to the STUB engine, so `X-Interlock-Force` drives decisions.
+
+    The real engine ignores that header by design -- its decisions come from detectors.
+    Tests that need a *specific* defect on a *specific* sentence (a canary block, a
+    hold) still need a way to ask for one, and the plan's answer is this header. It is
+    a test and demo affordance, never a default: `Settings.risk_engine` is "real"
+    everywhere else, including in the fixture above.
+    """
+    settings = Settings(db_path=tmp_path / "gateway.db", risk_engine="stub")
+    with TestClient(create_app(settings)) as test_client:
+        yield test_client
+
+
 #: A LOW-stakes question. Lane A routes it unbuffered, so the gate passes the
 #: provider's bytes through untouched and byte-identity is the right assertion.
 def _request(**overrides: object) -> dict[str, object]:
@@ -460,14 +475,14 @@ def test_high_stakes_traffic_engages_the_buffer(client: TestClient) -> None:
 
 
 @respx.mock
-def test_buffered_traffic_still_delivers_the_whole_answer(client: TestClient) -> None:
+def test_buffered_traffic_still_delivers_the_whole_answer(forcing_client: TestClient) -> None:
     """Byte-identity no longer holds -- the gate assembles sentences and may replace
     one -- but nothing may be silently lost. Compared on words, since the gate
     normalises whitespace at sentence boundaries and strips reasoning blocks."""
     _, raws = load_fixture("prepayment_penalty")
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
     payloads, _ = parse_stream(
-        client.post("/v1/chat/completions", json=_high_stakes_request()).text
+        forcing_client.post("/v1/chat/completions", json=_high_stakes_request()).text
     )
 
     delivered = set(assembled_text(payloads).split())
@@ -511,11 +526,11 @@ def test_an_intervention_carries_the_counterfactual(client: TestClient) -> None:
 
 
 @respx.mock
-def test_a_canary_defect_is_a_deterministic_block(client: TestClient) -> None:
+def test_a_canary_defect_is_a_deterministic_block(forcing_client: TestClient) -> None:
     """No model in the loop: the hard rule fires and the stream terminates."""
     _, raws = load_fixture("prepayment_penalty")
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
-    response = client.post(
+    response = forcing_client.post(
         "/v1/chat/completions",
         json=_high_stakes_request(),
         headers={"X-Interlock-Force": "canary_leak@0"},
@@ -527,17 +542,17 @@ def test_a_canary_defect_is_a_deterministic_block(client: TestClient) -> None:
 
 
 @respx.mock
-def test_a_held_sentence_becomes_a_durable_hold(client: TestClient) -> None:
+def test_a_held_sentence_becomes_a_durable_hold(forcing_client: TestClient) -> None:
     """F6/F7: the review card is a row, not an in-memory object, so it survives a
     restart. Written through the awaited path, never the fire-and-forget queue."""
     _, raws = load_fixture("prepayment_penalty")
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
-    client.post(
+    forcing_client.post(
         "/v1/chat/completions",
         json=_high_stakes_request(),
         headers={"X-Interlock-Force": "unsafe_action@0"},
     )
-    holds = client.get("/v1/holds").json()["holds"]
+    holds = forcing_client.get("/v1/holds").json()["holds"]
     assert holds
     assert holds[0]["state"] == "pending"
     assert holds[0]["kind"] == "response"

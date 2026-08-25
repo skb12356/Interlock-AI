@@ -1,5 +1,5 @@
 {
-  "items": 2000,
+  "items": 10000,
   "seed": 20260825,
   "source": "induced failures from corpus/manifest.json",
   "warning": "Induced data, not human labels. It calibrates; it does not audit. D2-B3's hand-labelled anchor set is what the meta-monitor re-scores."

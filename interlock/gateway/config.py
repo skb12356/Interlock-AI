@@ -99,6 +99,20 @@ class Settings:
     #: db_path on purpose: the ledger is written by exactly one task (Contract 5), the
     #: index is never written during a request at all.
     corpus_index_path: Path = REPO_ROOT / "data" / "corpus.db"
+    #: 'real' | 'stub'. The Day-3 exit criterion is "no stub on the hot path", so the
+    #: default is real. 'stub' keeps the X-Interlock-Force header working, which is how
+    #: the chaos tests and the demo script drive specific failures on demand -- a
+    #: deliberate affordance from the plan, and one that must never be the default in a
+    #: deployment that serves anyone.
+    risk_engine: str = "real"
+    #: Where scripts/calibrate.py wrote its artefacts. A missing calibrator does not
+    #: stop the gateway; it makes every decision degraded and says so.
+    calibration_dir: Path = REPO_ROOT / "artifacts" / "calibration"
+    #: Guaranteed mode. OFF by default -- see finding F-016: the certified threshold
+    #: currently strikes L0_pass on 100% of traffic, so turning this on trades the
+    #: false-intervention target for the escape guarantee. That is a deployment choice,
+    #: not a default.
+    conformal_filter: bool = False
     #: 'hashing-v1' (deterministic, no torch) or a sentence-transformers model name.
     #: Must match what built the index, or the index refuses to open -- deliberately.
     embedder: str = "hashing-v1"
@@ -148,6 +162,11 @@ def load_settings() -> Settings:
         corpus_index_path=Path(
             _env("INTERLOCK_CORPUS_INDEX_PATH", str(REPO_ROOT / "data" / "corpus.db"))
         ),
+        risk_engine=_env("INTERLOCK_RISK_ENGINE", "real"),
+        calibration_dir=Path(
+            _env("INTERLOCK_CALIBRATION_DIR", str(REPO_ROOT / "artifacts" / "calibration"))
+        ),
+        conformal_filter=_env_bool("INTERLOCK_CONFORMAL_FILTER", False),
         embedder=_env("INTERLOCK_EMBEDDER", "hashing-v1"),
         retrieval_k=int(_env_float("INTERLOCK_RETRIEVAL_K", 4.0)),
         store_prompts=_env_bool("INTERLOCK_STORE_PROMPTS", False),

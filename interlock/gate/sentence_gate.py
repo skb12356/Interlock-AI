@@ -40,6 +40,7 @@ from enum import StrEnum
 from typing import Any
 
 from interlock.core.types import Decision, Fragment, GateMode, RiskContext, Stakes
+from interlock.gate.ladder import Annotator
 from interlock.gate.segmenter import StreamingSegmenter
 
 __all__ = ["CommitGate", "Emission", "GateState", "drive"]
@@ -72,6 +73,10 @@ class Emission:
     event_payload: Any = None
     sentence_idx: int = -1
     decision: Decision | None = None
+    #: The sentence as the model wrote it, before any intervention. This is the
+    #: "what would have shipped" the console renders in red beside what did -- the
+    #: line the demo lands on, and it only exists if the gate carries it here.
+    original: str = ""
 
 
 #: Signature of the repair callback the gate uses for L2. Injected rather than imported
@@ -95,10 +100,18 @@ class CommitGate:
     #: What the risk engine is given per sentence.
     evaluate_deadline_ms: float = 120.0
     repair: RepairFn | None = None
+    #: L1. Deterministic, so it is injected as an object rather than a callback and can
+    #: be asserted on directly.
+    annotator: Annotator | None = field(default_factory=Annotator)
     #: L2 gets two attempts before escalating to L3 (Implementation02 §4.3).
     max_repair_attempts: int = 2
 
     state: GateState = field(default=GateState.PASSTHROUGH, init=False)
+    #: Whether the gate is withholding text. Tracked separately from `state` on
+    #: purpose: TERMINATED is "not PASSTHROUGH" but it is emphatically not "buffering",
+    #: and deriving one from the other made a blocked stream re-emit text that had
+    #: already gone out as raw chunks.
+    _buffered: bool = field(default=False, init=False)
     _segmenter: StreamingSegmenter = field(default_factory=StreamingSegmenter, init=False)
     _sentence_idx: int = field(default=0, init=False)
     _emitted_chars: int = field(default=0, init=False)
@@ -109,7 +122,8 @@ class CommitGate:
     _pending_idx: int = field(default=-1, init=False)
 
     def __post_init__(self) -> None:
-        self.state = GateState.BUFFERING if self.mode == "buffered" else GateState.PASSTHROUGH
+        self._buffered = self.mode == "buffered"
+        self.state = GateState.BUFFERING if self._buffered else GateState.PASSTHROUGH
 
     # ------------------------------------------------------------------ #
     # Public surface
@@ -117,7 +131,15 @@ class CommitGate:
 
     @property
     def buffered(self) -> bool:
-        return self.state is not GateState.PASSTHROUGH
+        """True while the gate is withholding text.
+
+        Deliberately NOT ``state is not PASSTHROUGH``. TERMINATED satisfies that and is
+        not buffering, and the difference is not cosmetic: it made an L5 block on an
+        unbuffered stream re-emit the following sentence, duplicating text the customer
+        had already received. Duplicated text is worse than dropped text, because it
+        looks deliberate.
+        """
+        return self._buffered
 
     @property
     def decisions(self) -> list[Decision]:
@@ -132,6 +154,7 @@ class CommitGate:
         """
         if self.state is GateState.PASSTHROUGH:
             self.state = GateState.BUFFERING
+            self._buffered = True
             self.mode = "buffered"
 
     async def push(self, chunk_text: str, raw: str = "") -> list[Emission]:
@@ -163,6 +186,10 @@ class CommitGate:
             # One sentence in flight at a time: wait for the previous verdict before
             # starting the next, which is what bounds the buffer to a single sentence.
             out.extend(await self._collect_pending(block=True))
+            # That verdict may have ended the stream. Evaluating the next sentence
+            # anyway would ship text from a response a hard rule already stopped.
+            if self.state is GateState.TERMINATED:
+                break
             self._start_evaluation(sentence, already_emitted=False)
 
         return out
@@ -174,6 +201,11 @@ class CommitGate:
 
         out: list[Emission] = []
         out.extend(await self._collect_pending(block=True))
+
+        # A terminating decision ends the stream. Continuing to drain the buffer after
+        # a block would ship exactly the text the block existed to withhold.
+        if self.state is GateState.TERMINATED:
+            return out
 
         tail = self._segmenter.flush()
         if tail:
@@ -254,11 +286,29 @@ class CommitGate:
             event_payload=decision,
             sentence_idx=index,
             decision=decision,
+            original=sentence,
         )
 
-        if decision.action in {"L0_pass", "L1_annotate"}:
+        if decision.action == "L0_pass":
             emissions = self._release(sentence, index, decision=decision)
             return [event, *emissions] if self.buffered else [event]
+
+        if decision.action == "L1_annotate":
+            # A deterministic string transform -- citation, unverified marker, hedge
+            # softening. No model, so it stays free enough for the argmin to pick it.
+            annotated = (
+                self.annotator.annotate(sentence, decision, self.retrieved)
+                if self.annotator is not None
+                else sentence
+            )
+            if not self.buffered:
+                # The original text has already shipped, so the annotation cannot be
+                # applied in place. It rides on the decision event instead, and the
+                # console shows it beside the sentence -- honestly labelled as an
+                # after-the-fact note rather than pretending we caught it in time.
+                event.text = annotated
+                return [event]
+            return [event, *self._release(annotated, index, decision=decision, replaced=True)]
 
         if decision.action == "L2_repair":
             return [event, *await self._do_repair(decision, sentence, index)]

@@ -7,7 +7,8 @@ The request lifecycle, in the order it happens:
    canary in the outbound prompt must never reach a provider at all.
 3. The upstream is opened on the tier Lane A chose *from the same stakes estimate the
    risk engine will price with*.
-4. Tokens stream back byte-for-byte. The commit gate attaches here at D2-A2.
+4. Tokens stream back through the commit gate: byte-for-byte when unbuffered,
+   one sentence behind when the stakes justify it.
 5. The whole request commits to the ledger in one transaction, off the token path.
 
 Two properties this file exists to protect:
@@ -31,18 +32,22 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from interlock.core.clock import monotonic_ms
 from interlock.core.errors import ProviderError, UpstreamError
-from interlock.core.ids import new_request_id, new_trace_id
+from interlock.core.ids import new_hold_id, new_request_id, new_trace_id
 from interlock.core.policy import load_policy
 from interlock.core.sse import (
     EVENT_DECISION,
+    EVENT_HOLD,
     EVENT_STAKES,
     DecisionEvent,
+    HoldEvent,
     StakesEvent,
     StreamOptions,
     format_data,
     format_done,
     format_event,
 )
+from interlock.gate.repair import SentenceRepairer
+from interlock.gate.sentence_gate import CommitGate, Emission
 from interlock.gateway.config import Settings, load_settings
 from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.providers import Provider, build_providers
@@ -285,15 +290,36 @@ async def _stream_response(
     started_ms: float,
     original_body: dict[str, Any],
 ) -> AsyncIterator[str]:
-    """Frame the upstream stream, with Interlock events alongside.
+    """Frame the upstream stream through the commit gate.
 
-    The commit gate replaces the straight passthrough at D2-A2. The seam is deliberate:
-    everything here already knows the stakes, the mode and the request id, so the gate
-    slots in without the surrounding code changing.
+    Low-stakes traffic passes byte-for-byte; high-stakes traffic streams one sentence
+    behind so a bad sentence can be repaired before anyone reads it. Which of the two
+    happens was decided by Lane A, from the same stakes estimate that chose the model.
     """
     settings: Settings = app.state.settings
     ledger: Ledger = app.state.ledger
     engine: StubRiskEngine = app.state.risk_engine
+
+    gate = CommitGate(
+        risk_engine=engine,
+        stakes=lane.stakes,
+        request_id=request_id,
+        mode=lane.mode,
+        retrieved=lane.fragments,
+        question=_last_user_message(original_body),
+        watchdog_s=settings.sentence_watchdog_s,
+        evaluate_deadline_ms=settings.observe_deadline_ms,
+        repair=SentenceRepairer(
+            provider=provider,
+            model=model,
+            risk_engine=engine,
+            stakes=lane.stakes,
+            request_id=request_id,
+            question=_last_user_message(original_body),
+            retrieved=lane.fragments,
+        ),
+    )
+    chunk_id = f"chatcmpl-{request_id}"
 
     if options.allows(EVENT_STAKES):
         yield format_event(
@@ -332,15 +358,51 @@ async def _stream_response(
                 if event.data:
                     for choice in event.data.get("choices", []):
                         finish_reason = choice.get("finish_reason") or finish_reason
-                # Byte-for-byte. Re-serialising the provider's JSON is a needless way
-                # to break a client's parser, and an unparseable chunk is still the
-                # customer's tokens -- forward it rather than swallowing it.
-                yield format_data(event.raw)
+                # A chunk we could not parse carries text we cannot segment, verify or
+                # repair. Dropping it would violate "never drop a token", so it is
+                # forwarded raw and unverified -- an honest, narrow gap, and better than
+                # silently losing the customer's data. Valid chunks with no content
+                # (a role-only opener) carry nothing and are simply consumed.
+                if gate.buffered and event.data is None and event.raw:
+                    yield format_data(event.raw)
+                    continue
+                for frame in _render(
+                    await gate.push(event.text, raw=event.raw), options, chunk_id, model, lane
+                ):
+                    yield frame
         except (UpstreamError, ProviderError) as exc:
             # Mid-stream failure: the client already has a 200 and some tokens, so the
             # only honest thing left is an in-band error chunk followed by [DONE].
             finish_reason = "upstream_error"
             yield format_data(_error_body(str(exc), code="upstream_error"))
+
+        # Drain the gate: the last buffered sentence is still holding, and abandoning it
+        # would silently truncate the answer.
+        for frame in _render(await gate.finish(), options, chunk_id, model, lane):
+            yield frame
+
+        # Any sentence the gate withheld for human review becomes a durable hold, so it
+        # survives a restart (F6/F7). Awaited, not queued -- see ledger/writer.py.
+        for decision in gate.decisions:
+            if decision.action in {"L3_reroute", "L4_hold"}:
+                hold_id = new_hold_id()
+                await ledger.persist_hold(
+                    hold_id=hold_id,
+                    request_id=request_id,
+                    kind="response",
+                    payload={"action": decision.action, "decision_id": decision.decision_id},
+                    evidence=decision.why,
+                    reason=decision.hard_rule or decision.action,
+                )
+                if options.allows(EVENT_HOLD):
+                    yield format_event(
+                        EVENT_HOLD,
+                        HoldEvent(
+                            hold_id=hold_id,
+                            kind="response",
+                            reason=decision.hard_rule or decision.action,
+                        ),
+                    )
 
         # A degraded Lane A is reported to the console rather than hidden: the reviewer
         # needs to know the answer was checked with fewer detectors than usual.
@@ -373,6 +435,7 @@ async def _stream_response(
                 ttft_ms=ttft_ms,
                 completion_tokens=max(1, completion_chars // 4) if completion_chars else 0,
                 finish_reason=finish_reason or ("stop" if completed else "client_disconnect"),
+                decisions=gate.decisions,
             )
         )
         engine.disarm(request_id)
@@ -381,6 +444,79 @@ async def _stream_response(
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+
+
+def _render(
+    emissions: list[Emission],
+    options: StreamOptions,
+    chunk_id: str,
+    model: str,
+    lane: PreflightResult,
+) -> list[str]:
+    """Turn the gate's emissions into SSE frames.
+
+    Two shapes, and the distinction is deliberate. A ``raw`` emission is the provider's
+    own bytes and is forwarded untouched, which is what keeps unbuffered traffic
+    byte-identical. A ``text`` emission is a sentence the gate assembled and may have
+    replaced, so it has to be wrapped in a fresh chunk -- it is no longer what the
+    provider sent, and pretending otherwise would put words in their mouth.
+    """
+    frames: list[str] = []
+    for emission in emissions:
+        if emission.kind == "raw":
+            frames.append(format_data(emission.raw))
+        elif emission.kind == "text":
+            frames.append(format_data(_chunk(chunk_id, model, emission.text)))
+        elif emission.kind == "event" and emission.decision is not None:
+            if not options.allows(EVENT_DECISION):
+                continue
+            decision = emission.decision
+            frames.append(
+                format_event(
+                    EVENT_DECISION,
+                    DecisionEvent(
+                        decision_id=decision.decision_id,
+                        sentence_idx=emission.sentence_idx,
+                        action=decision.action,
+                        chosen_loss=decision.chosen_loss,
+                        runner_up=decision.runner_up,
+                        margin=decision.margin,
+                        # What would have shipped. The console renders it in red beside
+                        # what actually did, and it is the line the demo lands on.
+                        counterfactual=(
+                            emission.original if decision.action != "L0_pass" else None
+                        ),
+                        hard_rule=decision.hard_rule,
+                        degraded=lane.degraded,
+                    ),
+                )
+            )
+    return frames
+
+
+def _chunk(chunk_id: str, model: str, text: str) -> str:
+    """Wrap gate-assembled text in an OpenAI-shaped streaming chunk.
+
+    Needed because this text is no longer what the provider sent -- the gate may have
+    annotated or replaced it -- so it cannot be forwarded as raw bytes.
+    """
+    return json.dumps(
+        {
+            "id": chunk_id,
+            "object": "chat.completion.chunk",
+            "model": model,
+            "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}],
+        },
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+
+
+def _last_user_message(body: dict[str, Any]) -> str:
+    for message in reversed(body.get("messages") or []):
+        if message.get("role") == "user":
+            return str(message.get("content") or "")
+    return ""
 
 
 def _batch_from(

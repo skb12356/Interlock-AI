@@ -1,46 +1,28 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 2 - Signals become probabilities; tokens become a controllable stream",
-  "last_completed_task": "D2-A3 (gate property test)",
-  "next_task": "D2-A5 (ladder: L1 annotate / L3 reroute / L4 hold / L5 block), then wire the gate into the gateway",
+  "current_phase": "Day 2 - the gate and the ladder are complete and wired",
+  "last_completed_task": "D2-A5 (ladder) + gate wired into the gateway",
+  "next_task": "D1-A5 (retrieval + demo app) -- repair needs evidence to correct against",
   "system_status": "Green",
   "verification": {
     "ruff": "clean",
     "mypy_strict_core": "clean",
-    "pytest": "395 passed",
-    "live_e2e": "Lane A + ledger + router verified against Ollama",
-    "router_live": "low stakes -> qwen3:4b, high stakes -> qwen3:8b"
+    "pytest": "448 passed",
+    "live_e2e": "Scene 1 runs end to end: stakes -> route -> buffer -> L2 repair -> delivered",
+    "ladder_live": "L0/L1/L2/L4/L5 all reachable; verified across impact x probability grid"
   },
-  "completed": [
-    "Phase 0 (D-001..D-008)",
-    "D1-J1.1..J1.5",
-    "D1-A1 proxy + 12 fixtures",
-    "D1-A2 Lane A",
-    "D1-A4 ledger + migration 001",
-    "D1-B1..B4 detectors",
-    "risk/objective.py",
-    "D2-A1 segmenter (tests first)",
-    "D2-A2 commit gate",
-    "D2-A3 property test"
-  ],
-  "remaining": [
-    "D2-A5 ladder",
-    "wire gate into gateway",
-    "D1-A3 tracing",
-    "D1-A5 demo app",
-    "D1-B5 labelling",
-    "D2-A6 governor",
-    "D2-B1..B7 calibration + observer",
-    "Day 3-5"
-  ],
   "open_findings": [
     "F-001 fixed: L5 nuisance caused over-blocking",
-    "F-002 open: objective intervenes on everything at high stakes; must NOT be tuned away",
-    "F-003 recorded: impact_inr is a base",
-    "F-004 fixed: <think> blocks excluded from answer text",
+    "F-002 open: high-stakes intervention rate; disciplined by the false-intervention metric, must NOT be tuned away",
+    "F-003 recorded: impact_inr is a base that multipliers scale",
+    "F-004 fixed: <think> excluded from answer text (segmenter) and from repairs",
     "F-005 fixed: client disconnect left no ledger row",
-    "F-006 fixed: unbuffered finish() leaked a dangling evaluation task"
+    "F-006 fixed: unbuffered finish() leaked a dangling evaluation task",
+    "F-007 fixed: human review charged as a false-alarm cost made L2_repair UNREACHABLE at every operating point -- the ladder's middle rung was dead",
+    "F-008 fixed: repair shipped the literal string '<think>' to customers as the corrected sentence",
+    "F-009 fixed: the plan's stop=newline fires inside the reasoning block, so every repair silently returned nothing; verified against a live model",
+    "F-010 open: a repair with no retrieved evidence restates the original -- correct but useless; needs retrieval (D1-A5)"
   ],
-  "updated_utc": "2026-08-25T16:30:00Z"
+  "updated_utc": "2026-08-25T18:00:00Z"
 }

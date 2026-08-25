@@ -296,3 +296,101 @@ def test_p_any_tolerates_out_of_range_input() -> None:
 def test_the_engine_never_produces_a_negative_loss(policy: Policy) -> None:
     for row in price_actions(probs={"ungrounded": 1.0}, stakes=_stakes(40_000), policy=policy):
         assert row.total >= 0.0
+
+
+# --------------------------------------------------------------------------- #
+# The ladder must not be degenerate
+# --------------------------------------------------------------------------- #
+
+
+def test_every_rung_of_the_ladder_is_reachable(policy: Policy) -> None:
+    """A rung nobody can reach is a rung that does not exist.
+
+    This caught a real degeneracy: with the human reviewer's cost charged through the
+    false-alarm term, holding cost only Rs.22 of human time at P=0.9 instead of Rs.220,
+    which made hold so cheap that **L2_repair -- the pitch's "common case" -- was never
+    chosen at any probability or any stakes level.** The whole middle of the ladder was
+    dead and nothing would have told us before stage.
+    """
+    chosen = set()
+    for impact, reversibility in [
+        (50, "reversible"),
+        (200, "reversible"),
+        (1_000, "costly"),
+        (3_000, "costly"),
+        (12_000, "costly"),
+        (40_000, "costly"),
+    ]:
+        for probability in (0.01, 0.10, 0.31, 0.55, 0.90):
+            for emitted in (False, True):
+                chosen.add(
+                    choose_action(
+                        probs={"ungrounded": probability},
+                        stakes=_stakes(impact, reversibility),
+                        policy=policy,
+                        already_emitted=emitted,
+                    ).action
+                )
+    for action in ("L0_pass", "L1_annotate", "L2_repair", "L4_hold", "L5_block"):
+        assert action in chosen, f"{action} is unreachable under any operating point"
+
+
+def test_repair_wins_across_a_usable_band(policy: Policy) -> None:
+    """Repairing one bad sentence is described as the common case, so it must win over
+    a range a real deployment actually occupies -- not at a single knife-edge."""
+    wins = [
+        impact
+        for impact in (1_000, 1_500, 2_000, 3_000)
+        if choose_action(
+            probs={"ungrounded": 0.31},
+            stakes=_stakes(impact, "costly"),
+            policy=policy,
+        ).action
+        == "L2_repair"
+    ]
+    assert len(wins) >= 3, f"L2_repair only wins at {wins}"
+
+
+def test_a_human_in_the_loop_is_charged_unconditionally(policy: Policy) -> None:
+    """The reviewer is paid whether or not the answer turned out to be fine, so their
+    time is an operational cost (term 3), not a false-alarm cost (term 2).
+
+    Charging it as a false alarm made it shrink as the defect became more likely --
+    holding cost Rs.22 of human time at P=0.9 -- so holding looked nearly free at
+    exactly the moment it was most likely to be chosen.
+    """
+    for probability in (0.01, 0.5, 0.99):
+        rows = {
+            r.action: r
+            for r in price_actions(
+                probs={"ungrounded": probability},
+                stakes=_stakes(40_000, "costly"),
+                policy=policy,
+            )
+        }
+        assert rows["L4_hold"].compute >= policy.human_review.cost_inr
+
+
+def test_blocking_also_pays_for_the_escalation(policy: Policy) -> None:
+    """A blocked customer still needs their question answered by someone. Charging the
+    escalation on hold but not on block would make refusing cheaper than deferring,
+    which is precisely backwards."""
+    rows = {
+        r.action: r
+        for r in price_actions(
+            probs={"ungrounded": 0.31}, stakes=_stakes(40_000, "costly"), policy=policy
+        )
+    }
+    assert rows["L5_block"].compute >= policy.human_review.cost_inr
+
+
+def test_holding_still_beats_blocking_at_the_pitch_operating_point(policy: Policy) -> None:
+    """Case A of the three-case table. Kept as a test because the margin is not large:
+    correcting the human-cost accounting moved block and hold within 5% of each other
+    before the escalation cost was applied to both consistently."""
+    choice = choose_action(
+        probs={"ungrounded": 0.31},
+        stakes=_stakes(40_000, "costly", "loan_terms"),
+        policy=policy,
+    )
+    assert choice.action == "L4_hold"

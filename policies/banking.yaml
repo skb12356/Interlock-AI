@@ -59,6 +59,10 @@ nuisance_inr:
   L1_annotate: 0.5
   L2_repair: 2.0
   L3_reroute: 4.0
+  # The reviewer's time is NOT here -- it is an operational cost charged
+  # unconditionally in term (3), because a reviewer is paid whether or not the answer
+  # turns out to have been fine. What remains here is the additional annoyance of a
+  # hold that was NOT needed: a customer who waited 15 minutes for nothing.
   L4_hold: 220.0
   # Raised from the plan's illustrative 900. At 900 the arithmetic prefers BLOCKING to
   # HOLDING on high-stakes traffic (a Rs.40,000 loan question at P=0.31 priced block at

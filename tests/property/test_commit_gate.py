@@ -509,3 +509,49 @@ async def test_decisions_are_recorded_for_the_trace() -> None:
     )
     await run_gate(gate, ["Fine sentence. ", "Bad sentence. "])
     assert [d.action for d in gate.decisions] == ["L0_pass", "L4_hold"]
+
+
+async def test_a_block_does_not_duplicate_already_emitted_text() -> None:
+    """Regression for a bug the property test found.
+
+    `buffered` was defined as "state is not PASSTHROUGH". TERMINATED satisfies that, so
+    once an L5 block fired on an unbuffered stream the gate began reporting itself as
+    buffered and re-emitted the following sentence -- text the customer had already
+    received as raw chunks. Duplicated text is worse than dropped text, because it looks
+    deliberate.
+    """
+    text = "Clause 7.4 imposes a 2% prepayment penalty. The branch opens at 9:30 AM."
+    gate = CommitGate(
+        risk_engine=ScriptedEngine(actions=["L5_block"]),
+        stakes=_stakes(),
+        request_id="r",
+        mode="unbuffered",
+    )
+    seen = emitted_text(await run_gate(gate, list(text)))
+    assert text.startswith(seen)
+    assert seen.count("The branch opens") <= 1
+
+
+async def test_terminated_is_not_buffering() -> None:
+    gate = CommitGate(
+        risk_engine=ScriptedEngine(actions=["L5_block"]),
+        stakes=_stakes(50),
+        request_id="r",
+        mode="unbuffered",
+    )
+    await run_gate(gate, ["A sentence. "])
+    assert gate.state is GateState.TERMINATED
+    assert gate.buffered is False
+
+
+async def test_a_block_stops_the_rest_of_the_answer() -> None:
+    """Continuing to drain the buffer after a block would ship exactly the text the
+    block existed to withhold."""
+    gate = CommitGate(
+        risk_engine=ScriptedEngine(actions=["L5_block"]),
+        stakes=_stakes(),
+        request_id="r",
+        mode="buffered",
+    )
+    seen = emitted_text(await run_gate(gate, ["Leaks a canary. ", "And more text follows."]))
+    assert seen == ""

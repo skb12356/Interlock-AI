@@ -43,6 +43,18 @@ __all__ = [
 #: You cannot un-say something; the contract says so and the console shows it honestly.
 _BLOCKED_ONCE_EMITTED: frozenset[Action] = frozenset({"L2_repair", "L3_reroute", "L5_block"})
 
+#: Actions that put a human in the loop. Their time is an OPERATIONAL cost (term 3),
+#: charged unconditionally -- the reviewer is paid whether or not the answer turns out
+#: to have been fine. Charging it through the false-alarm term instead (weighted by
+#: 1 - P(any)) made holding cost Rs.22 of human time at P=0.9 rather than Rs.220, which
+#: made holding look nearly free at exactly the moment it was most likely to be chosen.
+#: L5 is here too, and consistently so: a blocked customer still needs their question
+#: answered by someone. The reasoning recorded against F-001 -- "blocking loses the
+#: interaction AND still escalates to a human" -- only holds if the escalation is
+#: actually priced. Charging it on hold but not on block would make refusing cheaper
+#: than deferring, which is precisely backwards.
+_REQUIRES_HUMAN: frozenset[Action] = frozenset({"L4_hold", "L5_block"})
+
 
 @dataclass(frozen=True, slots=True)
 class HardRule:
@@ -134,6 +146,8 @@ def price_actions(
         )
         nuisance = (1.0 - probability_of_any) * policy.nuisance_inr[action]
         compute = policy.compute_tokens[action] * price_per_token
+        if action in _REQUIRES_HUMAN:
+            compute += policy.human_review.cost_inr
         latency = policy.lambda_time_inr_per_second * (policy.latency_ms[action] / 1000.0)
 
         reason = unavailable.get(action)

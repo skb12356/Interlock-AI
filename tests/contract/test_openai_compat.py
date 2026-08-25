@@ -68,12 +68,25 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
         yield test_client
 
 
+#: A LOW-stakes question. Lane A routes it unbuffered, so the gate passes the
+#: provider's bytes through untouched and byte-identity is the right assertion.
 def _request(**overrides: object) -> dict[str, object]:
     body: dict[str, object] = {
         "model": "qwen3:4b",
-        "messages": [{"role": "user", "content": "Does prepaying my home loan attract a penalty?"}],
+        "messages": [{"role": "user", "content": "What time does the branch open?"}],
         "stream": True,
     }
+    body.update(overrides)
+    return body
+
+
+#: A HIGH-stakes question. Lane A engages the commit buffer, so the gate re-emits
+#: assembled sentences and byte-identity no longer holds -- by design (ADR-003).
+def _high_stakes_request(**overrides: object) -> dict[str, object]:
+    body = _request()
+    body["messages"] = [
+        {"role": "user", "content": "Does prepaying my home loan attract a penalty?"}
+    ]
     body.update(overrides)
     return body
 
@@ -140,9 +153,13 @@ def test_recorded_output_contains_reasoning_blocks() -> None:
 
 @respx.mock
 @pytest.mark.parametrize("name", fixture_names())
-def test_fixture_replays_byte_for_byte(client: TestClient, name: str) -> None:
-    """The `data:` channel must carry exactly what the upstream sent. Re-serialising a
-    provider's JSON is a needless way to break a client's parser."""
+def test_unbuffered_traffic_replays_byte_for_byte(client: TestClient, name: str) -> None:
+    """On L0 traffic the `data:` channel carries exactly what the upstream sent.
+
+    This is ~80% of requests and it is where the "TTFT statistically unchanged" claim
+    lives: nothing is buffered, nothing is re-serialised, and re-encoding a provider's
+    JSON would be a needless way to break a client's parser.
+    """
     _, raws = load_fixture(name)
     respx.post(UPSTREAM).mock(
         return_value=httpx.Response(
@@ -160,7 +177,7 @@ def test_fixture_replays_byte_for_byte(client: TestClient, name: str) -> None:
 
 @respx.mock
 @pytest.mark.parametrize("name", fixture_names())
-def test_no_token_is_lost(client: TestClient, name: str) -> None:
+def test_no_token_is_lost_unbuffered(client: TestClient, name: str) -> None:
     _, raws = load_fixture(name)
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
     response = client.post("/v1/chat/completions", json=_request())
@@ -242,7 +259,7 @@ def test_a_client_can_opt_out_of_named_events(client: TestClient) -> None:
 @respx.mock
 def test_opting_out_still_delivers_every_token(client: TestClient) -> None:
     """The escape hatch governs what the client sees, never what the gate does."""
-    _, raws = load_fixture("multi_sentence")
+    _, raws = load_fixture("branch_hours")
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
     text = client.post(
         "/v1/chat/completions", json=_request(), headers={"X-Interlock-Events": "off"}
@@ -424,3 +441,119 @@ def test_the_router_and_the_ledger_agree_on_one_stakes_id(client: TestClient) ->
 
     assert header_stakes_id == event_stakes_id == row["stakes_id"]
     assert row["route_reason"] is not None
+
+
+# --------------------------------------------------------------------------- #
+# Buffered traffic: the commit gate is in the path
+# --------------------------------------------------------------------------- #
+
+
+@respx.mock
+def test_high_stakes_traffic_engages_the_buffer(client: TestClient) -> None:
+    """The same estimate that picked the model also decided to hold a sentence."""
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    text = client.post("/v1/chat/completions", json=_high_stakes_request()).text
+    _, events = parse_stream(text)
+    assert events[0][1]["mode"] == "buffered"
+    assert events[0][1]["route_reason"] == "stakes_high"
+
+
+@respx.mock
+def test_buffered_traffic_still_delivers_the_whole_answer(client: TestClient) -> None:
+    """Byte-identity no longer holds -- the gate assembles sentences and may replace
+    one -- but nothing may be silently lost. Compared on words, since the gate
+    normalises whitespace at sentence boundaries and strips reasoning blocks."""
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    payloads, _ = parse_stream(
+        client.post("/v1/chat/completions", json=_high_stakes_request()).text
+    )
+
+    delivered = set(assembled_text(payloads).split())
+    expected = assembled_text(raws).replace("<think>", " ").replace("</think>", " ")
+    missing = [w for w in expected.split() if w not in delivered]
+    assert not missing, f"buffered stream dropped: {missing}"
+
+
+@respx.mock
+def test_a_forced_defect_produces_a_decision_event(client: TestClient) -> None:
+    """The Day 1 exit criterion, now end to end: X-Interlock-Force reaches the stub
+    engine through the gate and the intervention appears on the wire."""
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    response = client.post(
+        "/v1/chat/completions",
+        json=_high_stakes_request(),
+        headers={"X-Interlock-Force": "ungrounded@0"},
+    )
+    _, events = parse_stream(response.text)
+    decisions = [payload for name, payload in events if name == "interlock.decision"]
+    assert decisions, "no decision event was emitted"
+    assert any(d["action"] != "L0_pass" for d in decisions)
+
+
+@respx.mock
+def test_an_intervention_carries_the_counterfactual(client: TestClient) -> None:
+    """'What would have shipped' is the line the demo lands on, so it must be on the
+    wire rather than reconstructed by the console."""
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    response = client.post(
+        "/v1/chat/completions",
+        json=_high_stakes_request(),
+        headers={"X-Interlock-Force": "ungrounded@0"},
+    )
+    _, events = parse_stream(response.text)
+    intervened = [p for n, p in events if n == "interlock.decision" and p["action"] != "L0_pass"]
+    assert intervened
+    assert intervened[0]["counterfactual"]
+
+
+@respx.mock
+def test_a_canary_defect_is_a_deterministic_block(client: TestClient) -> None:
+    """No model in the loop: the hard rule fires and the stream terminates."""
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    response = client.post(
+        "/v1/chat/completions",
+        json=_high_stakes_request(),
+        headers={"X-Interlock-Force": "canary_leak@0"},
+    )
+    _, events = parse_stream(response.text)
+    blocked = [p for n, p in events if n == "interlock.decision" and p["action"] == "L5_block"]
+    assert blocked
+    assert blocked[0]["hard_rule"] == "canary_leak"
+
+
+@respx.mock
+def test_a_held_sentence_becomes_a_durable_hold(client: TestClient) -> None:
+    """F6/F7: the review card is a row, not an in-memory object, so it survives a
+    restart. Written through the awaited path, never the fire-and-forget queue."""
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    client.post(
+        "/v1/chat/completions",
+        json=_high_stakes_request(),
+        headers={"X-Interlock-Force": "unsafe_action@0"},
+    )
+    holds = client.get("/v1/holds").json()["holds"]
+    assert holds
+    assert holds[0]["state"] == "pending"
+    assert holds[0]["kind"] == "response"
+
+
+@respx.mock
+def test_decisions_reach_the_ledger(client: TestClient) -> None:
+    """Every decision is replayable from stored inputs (F9), including its loss table."""
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    client.post(
+        "/v1/chat/completions",
+        json=_high_stakes_request(),
+        headers={"X-Interlock-Force": "ungrounded@0"},
+    )
+    rows = _wait_for_rows(client, "SELECT action, loss_table_json, inputs_digest FROM decisions")
+    assert rows
+    assert json.loads(rows[0]["loss_table_json"])
+    assert rows[0]["inputs_digest"].startswith("sha256:")

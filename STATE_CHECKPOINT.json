@@ -1,47 +1,46 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 1 - The spine, and the seam (near complete)",
-  "last_completed_task": "D1-A4 (ledger) + gateway wiring",
-  "next_task": "D1-A3 (OpenTelemetry tracing), then D2-A1 (streaming segmenter, tests first)",
+  "current_phase": "Day 2 - Signals become probabilities; tokens become a controllable stream",
+  "last_completed_task": "D2-A3 (gate property test)",
+  "next_task": "D2-A5 (ladder: L1 annotate / L3 reroute / L4 hold / L5 block), then wire the gate into the gateway",
   "system_status": "Green",
   "verification": {
     "ruff": "clean",
-    "mypy_strict_core": "clean (9 files)",
-    "pytest": "326 passed",
+    "mypy_strict_core": "clean",
+    "pytest": "395 passed",
     "live_e2e": "Lane A + ledger + router verified against Ollama",
-    "router_live": "low stakes -> qwen3:4b, high stakes -> qwen3:8b",
-    "lane_a_measured_ms": "<1 (deterministic detectors)",
-    "cold_start_seconds": 5.3
+    "router_live": "low stakes -> qwen3:4b, high stakes -> qwen3:8b"
   },
-  "day1_complete": [
-    "P0.1-P0.7 environment reconciliation",
-    "D1-J1.1 skeleton+CI",
-    "D1-J1.2 Contract 1",
-    "D1-J1.3 Contracts 2+3",
-    "Contract 4 policy",
-    "D1-J1.4 native supervisor",
-    "D1-J1.5 45-doc corpus",
-    "D1-A1 streaming proxy + 12 fixtures",
+  "completed": [
+    "Phase 0 (D-001..D-008)",
+    "D1-J1.1..J1.5",
+    "D1-A1 proxy + 12 fixtures",
     "D1-A2 Lane A",
-    "D1-A4 ledger",
-    "D1-B1 stub+mock",
-    "D1-B2 injection",
-    "D1-B3 pii+canary",
-    "D1-B4 stakes v1",
-    "risk/objective.py (pulled forward from D3-B1)"
+    "D1-A4 ledger + migration 001",
+    "D1-B1..B4 detectors",
+    "risk/objective.py",
+    "D2-A1 segmenter (tests first)",
+    "D2-A2 commit gate",
+    "D2-A3 property test"
   ],
-  "day1_remaining": [
-    "D1-A3 OpenTelemetry tracing",
-    "D1-A5 demo app UI + sqlite-vec retrieval",
-    "D1-B5 labelling pipeline + semantic-entropy job"
+  "remaining": [
+    "D2-A5 ladder",
+    "wire gate into gateway",
+    "D1-A3 tracing",
+    "D1-A5 demo app",
+    "D1-B5 labelling",
+    "D2-A6 governor",
+    "D2-B1..B7 calibration + observer",
+    "Day 3-5"
   ],
   "open_findings": [
-    "F-001 fixed: illustrative L5 nuisance caused over-blocking",
-    "F-002 open: objective intervenes on everything at high stakes; disciplined by the false-intervention metric, must NOT be tuned away",
-    "F-003 recorded: impact_inr is a base that multipliers scale",
-    "F-004 open: qwen3 emits <think></think> even with /no_think; blocks D2-A1 segmenter",
-    "F-005 fixed: a client disconnect mid-stream left NO ledger row, so cost was incurred without a trace; record now happens in a finally"
+    "F-001 fixed: L5 nuisance caused over-blocking",
+    "F-002 open: objective intervenes on everything at high stakes; must NOT be tuned away",
+    "F-003 recorded: impact_inr is a base",
+    "F-004 fixed: <think> blocks excluded from answer text",
+    "F-005 fixed: client disconnect left no ledger row",
+    "F-006 fixed: unbuffered finish() leaked a dangling evaluation task"
   ],
-  "updated_utc": "2026-08-25T15:10:00Z"
+  "updated_utc": "2026-08-25T16:30:00Z"
 }

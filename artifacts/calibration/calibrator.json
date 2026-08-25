@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "signals": [
+    "grounding.unsupported_content",
+    "grounding.numeric_unsupported",
+    "grounding.citation_unsupported",
+    "grounding.overconfidence",
+    "grounding.context_conflict",
+    "grounding.question_drift"
+  ],
+  "isotonic": {
+    "grounding.unsupported_content": {
+      "x": [
+        0.0,
+        0.04,
+        1.0
+      ],
+      "y": [
+        0.24812030075187969,
+        1.0,
+        1.0
+      ]
+    },
+    "grounding.numeric_unsupported": {
+      "x": [
+        0.0,
+        0.1111111111111111,
+        1.0
+      ],
+      "y": [
+        0.3060374739764053,
+        1.0,
+        1.0
+      ]
+    },
+    "grounding.citation_unsupported": {
+      "x": [
+        0.0,
+        1.0
+      ],
+      "y": [
+        0.4444444444444444,
+        1.0
+      ]
+    },
+    "grounding.overconfidence": {
+      "x": [
+        0.6666666666666667,
+        1.0
+      ],
+      "y": [
+        0.44525547445255476,
+        0.5086906141367323
+      ]
+    },
+    "grounding.context_conflict": {
+      "x": [
+        0.0,
+        1.0
+      ],
+      "y": [
+        0.4582881906825569,
+        1.0
+      ]
+    },
+    "grounding.question_drift": {
+      "x": [
+        0.5,
+        0.8,
+        0.8181818181818182,
+        0.8333333333333334,
+        0.9,
+        1.0
+      ],
+      "y": [
+        0.43611584327086883,
+        0.43611584327086883,
+        0.45045045045045046,
+        0.45045045045045046,
+        0.5407220822837951,
+        0.5407220822837951
+      ]
+    }
+  },
+  "fusion": {
+    "coefficients": [
+      6.0367546166556645,
+      2.590587067353735,
+      0.6681025571416315,
+      0.09422477488507473,
+      6.591988889490122,
+      3.4728881147837547
+    ],
+    "intercept": -8.849487932790433
+  }
+}

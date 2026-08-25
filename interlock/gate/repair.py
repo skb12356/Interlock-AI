@@ -49,6 +49,19 @@ DEFAULT_MAX_TOKENS = 80
 #: the whole budget goes on the block and the repair comes back empty.
 REASONING_HEADROOM_TOKENS = 96
 
+#: Finding F-012. Qwen3 honours an inline ``/no_think`` directive and emits an empty
+#: reasoning block; nothing else reaches it through Ollama's OpenAI-compatible shim
+#: (``chat_template_kwargs.enable_thinking`` is silently ignored there -- measured).
+#: Without it, qwen3:8b spent its entire 176-token budget thinking, the completion was
+#: pure truncated reasoning, ``_tidy`` stripped it to nothing, and every repair returned
+#: None after ~95 s. A repair is budgeted at 150-400 ms; 95 s is not a slow repair, it
+#: is a broken one. Measured with the directive: 3.8 s and a correct one-line answer.
+#:
+#: Model-specific, so it is a field rather than a constant: a model that has never seen
+#: the token treats it as a stray word in the system prompt, which is harmless. Set
+#: ``no_think_directive=""`` for a generator where even that is unwanted.
+NO_THINK_DIRECTIVE = "/no_think"
+
 _SYSTEM = (
     "You correct a single sentence in a bank support answer. "
     "Rewrite ONLY the flagged sentence so that it is fully supported by the evidence "
@@ -66,6 +79,7 @@ def build_repair_messages(
     answer_prefix: str,
     evidence: list[str],
     unsupported_claim: str = "",
+    no_think_directive: str = NO_THINK_DIRECTIVE,
 ) -> list[dict[str, str]]:
     """Assemble the repair prompt.
 
@@ -87,8 +101,9 @@ def build_repair_messages(
         f"Evidence actually retrieved:\n{evidence_block}\n\n"
         "Corrected sentence:"
     )
+    system = f"{_SYSTEM} {no_think_directive}".strip() if no_think_directive else _SYSTEM
     return [
-        {"role": "system", "content": _SYSTEM},
+        {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
 
@@ -126,6 +141,8 @@ class SentenceRepairer:
     #: repair silently fails. One sentence is enforced by taking the first
     #: non-empty line after stripping reasoning instead.
     stop: list[str] | None = None
+    #: See NO_THINK_DIRECTIVE. Appended to the repair system prompt, not the user's.
+    no_think_directive: str = NO_THINK_DIRECTIVE
     max_attempts: int = 2
     verify_deadline_ms: float = 120.0
     #: Actions that mean the replacement is good enough to ship.
@@ -147,6 +164,7 @@ class SentenceRepairer:
         max_tokens = hint.suggested_max_tokens if hint else self.max_tokens
 
         attempts = 0
+        generated = 0
         for attempt in range(self.max_attempts):
             attempts = attempt + 1
             candidate = await self._generate(
@@ -158,6 +176,7 @@ class SentenceRepairer:
             )
             if not candidate:
                 continue
+            generated += 1
 
             verdict = await self._verify(candidate, answer_prefix)
             if verdict in self._accepted:
@@ -170,16 +189,27 @@ class SentenceRepairer:
                     reason=f"verified as {verdict}",
                 )
 
-        # Both attempts failed verification. Returning None escalates: a repair nobody
-        # could verify is just a different unverified sentence, and a third attempt
-        # costs more than rerouting.
+        # Returning None escalates: a repair nobody could verify is just a different
+        # unverified sentence, and a third attempt costs more than rerouting.
+        #
+        # The two ways of getting here are NOT the same incident and must not share a
+        # reason string (finding F-013). "The model returned nothing" is an upstream or
+        # budget failure and points at a reroute; "the replacement was checked and
+        # refused" is the risk engine doing its job and points at a hold. Reporting
+        # both as "failed verification" sent an hour of debugging at the risk engine
+        # when the generator had produced no text at all.
+        reason = (
+            "the model produced no usable replacement"
+            if generated == 0
+            else f"replacement failed verification ({generated} of {attempts} attempts generated)"
+        )
         return RepairResult(
             text=None,
             attempts=attempts,
             verified=False,
             latency_ms=monotonic_ms() - started,
             tokens=(max_tokens + self.reasoning_headroom_tokens) * max(attempts, 1),
-            reason="replacement failed verification twice",
+            reason=reason,
         )
 
     # ------------------------------------------------------------------ #
@@ -202,6 +232,7 @@ class SentenceRepairer:
                 answer_prefix=answer_prefix,
                 evidence=evidence,
                 unsupported_claim=claim,
+                no_think_directive=self.no_think_directive,
             ),
             "max_tokens": max_tokens + self.reasoning_headroom_tokens,
             "temperature": 0.0,  # deterministic, so a repair is replayable
@@ -272,5 +303,17 @@ class SentenceRepairer:
         return str(decision.action)
 
     def _fallback_evidence(self) -> list[str]:
-        """Without a verifier span, fall back to the retrieved passages themselves."""
-        return [f.text for f in self.retrieved[:3] if f.text.strip()]
+        """Without a verifier span, fall back to the retrieved passages themselves.
+
+        **Untrusted passages are excluded** (finding F-011). This text is handed to a
+        model as ground truth to rewrite against, so a poisoned document reaching it
+        would turn the repair into the attack's delivery mechanism: the guardrail
+        rewriting a correct answer into agreement with the injection, and stamping a
+        citation on it. Passing the whole retrieval set through unfiltered was the
+        original behaviour, and it was wrong in exactly that direction.
+        """
+        return [
+            f.text
+            for f in self.retrieved
+            if f.text.strip() and not str(f.provenance).endswith("untrusted")
+        ][:3]

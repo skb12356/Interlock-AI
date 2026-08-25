@@ -91,6 +91,16 @@ class Settings:
     # -- storage ------------------------------------------------------------ #
     db_path: Path = REPO_ROOT / "data" / "interlock.db"
     policy_path: Path = REPO_ROOT / "policies" / "banking.yaml"
+    #: Built offline by ``scripts/build_index.py`` and opened read-only. Separate from
+    #: db_path on purpose: the ledger is written by exactly one task (Contract 5), the
+    #: index is never written during a request at all.
+    corpus_index_path: Path = REPO_ROOT / "data" / "corpus.db"
+    #: 'hashing-v1' (deterministic, no torch) or a sentence-transformers model name.
+    #: Must match what built the index, or the index refuses to open -- deliberately.
+    embedder: str = "hashing-v1"
+    #: How many passages reach the context window. Enough for a repair to have
+    #: something to correct against, few enough not to bury the flagged claim.
+    retrieval_k: int = 4
 
     # -- privacy ------------------------------------------------------------ #
     #: Prompts are stored **hashed** unless this is set. Five lines of behaviour that
@@ -130,6 +140,11 @@ def load_settings() -> Settings:
         policy_path=Path(
             _env("INTERLOCK_POLICY_PATH", str(REPO_ROOT / "policies" / "banking.yaml"))
         ),
+        corpus_index_path=Path(
+            _env("INTERLOCK_CORPUS_INDEX_PATH", str(REPO_ROOT / "data" / "corpus.db"))
+        ),
+        embedder=_env("INTERLOCK_EMBEDDER", "hashing-v1"),
+        retrieval_k=int(_env_float("INTERLOCK_RETRIEVAL_K", 4.0)),
         store_prompts=_env_bool("INTERLOCK_STORE_PROMPTS", False),
         tenant_id=_env("INTERLOCK_TENANT_ID", "demo"),
     )

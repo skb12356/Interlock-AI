@@ -1,16 +1,17 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 2 - the gate and the ladder are complete and wired",
-  "last_completed_task": "D2-A5 (ladder) + gate wired into the gateway",
-  "next_task": "D1-A5 (retrieval + demo app) -- repair needs evidence to correct against",
+  "current_phase": "Day 1/2 - retrieval is live and F-010 is closed",
+  "last_completed_task": "D1-A5 retrieval half: hybrid FTS5 + sqlite-vec index over the 45-doc corpus, wired into Lane A, evidence reaching L2 repair",
+  "next_task": "D1-A5 remainder (bank assistant UI), then D1-A3 (OpenTelemetry spans). D2-B1 calibration is the next never-cut item.",
   "system_status": "Green",
   "verification": {
     "ruff": "clean",
-    "mypy_strict_core": "clean",
-    "pytest": "448 passed",
-    "live_e2e": "Scene 1 runs end to end: stakes -> route -> buffer -> L2 repair -> delivered",
-    "ladder_live": "L0/L1/L2/L4/L5 all reachable; verified across impact x probability grid"
+    "mypy_strict": "clean on interlock/core + interlock/retrieval",
+    "pytest": "486 passed",
+    "live_e2e": "Scene 1 repair now cites the real clause: 'Prepayment of a floating-rate home loan does not attract a foreclosure charge as Clause 9.1 explicitly states that no prepayment charge applies to such loans. [Clause 9.1]'",
+    "retrieval": "45 docs -> 47 chunks; top-1 correct on all four demo questions; d044 (poisoned) retrieved and labelled untrusted rather than filtered",
+    "routing": "stakes now derived from the RETRIEVED domain: the prepayment question prices at Rs.40,000/prepayment, not Rs.3,000/fees"
   },
   "open_findings": [
     "F-001 fixed: L5 nuisance caused over-blocking",
@@ -19,10 +20,18 @@
     "F-004 fixed: <think> excluded from answer text (segmenter) and from repairs",
     "F-005 fixed: client disconnect left no ledger row",
     "F-006 fixed: unbuffered finish() leaked a dangling evaluation task",
-    "F-007 fixed: human review charged as a false-alarm cost made L2_repair UNREACHABLE at every operating point -- the ladder's middle rung was dead",
-    "F-008 fixed: repair shipped the literal string '<think>' to customers as the corrected sentence",
-    "F-009 fixed: the plan's stop=newline fires inside the reasoning block, so every repair silently returned nothing; verified against a live model",
-    "F-010 open: a repair with no retrieved evidence restates the original -- correct but useless; needs retrieval (D1-A5)"
+    "F-007 fixed: human review charged as a false-alarm cost made L2_repair UNREACHABLE at every operating point",
+    "F-008 fixed: repair shipped the literal string '<think>' as the corrected sentence",
+    "F-009 fixed: the plan's stop=newline fires inside the reasoning block",
+    "F-010 CLOSED: repair now corrects against real retrieved evidence and cites the clause",
+    "F-011 fixed: the repair's fallback evidence included UNTRUSTED passages -- the guardrail would have rewritten a correct answer into agreement with the poisoned document and cited it. Now filtered; regression test added.",
+    "F-012 fixed: qwen3:8b spent its whole 176-token repair budget thinking, so every repair returned None after ~95s. '/no_think' in the repair system prompt fixes it; chat_template_kwargs.enable_thinking is silently ignored by Ollama's OpenAI shim (measured both ways).",
+    "F-013 fixed: RepairResult reported 'failed verification' when the model had produced no text at all -- two different incidents pointing at two different escalations.",
+    "F-014 OPEN, MEASURED: a verified repair takes ~46s against local qwen3:8b. The plan budgets 150-400ms and term (4) of the objective prices it at 280ms, so the objective is charging a fiction on this hardware. Options: a small warm-loaded repair model, or re-price latency_ms.L2_repair from measurement. Must be resolved before any latency claim is published.",
+    "F-015 OPEN: on an L4_hold at sentence 0 the held sentence is suppressed but later sentences still stream. Whether a hold terminates the response or holds only the flagged span is a decision-layer question, not yet settled."
   ],
-  "updated_utc": "2026-08-25T18:00:00Z"
+  "deviations_recorded": [
+    "D-009: the dense retrieval arm is a deterministic hashed lexical vector, not bge-small-en-v1.5, because torch is not installed. BM25 carries retrieval; the dense arm declares semantic=False and is weighted at half a vote. One config string swaps in the real model."
+  ],
+  "updated_utc": "2026-08-25T19:30:00Z"
 }

@@ -22,6 +22,7 @@ Two properties this file exists to protect:
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -52,11 +53,15 @@ from interlock.gateway.config import Settings, load_settings
 from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.providers import Provider, build_providers
 from interlock.ledger.writer import Ledger, RequestBatch
+from interlock.retrieval.embedder import load_embedder
+from interlock.retrieval.retriever import NullRetriever, Retriever
 from interlock.risk.stub import StubRiskEngine
 from interlock.signals.base import PreflightContext
 from interlock.signals.canary import CanaryDetector, CanaryRegistry
 from interlock.signals.injection import InjectionDetector, PatternInjectionBackend
 from interlock.signals.pii import PIIDetector
+
+_log = logging.getLogger("interlock.gateway")
 
 __all__ = ["create_app"]
 
@@ -110,6 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.ledger = ledger
         app.state.providers = build_providers(settings, client)
         app.state.risk_engine = StubRiskEngine(policy=policy)
+        app.state.retriever = _open_retriever(settings)
         app.state.lane_a = LaneA(
             policy=policy,
             detectors=[
@@ -118,10 +124,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 CanaryDetector(registry=canaries),
             ],
             deadline_ms=settings.lane_a_deadline_ms,
+            retriever=app.state.retriever,
         )
         try:
             yield
         finally:
+            app.state.retriever.close()
             await ledger.stop()
             await client.aclose()
 
@@ -139,6 +147,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "providers": sorted(app.state.providers),
             "ledger": app.state.ledger.stats(),
             "lane_a_deadline_ms": app.state.settings.lane_a_deadline_ms,
+            "retrieval": _retrieval_health(app.state.retriever),
             "tiers": {
                 name: f"{tier.provider}:{tier.model}"
                 for name, tier in app.state.settings.tiers.items()
@@ -565,6 +574,46 @@ def _usage(result: dict[str, Any], key: str) -> int:
     return int(usage.get(key, 0)) if isinstance(usage, dict) else 0
 
 
+def _retrieval_health(retriever: Retriever | NullRetriever) -> dict[str, Any]:
+    """Reported, not assumed. "Retrieval is off" must be visible from outside."""
+    if isinstance(retriever, NullRetriever):
+        return {"available": False, "reason": retriever.reason}
+    return {
+        "available": True,
+        "chunks": len(retriever.index),
+        "embedder": retriever.index.meta.get("embedder", "?"),
+        "semantic": bool(getattr(retriever.index.embedder, "semantic", False)),
+        "corpus_version": retriever.index.meta.get("corpus_version", ""),
+        "k": retriever.k,
+    }
+
+
+def _open_retriever(settings: Settings) -> Retriever | NullRetriever:
+    """Open the corpus index, or degrade loudly to no retrieval at all.
+
+    A missing index must not stop the gateway -- the proxy is useful in front of a
+    caller that does its own retrieval, which is the honest deployment shape. But it
+    must not be invisible either: retrieval quietly returning nothing forever is
+    exactly what gets noticed the week after a demo, so the reason is logged at
+    startup and reported on ``/health``.
+    """
+    path = settings.corpus_index_path
+    if not path.exists():
+        _log.warning(
+            "no corpus index at %s -- answers will be ungrounded unless the caller "
+            "attaches its own context; build one with scripts/build_index.py",
+            path,
+        )
+        return NullRetriever(reason=f"no index at {path}")
+    try:
+        return Retriever.open(
+            path, embedder=load_embedder(settings.embedder), k=settings.retrieval_k
+        )
+    except Exception as exc:  # a stale index, or sqlite-vec missing
+        _log.warning("corpus index at %s unusable (%s) -- continuing without it", path, exc)
+        return NullRetriever(reason=str(exc))
+
+
 def _fragments_from_body(body: dict[str, Any]) -> list[Any]:
     """Read retrieved context the caller attached.
 
@@ -595,6 +644,11 @@ def _fragments_from_body(body: dict[str, Any]) -> list[Any]:
     return fragments
 
 
+#: A client asking Interlock to choose. ``model`` is required by the OpenAI schema,
+#: so "let the router decide" needs a name rather than an omission.
+ROUTING_SENTINELS = frozenset({"auto", "interlock", "interlock/auto", "interlock-auto"})
+
+
 def _select_provider(state: Any, body: dict[str, Any], tier_name: str) -> tuple[Provider, str]:
     """Pick the upstream.
 
@@ -606,14 +660,20 @@ def _select_provider(state: Any, body: dict[str, Any], tier_name: str) -> tuple[
     settings: Settings = state.settings
     tier = settings.tiers[tier_name]
 
-    requested = body.get("model")
-    if requested:
+    requested = str(body.get("model") or "").strip()
+    if requested and requested.lower() not in ROUTING_SENTINELS:
         for candidate in settings.tiers.values():
             if candidate.model == requested:
                 return providers[candidate.provider], candidate.model
-        # An unknown model name still routes to the default provider, so a client that
-        # asks for 'gpt-4o' against a local deployment gets an answer rather than a 404.
-        return providers[tier.provider], str(requested)
+        # An unknown model name is passed through unchanged. If the upstream does not
+        # have it, its 404 is surfaced as-is rather than being silently rewritten to
+        # some other model -- a proxy that quietly answers with a different model than
+        # the one asked for is a proxy nobody can measure anything against.
+        return providers[tier.provider], requested
+    # No model, or the routing sentinel: the stakes estimate decides. This is the
+    # routing half of Contribution 1, and the sentinel exists because `model` is a
+    # required field in the OpenAI schema -- a client cannot ask for routing by
+    # omitting it without sending a request its own SDK will reject.
     return providers[tier.provider], tier.model
 
 

@@ -12,6 +12,13 @@ information*: "we did not check" is a different claim from "we checked and found
 nothing", and the console must be able to tell a reviewer which one happened. A lane
 that silently waits for a slow detector is a lane that has no deadline at all.
 
+Retrieval is the third inline step, and it runs **first**, because the stakes model
+prices from what was actually retrieved rather than from what the question claimed to
+be about -- the part an attacker controls. It has its own sub-budget and fails open: a
+retrieval that misses its deadline yields an answer with less grounding, and that
+ungroundedness is exactly what Lane B is there to catch. Blocking the request instead
+would trade a soft failure for a hard one.
+
 Two things deliberately do **not** race:
 
 * **Stakes.** It is a deterministic sub-millisecond scorer, and without it there is no
@@ -26,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 from interlock.core.clock import Deadline
 from interlock.core.ids import new_stakes_id
@@ -35,7 +43,14 @@ from interlock.risk.objective import HardRule
 from interlock.signals.base import Detector, DetectorOutcome, PreflightContext
 from interlock.signals.stakes import StakesModel
 
-__all__ = ["LaneA", "PreflightResult"]
+__all__ = ["LaneA", "PreflightResult", "RetrievalPort"]
+
+
+class RetrievalPort(Protocol):
+    """The slice of ``Retriever`` Lane A depends on -- kept narrow so the gateway can
+    be handed a stub, and so a caller-supplied RAG stack is a drop-in replacement."""
+
+    async def retrieve(self, question: str, **kwargs: Any) -> Any: ...
 
 
 @dataclass(slots=True)
@@ -55,6 +70,10 @@ class PreflightResult:
     dropped: list[str] = field(default_factory=list)
     #: Fragments after injection re-labelling; what the tool interlock joins over.
     fragments: list[Fragment] = field(default_factory=list)
+    #: 'caller' | 'index' | 'none'. The console shows this because "the model had no
+    #: context" and "the model ignored its context" are different incidents.
+    retrieved_by: str = "none"
+    retrieval_ms: float = 0.0
     elapsed_ms: float = 0.0
 
     @property
@@ -74,6 +93,13 @@ class LaneA:
     detectors: list[Detector] = field(default_factory=list)
     stakes_model: StakesModel | None = None
     deadline_ms: float = 120.0
+    #: Interlock's own index over the corpus. Used **only** when the caller attached no
+    #: context of its own: Interlock is a proxy, not a RAG stack, and silently replacing
+    #: a customer's retrieval with ours would make every downstream number ours too.
+    retriever: RetrievalPort | None = None
+    #: Retrieval's slice of the pre-flight budget. Measured at ~3 ms on the 45-document
+    #: corpus, so this is a ceiling for a pathological case, not an expectation.
+    retrieval_deadline_ms: float = 40.0
 
     def __post_init__(self) -> None:
         if self.stakes_model is None:
@@ -81,6 +107,10 @@ class LaneA:
 
     async def run(self, ctx: PreflightContext) -> PreflightResult:
         deadline = Deadline(budget_ms=self.deadline_ms)
+
+        # First, because stakes prices from what was retrieved, and the injection
+        # detector scans each retrieved chunk on its own.
+        retrieved_by, retrieval_ms = await self._retrieve(ctx)
 
         # Inline: deterministic, sub-millisecond, and everything downstream needs it.
         assert self.stakes_model is not None
@@ -120,8 +150,35 @@ class LaneA:
             findings=findings,
             dropped=dropped,
             fragments=fragments,
+            retrieved_by=retrieved_by,
+            retrieval_ms=retrieval_ms,
             elapsed_ms=deadline.elapsed_ms,
         )
+
+    async def _retrieve(self, ctx: PreflightContext) -> tuple[str, float]:
+        """Fill ``ctx.retrieved`` from the index, if and only if the caller sent none."""
+        if ctx.retrieved:
+            return "caller", 0.0
+        if self.retriever is None:
+            return "none", 0.0
+        question = ctx.last_user_message.strip()
+        if not question:
+            return "none", 0.0
+
+        sub = Deadline(budget_ms=self.retrieval_deadline_ms)
+        try:
+            result = await asyncio.wait_for(
+                self.retriever.retrieve(question),
+                timeout=self.retrieval_deadline_ms / 1000.0,
+            )
+        except Exception:
+            # Fail open, and broadly: a timeout, a corrupt index, a missing sqlite-vec
+            # extension. See the module docstring -- less grounding, not a failed
+            # request. The absence is reported as ``retrieved_by='none'`` rather than
+            # swallowed, so the console can tell "no context" from "ignored context".
+            return "none", sub.elapsed_ms
+        ctx.retrieved = list(result.fragments)
+        return ("index" if ctx.retrieved else "none"), sub.elapsed_ms
 
     # ------------------------------------------------------------------ #
 

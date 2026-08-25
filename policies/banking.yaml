@@ -1,0 +1,140 @@
+# Interlock policy — retail banking support.
+#
+# THIS FILE IS THE GOVERNANCE ARTEFACT. Every competing product encodes the same
+# judgement inside an opaque 0.7 threshold picked by an engineer. Here it is explicit,
+# diffable, reviewable by risk and compliance, and stamped on every decision — so an
+# auditor can ask "which version priced this?" and get an answer.
+#
+# Treat changes here as reviewed code changes, never as inline constants (CLAUDE.md §9).
+
+version: "banking-v3"
+currency: INR
+
+# What one second of a customer's waiting is worth. This is term (4) of the objective,
+# and it is the structural reason the system cannot slow the AI down: a slow action must
+# earn its delay.
+lambda_time_inr_per_second: 0.40
+
+stakes:
+  # Used when no domain matches. Deliberately small: unknown should not mean expensive.
+  default_impact_inr: 200
+
+  # What it costs if an answer in this domain is wrong.
+  domains:
+    loan_terms:   {impact_inr: 40000, reversibility: costly}
+    prepayment:   {impact_inr: 40000, reversibility: costly}
+    claims:       {impact_inr: 12000, reversibility: costly}
+    fees:         {impact_inr: 3000,  reversibility: costly}
+    payments:     {impact_inr: 25000, reversibility: irreversible}
+    branch_info:  {impact_inr: 50,    reversibility: reversible}
+    general:      {impact_inr: 200,   reversibility: reversible}
+
+  multipliers:
+    # Irreversibility is the multiplier that makes the tool interlock fire on requests a
+    # content filter would happily wave through.
+    reversibility:
+      reversible: 1.0
+      costly: 2.5
+      irreversible: 8.0
+
+    # How much worse each defect class is than a plain ungrounded claim.
+    defect:
+      ungrounded: 1.0
+      contradicted: 1.4
+      overconfident: 1.2
+      unsafe_action: 3.0
+      pii_leak: 6.0
+      canary_leak: 10.0
+      biased: 4.0
+
+    # Applied on the largest monetary amount detected in the request or the answer.
+    monetary_amount_over_inr:
+      10000: 1.5
+      100000: 3.0
+
+# Term (2): what a false alarm costs. This is why Interlock does not over-block —
+# over-blocking is what gets guardrails switched off in week two.
+nuisance_inr:
+  L0_pass: 0.0
+  L1_annotate: 0.5
+  L2_repair: 2.0
+  L3_reroute: 4.0
+  L4_hold: 220.0
+  L5_block: 900.0
+
+# Term (4): added latency per action, in milliseconds.
+latency_ms:
+  L0_pass: 0
+  L1_annotate: 5
+  L2_repair: 280
+  L3_reroute: 1400
+  L4_hold: 240000     # a human SLA, priced honestly rather than hidden
+  L5_block: 0
+
+# eff[action][defect] — how much of defect d does action a actually remove?
+#
+# ADR-009: these are a PRIOR on Day 1 and MEASURED from the seeded eval set by Day 5.
+# Each entry may be a bare float (a prior) or an object carrying the measurement and its
+# Wilson interval. If these numbers were made up, the whole objective is theatre with
+# extra steps — so the provenance of every one of them is recorded here.
+efficacy:
+  L0_pass:
+    {}                       # by definition, removes nothing
+  L1_annotate:
+    ungrounded:    {value: 0.25, source: prior}
+    contradicted:  {value: 0.20, source: prior}
+    overconfident: {value: 0.55, source: prior}
+  L2_repair:
+    ungrounded:    {value: 0.80, source: prior}
+    contradicted:  {value: 0.85, source: prior}
+    overconfident: {value: 0.60, source: prior}
+  L3_reroute:
+    ungrounded:    {value: 0.70, source: prior}
+    contradicted:  {value: 0.75, source: prior}
+    overconfident: {value: 0.55, source: prior}
+  L4_hold:
+    ungrounded:    {value: 0.98, source: prior}
+    contradicted:  {value: 0.98, source: prior}
+    overconfident: {value: 0.95, source: prior}
+    unsafe_action: {value: 0.99, source: prior}
+    pii_leak:      {value: 0.98, source: prior}
+    biased:        {value: 0.90, source: prior}
+  L5_block:
+    ungrounded:    {value: 1.0, source: definitional}
+    contradicted:  {value: 1.0, source: definitional}
+    overconfident: {value: 1.0, source: definitional}
+    unsafe_action: {value: 1.0, source: definitional}
+    pii_leak:      {value: 1.0, source: definitional}
+    canary_leak:   {value: 1.0, source: definitional}
+    biased:        {value: 1.0, source: definitional}
+
+# Reversibility is declared per tool, not inferred from its name. Unknown tools default
+# to `costly` — the safe direction, and priced, so the optimiser will not freeze a
+# low-stakes reversible call just because a fragment was untrusted.
+tools:
+  lookup_balance:      {reversibility: reversible}
+  lookup_transactions: {reversibility: reversible}
+  search_documents:    {reversibility: reversible}
+  raise_ticket:        {reversibility: costly}
+  send_email:          {reversibility: irreversible}
+  transfer_funds:      {reversibility: irreversible, max_auto_inr: 0}
+  delete_record:       {reversibility: irreversible}
+  http_post_external:  {reversibility: irreversible}
+  default:             {reversibility: costly}
+
+human_review:
+  cost_inr: 220
+  sla_minutes: 15
+
+# What we are willing to state publicly. The conformal threshold search is what earns
+# the right to say it: "at most 1% ungrounded escapes, at 90% confidence" is a statement
+# about a bound, not a hope.
+guarantees:
+  max_ungrounded_escape_rate: 0.01
+  confidence: 0.90
+
+# Stakes at or above this route to the strong tier and engage the commit buffer.
+# One number, two budgets — this is Contribution 1 in its most literal form.
+thresholds:
+  buffer_above_impact_inr: 1000
+  strong_model_above_impact_inr: 1000

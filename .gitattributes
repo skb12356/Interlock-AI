@@ -1,0 +1,18 @@
+# Normalise line endings so a Windows checkout and CI on Linux agree.
+* text=auto eol=lf
+
+# Shell scripts must keep LF or they will not run.
+*.sh text eol=lf
+Makefile text eol=lf
+
+# PowerShell is happy either way; keep CRLF so it opens cleanly in Windows editors.
+*.ps1 text eol=crlf
+
+# Fixtures are byte-exact recordings of provider output. Never touch them.
+tests/fixtures/streams/*.jsonl -text
+*.pdf binary
+*.jpg binary
+*.png binary
+*.joblib binary
+*.onnx binary
+*.safetensors binary

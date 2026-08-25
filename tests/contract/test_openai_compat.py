@@ -12,6 +12,7 @@ against the actual SDK rather than trusting the assertion.
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -61,8 +62,9 @@ def assembled_text(raws: list[str]) -> str:
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
-    with TestClient(create_app(Settings())) as test_client:
+def client(tmp_path: Path) -> Iterator[TestClient]:
+    settings = Settings(db_path=tmp_path / "gateway.db")
+    with TestClient(create_app(settings)) as test_client:
         yield test_client
 
 
@@ -254,7 +256,7 @@ def test_opting_out_still_delivers_every_token(client: TestClient) -> None:
 # --------------------------------------------------------------------------- #
 
 
-async def test_the_real_openai_sdk_can_read_our_stream() -> None:
+async def test_the_real_openai_sdk_can_read_our_stream(tmp_path: Path) -> None:
     """Contract 3 asserts standard clients ignore named events. Verify, don't trust.
 
     This is the risk recorded when Contract 3 was frozen: some SDK stream decoders cast
@@ -265,7 +267,7 @@ async def test_the_real_openai_sdk_can_read_our_stream() -> None:
     openai = pytest.importorskip("openai")
 
     _, raws = load_fixture("prepayment_penalty")
-    app = create_app(Settings())
+    app = create_app(Settings(db_path=tmp_path / "sdk.db"))
 
     with respx.mock(assert_all_called=False) as mock:
         mock.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
@@ -341,3 +343,84 @@ def test_models_advertises_both_tiers(client: TestClient) -> None:
     """Two local models are what make the router a real two-tier router."""
     ids = {m["id"] for m in client.get("/v1/models").json()["data"]}
     assert ids == {"qwen3:4b", "qwen3:8b"}
+
+
+# --------------------------------------------------------------------------- #
+# The ledger row must exist even when the client hangs up
+# --------------------------------------------------------------------------- #
+
+
+def _wait_for_rows(client: TestClient, sql: str, minimum: int = 1, timeout: float = 3.0) -> list:
+    """Poll until the ledger writer has drained.
+
+    The write is deliberately asynchronous -- the token path must never await on our
+    telemetry -- so a test has to wait for it rather than assume it landed. Polling
+    keeps that honest instead of hiding it behind a sleep.
+    """
+    ledger = client.app.state.ledger  # type: ignore[attr-defined]
+    deadline = time.monotonic() + timeout
+    rows: list = []
+    while time.monotonic() < deadline:
+        rows = ledger._require_connection().execute(sql).fetchall()
+        if len(rows) >= minimum:
+            return rows
+        time.sleep(0.02)
+    return rows
+
+
+@respx.mock
+def test_a_completed_stream_is_recorded(client: TestClient) -> None:
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    client.post("/v1/chat/completions", json=_request())
+
+    rows = _wait_for_rows(client, "SELECT stakes_domain, route_reason, gate_mode FROM requests")
+    assert len(rows) == 1
+    assert rows[0]["route_reason"] in {"stakes_low", "stakes_high", "preflight_flag"}
+
+
+@respx.mock
+def test_a_client_disconnect_still_records_the_request(client: TestClient) -> None:
+    """Found live: `curl | head` closed the stream early and the ledger row vanished
+    entirely. A closed tab or a proxy timeout is common, still costs upstream tokens,
+    and a request that incurs cost without leaving a trace makes the spend numbers
+    quietly wrong. The record therefore happens in a `finally`, which also runs on the
+    GeneratorExit that ASGI raises to cancel a disconnected stream.
+    """
+    _, raws = load_fixture("multi_sentence")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+
+    with client.stream("POST", "/v1/chat/completions", json=_request()) as response:
+        for _ in zip(response.iter_lines(), range(2), strict=False):
+            pass  # hang up after two lines
+
+    rows = _wait_for_rows(client, "SELECT finish_reason FROM requests")
+    assert len(rows) == 1, "a disconnected request left no trace"
+
+
+@respx.mock
+def test_lane_a_signals_reach_the_ledger(client: TestClient) -> None:
+    """Lane A ran on this request and its findings are auditable afterwards (F2)."""
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    client.post("/v1/chat/completions", json=_request())
+
+    rows = _wait_for_rows(client, "SELECT name FROM signals", minimum=3)
+    assert {"injection", "pii_leak", "canary_planted"} <= {row[0] for row in rows}
+
+
+@respx.mock
+def test_the_router_and_the_ledger_agree_on_one_stakes_id(client: TestClient) -> None:
+    """Contribution 1, provable from a single trace row rather than asserted."""
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    response = client.post("/v1/chat/completions", json=_request())
+
+    header_stakes_id = response.headers["x-interlock-stakes-id"]
+    _, events = parse_stream(response.text)
+    event_stakes_id = events[0][1]["stakes_id"]
+
+    row = _wait_for_rows(client, "SELECT stakes_id, route_reason FROM requests")[0]
+
+    assert header_stakes_id == event_stakes_id == row["stakes_id"]
+    assert row["route_reason"] is not None

@@ -1,13 +1,19 @@
 """The gateway — an OpenAI-compatible proxy that any SDK can point ``base_url`` at.
 
-D1-A1 scope: the spine. A request goes in, tokens come back byte-for-byte, and
-Interlock metadata rides alongside on named SSE events. Lane A (D1-A2), the commit gate
-(D2-A2) and the tool interlock (D3-A1) attach to the seams left here.
+The request lifecycle, in the order it happens:
+
+1. Lane A runs pre-flight under a hard deadline (injection, PII, canary, stakes, route).
+2. Deterministic pre-block rules short-circuit **before** the upstream is called — a
+   canary in the outbound prompt must never reach a provider at all.
+3. The upstream is opened on the tier Lane A chose *from the same stakes estimate the
+   risk engine will price with*.
+4. Tokens stream back byte-for-byte. The commit gate attaches here at D2-A2.
+5. The whole request commits to the ledger in one transaction, off the token path.
 
 Two properties this file exists to protect:
 
-* **Never drop a token.** Whatever the upstream sent, the client gets — including
-  chunks we could not parse, which are forwarded rather than swallowed.
+* **Never drop a token.** Whatever the upstream sent, the client gets — including chunks
+  we could not parse, which are forwarded rather than swallowed.
 * **Never buffer L0 traffic.** ``X-Accel-Buffering: no`` and an unbuffered response, so
   a reverse proxy cannot silently reintroduce the latency the architecture removed.
 """
@@ -23,27 +29,35 @@ import httpx
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from interlock.core.clock import monotonic_ms
 from interlock.core.errors import ProviderError, UpstreamError
-from interlock.core.ids import new_request_id, new_stakes_id, new_trace_id
+from interlock.core.ids import new_request_id, new_trace_id
 from interlock.core.policy import load_policy
 from interlock.core.sse import (
+    EVENT_DECISION,
     EVENT_STAKES,
+    DecisionEvent,
     StakesEvent,
     StreamOptions,
     format_data,
     format_done,
     format_event,
 )
-from interlock.core.types import Stakes
 from interlock.gateway.config import Settings, load_settings
+from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.providers import Provider, build_providers
+from interlock.ledger.writer import Ledger, RequestBatch
 from interlock.risk.stub import StubRiskEngine
+from interlock.signals.base import PreflightContext
+from interlock.signals.canary import CanaryDetector, CanaryRegistry
+from interlock.signals.injection import InjectionDetector, PatternInjectionBackend
+from interlock.signals.pii import PIIDetector
 
 __all__ = ["create_app"]
 
 #: Streaming responses must not be buffered by anything between us and the client.
 #: nginx and several PaaS proxies buffer SSE by default, which turns a working commit
-#: gate into a demo that appears to freeze and then dump the whole answer at once.
+#: gate into a demo that appears to freeze and then dumps the whole answer at once.
 _STREAM_HEADERS = {
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-cache, no-transform",
@@ -78,14 +92,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # An invalid policy must stop the process, not be discovered mid-demo.
         policy = load_policy(settings.policy_path)
 
+        canaries = CanaryRegistry()
+        canaries.mint(settings.tenant_id)
+
+        ledger = Ledger(db_path=settings.db_path, store_prompts=settings.store_prompts)
+        await ledger.start()
+
         app.state.settings = settings
         app.state.client = client
         app.state.policy = policy
+        app.state.canaries = canaries
+        app.state.ledger = ledger
         app.state.providers = build_providers(settings, client)
         app.state.risk_engine = StubRiskEngine(policy=policy)
+        app.state.lane_a = LaneA(
+            policy=policy,
+            detectors=[
+                InjectionDetector(backend=PatternInjectionBackend()),
+                PIIDetector(),
+                CanaryDetector(registry=canaries),
+            ],
+            deadline_ms=settings.lane_a_deadline_ms,
+        )
         try:
             yield
         finally:
+            await ledger.stop()
             await client.aclose()
 
     app = FastAPI(title="Interlock gateway", version="0.1.0", lifespan=lifespan)
@@ -100,6 +132,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "policy_version": app.state.policy.policy_version,
             "risk_engine": app.state.risk_engine.health(),
             "providers": sorted(app.state.providers),
+            "ledger": app.state.ledger.stats(),
+            "lane_a_deadline_ms": app.state.settings.lane_a_deadline_ms,
             "tiers": {
                 name: f"{tier.provider}:{tier.model}"
                 for name, tier in app.state.settings.tiers.items()
@@ -109,21 +143,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/v1/models")
     async def models() -> dict[str, Any]:
         """Advertise the tiers, so an SDK's model list is not empty."""
-        tiers = app.state.settings.tiers
         return {
             "object": "list",
             "data": [
                 {"id": tier.model, "object": "model", "owned_by": tier.provider}
-                for tier in tiers.values()
+                for tier in app.state.settings.tiers.values()
             ],
         }
+
+    @app.get("/v1/holds")
+    async def holds() -> dict[str, Any]:
+        """Pending review cards. Read straight from the durable table, which is what
+        makes them survive a restart (F6/F7)."""
+        return {"holds": app.state.ledger.pending_holds()}
 
     @app.post("/v1/chat/completions")
     async def chat_completions(
         request: Request,
         x_interlock_force: str | None = Header(default=None),
         x_interlock_events: str | None = Header(default=None),
+        x_interlock_role: str | None = Header(default=None),
     ) -> Any:
+        started_ms = monotonic_ms()
         try:
             body = await request.json()
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -133,50 +174,94 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "'messages' is required", status=400, code="invalid_request_error"
             )
 
+        settings: Settings = app.state.settings
+        ledger: Ledger = app.state.ledger
         request_id = new_request_id()
         trace_id = new_trace_id()
-        engine: StubRiskEngine = app.state.risk_engine
-        engine.arm(request_id, x_interlock_force)
+        app.state.risk_engine.arm(request_id, x_interlock_force)
 
-        # Lane A lands here at D1-A2. Until then the stakes estimate is derived from the
-        # policy default so the wire format and the shared-estimate id are already real.
-        stakes, tier = _provisional_stakes(app.state.policy, body)
-        stakes_id = new_stakes_id()
+        # ---- Lane A: the only synchronous work before the model is called ----
+        preflight_ctx = PreflightContext(
+            request_id=request_id,
+            tenant_id=settings.tenant_id,
+            messages=list(body.get("messages") or []),
+            retrieved=_fragments_from_body(body),
+            tools=list(body.get("tools") or []),
+            user_role=(x_interlock_role or "customer").strip().lower(),
+        )
+        lane: PreflightResult = await app.state.lane_a.run(preflight_ctx)
 
-        provider, model = _select_provider(app.state, body, tier)
+        # ---- Deterministic pre-block, before any provider sees the prompt ----
+        if lane.hard_rules:
+            rule = lane.hard_rules[0]
+            ledger.record(
+                _batch_from(
+                    request_id,
+                    trace_id,
+                    settings,
+                    lane,
+                    body,
+                    overhead_ms=monotonic_ms() - started_ms,
+                    finish_reason=f"blocked:{rule.name}",
+                )
+            )
+            app.state.risk_engine.disarm(request_id)
+            return _error_response(
+                f"blocked by a deterministic rule: {rule.reason}",
+                status=403,
+                code=rule.name,
+            )
+
+        provider, model = _select_provider(app.state, body, lane.tier)
         upstream_body = {**body, "model": model}
+        headers = {
+            "x-interlock-request-id": request_id,
+            "x-interlock-trace-id": trace_id,
+            "x-interlock-stakes-id": lane.stakes_id,
+            "x-interlock-route-reason": lane.route_reason,
+        }
 
         if not body.get("stream", False):
+            upstream_started = monotonic_ms()
             try:
                 result = await provider.complete(upstream_body)
             except (UpstreamError, ProviderError) as exc:
-                engine.disarm(request_id)
+                app.state.risk_engine.disarm(request_id)
                 return _error_from_exception(exc)
-            engine.disarm(request_id)
-            return JSONResponse(
-                result,
-                headers={"x-interlock-request-id": request_id, "x-interlock-trace-id": trace_id},
+            upstream_ms = monotonic_ms() - upstream_started
+            ledger.record(
+                _batch_from(
+                    request_id,
+                    trace_id,
+                    settings,
+                    lane,
+                    body,
+                    model_served=model,
+                    upstream_ms=upstream_ms,
+                    overhead_ms=(monotonic_ms() - started_ms) - upstream_ms,
+                    completion_tokens=_usage(result, "completion_tokens"),
+                    prompt_tokens=_usage(result, "prompt_tokens"),
+                )
             )
+            app.state.risk_engine.disarm(request_id)
+            return JSONResponse(result, headers=headers)
 
-        options = _stream_options(x_interlock_events)
         generator = _stream_response(
             app=app,
             provider=provider,
             body=upstream_body,
             request_id=request_id,
-            stakes=stakes,
-            stakes_id=stakes_id,
+            trace_id=trace_id,
+            lane=lane,
             model=model,
-            options=options,
+            options=_stream_options(x_interlock_events),
+            started_ms=started_ms,
+            original_body=body,
         )
         return StreamingResponse(
             generator,
             media_type="text/event-stream",
-            headers={
-                **_STREAM_HEADERS,
-                "x-interlock-request-id": request_id,
-                "x-interlock-trace-id": trace_id,
-            },
+            headers={**_STREAM_HEADERS, **headers},
         )
 
     return app
@@ -193,10 +278,12 @@ async def _stream_response(
     provider: Provider,
     body: dict[str, Any],
     request_id: str,
-    stakes: Stakes,
-    stakes_id: str,
+    trace_id: str,
+    lane: PreflightResult,
     model: str,
     options: StreamOptions,
+    started_ms: float,
+    original_body: dict[str, Any],
 ) -> AsyncIterator[str]:
     """Frame the upstream stream, with Interlock events alongside.
 
@@ -204,46 +291,91 @@ async def _stream_response(
     everything here already knows the stakes, the mode and the request id, so the gate
     slots in without the surrounding code changing.
     """
+    settings: Settings = app.state.settings
+    ledger: Ledger = app.state.ledger
     engine: StubRiskEngine = app.state.risk_engine
-    policy = app.state.policy
-    buffered = stakes.impact_inr >= policy.thresholds.buffer_above_impact_inr
 
     if options.allows(EVENT_STAKES):
         yield format_event(
             EVENT_STAKES,
             StakesEvent(
-                impact_inr=stakes.impact_inr,
-                reversibility=stakes.reversibility,
-                domain=stakes.domain,
-                mode="buffered" if buffered else "unbuffered",
-                stakes_id=stakes_id,
-                route_reason="stakes_high" if buffered else "stakes_low",
+                impact_inr=lane.stakes.impact_inr,
+                reversibility=lane.stakes.reversibility,
+                domain=lane.stakes.domain,
+                mode=lane.mode,
+                stakes_id=lane.stakes_id,
+                route_reason=lane.route_reason,
                 model_served=model,
             ),
         )
 
+    upstream_started = monotonic_ms()
+    ttft_ms = 0.0
+    completion_chars = 0
+    finish_reason: str | None = None
+    completed = False
+
+    # The whole stream sits inside try/finally so the ledger row is written even when
+    # the client hangs up mid-stream -- a closed tab, a proxy timeout, a cancelled
+    # request. Those are common, they still cost upstream tokens, and a request that
+    # incurs cost without leaving a trace makes the spend numbers quietly wrong. The
+    # `finally` also runs on GeneratorExit, which is how ASGI cancels a disconnected
+    # stream, and `record` is non-blocking so it is safe to call from there.
     try:
-        async for event in provider.stream(body):
-            if event.is_done:
-                break
-            # Byte-for-byte. Re-serialising the provider's JSON is a needless way to
-            # break a client's parser, and an unparseable chunk is still the customer's
-            # tokens -- forward it rather than swallowing it.
-            yield format_data(event.raw)
-    except (UpstreamError, ProviderError) as exc:
-        # Mid-stream failure: the client has already received a 200 and some tokens, so
-        # the only honest thing left is an in-band error chunk followed by [DONE].
-        yield format_data(_error_body(str(exc), code="upstream_error"))
+        try:
+            async for event in provider.stream(body):
+                if event.is_done:
+                    break
+                if ttft_ms == 0.0:
+                    ttft_ms = monotonic_ms() - upstream_started
+                completion_chars += len(event.text)
+                if event.data:
+                    for choice in event.data.get("choices", []):
+                        finish_reason = choice.get("finish_reason") or finish_reason
+                # Byte-for-byte. Re-serialising the provider's JSON is a needless way
+                # to break a client's parser, and an unparseable chunk is still the
+                # customer's tokens -- forward it rather than swallowing it.
+                yield format_data(event.raw)
+        except (UpstreamError, ProviderError) as exc:
+            # Mid-stream failure: the client already has a 200 and some tokens, so the
+            # only honest thing left is an in-band error chunk followed by [DONE].
+            finish_reason = "upstream_error"
+            yield format_data(_error_body(str(exc), code="upstream_error"))
+
+        # A degraded Lane A is reported to the console rather than hidden: the reviewer
+        # needs to know the answer was checked with fewer detectors than usual.
+        if lane.degraded and options.allows(EVENT_DECISION):
+            yield format_event(
+                EVENT_DECISION,
+                DecisionEvent(
+                    decision_id="dec_degraded",
+                    sentence_idx=-1,
+                    action="L0_pass",
+                    chosen_loss=0.0,
+                    degraded=True,
+                ),
+            )
+
         yield format_done()
+        completed = True
+    finally:
+        upstream_ms = monotonic_ms() - upstream_started
+        ledger.record(
+            _batch_from(
+                request_id,
+                trace_id,
+                settings,
+                lane,
+                original_body,
+                model_served=model,
+                upstream_ms=upstream_ms,
+                overhead_ms=(monotonic_ms() - started_ms) - upstream_ms,
+                ttft_ms=ttft_ms,
+                completion_tokens=max(1, completion_chars // 4) if completion_chars else 0,
+                finish_reason=finish_reason or ("stop" if completed else "client_disconnect"),
+            )
+        )
         engine.disarm(request_id)
-        return
-
-    # No decision event here. Decisions are per-sentence and come from the commit gate
-    # (D2-A2); emitting a synthetic one would put a decision in the trace that nothing
-    # actually made, which is the opposite of what this system is for.
-
-    yield format_done()
-    engine.disarm(request_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -251,26 +383,80 @@ async def _stream_response(
 # --------------------------------------------------------------------------- #
 
 
-def _provisional_stakes(policy: Any, body: dict[str, Any]) -> tuple[Stakes, str]:
-    """A placeholder stakes estimate until Lane A lands at D1-A2.
+def _batch_from(
+    request_id: str,
+    trace_id: str,
+    settings: Settings,
+    lane: PreflightResult,
+    body: dict[str, Any],
+    **overrides: Any,
+) -> RequestBatch:
+    """Fold Lane A's result into the ledger row.
 
-    Deliberately the policy default rather than a guess: an unclassified request must
-    not be treated as expensive, or every request holds for a human.
+    ``stakes_id`` is written here and read by the router's ``route_reason``: one trace
+    row proves the two consumed the same estimate, which is what makes Contribution 1
+    checkable rather than asserted.
     """
-    domain = policy.domain("general")
-    stakes = Stakes(
-        impact_inr=domain.impact_inr,
-        reversibility=domain.reversibility,
-        domain="general",
-        confidence=0.2,
-        rationale=["provisional: Lane A stakes model lands at D1-A2"],
+    batch = RequestBatch(
+        request_id=request_id,
+        trace_id=trace_id,
+        tenant_id=settings.tenant_id,
+        model_requested=str(body.get("model") or ""),
+        route_reason=lane.route_reason,
+        stakes_id=lane.stakes_id,
+        stakes_impact_inr=lane.stakes.impact_inr,
+        stakes_reversibility=lane.stakes.reversibility,
+        stakes_domain=lane.stakes.domain,
+        stakes_confidence=lane.stakes.confidence,
+        gate_mode=lane.mode,
+        lane_a_ms=lane.elapsed_ms,
+        degraded=lane.degraded,
+        dropped_detectors=lane.dropped,
+        signals=lane.signals,
+        prompt_text=_flatten_prompt(body),
     )
-    tier = (
-        "strong"
-        if stakes.impact_inr >= policy.thresholds.strong_model_above_impact_inr
-        else "cheap"
-    )
-    return stakes, tier
+    for key, value in overrides.items():
+        setattr(batch, key, value)
+    return batch
+
+
+def _flatten_prompt(body: dict[str, Any]) -> str:
+    return "\n".join(str(m.get("content") or "") for m in body.get("messages") or [])
+
+
+def _usage(result: dict[str, Any], key: str) -> int:
+    usage = result.get("usage")
+    return int(usage.get(key, 0)) if isinstance(usage, dict) else 0
+
+
+def _fragments_from_body(body: dict[str, Any]) -> list[Any]:
+    """Read retrieved context the caller attached.
+
+    A demo app that does its own retrieval passes fragments in
+    ``extra_body["interlock"]["retrieved"]`` so we can label provenance per chunk.
+    Without them we still work; we simply have less to be specific about.
+    """
+    from interlock.core.types import Fragment
+
+    interlock_block = body.get("interlock")
+    if not isinstance(interlock_block, dict):
+        return []
+    raw = interlock_block.get("retrieved")
+    if not isinstance(raw, list):
+        return []
+    fragments = []
+    for item in raw:
+        if isinstance(item, dict) and item.get("text"):
+            fragments.append(
+                Fragment(
+                    text=str(item["text"]),
+                    provenance=item.get("provenance", "retrieved_untrusted"),
+                    doc_id=item.get("doc_id"),
+                    domain=item.get("domain"),
+                    score=item.get("score"),
+                )
+            )
+    return fragments
 
 
 def _select_provider(state: Any, body: dict[str, Any], tier_name: str) -> tuple[Provider, str]:
@@ -303,10 +489,8 @@ def _error_body(message: str, *, code: str, kind: str = "interlock_error") -> st
 
 
 def _error_response(message: str, *, status: int, code: str) -> JSONResponse:
-    return JSONResponse(
-        json.loads(_error_body(message, code=code, kind="invalid_request_error")),
-        status_code=status,
-    )
+    kind = "invalid_request_error" if status == 400 else "interlock_error"
+    return JSONResponse(json.loads(_error_body(message, code=code, kind=kind)), status_code=status)
 
 
 def _error_from_exception(exc: Exception) -> JSONResponse:

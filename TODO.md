@@ -88,11 +88,11 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[ ]` **D1-A3 — OpenTelemetry tracing**
   - *Output:* GenAI semantic conventions (`gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.*`) + `interlock.*` attributes; exporter → SQLite span table (no Jaeger container).
   - *Test:* one request produces a complete span tree with the stakes attributes attached.
-- `[ ]` **D1-A4 — `ledger/writer.py` + migration 001**
+- `[x]` **D1-A4 — `ledger/writer.py` + migration 001** — *done 2026-08-25. Bounded queue, single writer task, one transaction per request, WAL + busy_timeout=5000. Migration 001 has all 11 tables + 9 indexes, idempotent, applied at boot. **Holds are the deliberate exception: awaited and committed, verified to survive a process kill.** Contract 5 enforced by a test that greps gateway/gate/signals/risk for direct sqlite3 imports. DuckDB read-only attach verified.*
   - *Output:* bounded `asyncio.Queue`, **single writer task**, one transaction per request, WAL + `busy_timeout=5000`. Migration `001_initial.sql` = the full schema from Implementation02 §3 (requests, signals, decisions, spend, tool_calls, holds, rework_edges, shadow_runs, fairness_pairs, labels) + all five indexes.
   - *Contract validation (Contract 5):* nothing on the token path touches `sqlite3` directly — enforced by a test that greps the gate/gateway modules.
   - *Test:* concurrent-write load test; migration idempotency.
-- `[ ]` **D1-A5 — Demo application skeleton**
+- `[~]` **D1-A5 — Demo application skeleton** — *gateway wiring done: Lane A + ledger live on every request, verified end-to-end against Ollama. **Router demonstrated live: low stakes -> qwen3:4b, high stakes -> qwen3:8b, from one stakes estimate.** Remaining: the bank assistant UI + sqlite-vec retrieval.* — original scope:
   - *Output:* FastAPI + minimal React bank support assistant, **real retrieval** (`bge-small-en-v1.5` + `sqlite-vec` over the 45 docs), `base_url` pointed at the gateway.
   - *Test:* answers a corpus question end to end through the gateway, streaming, with a trace row.
 

@@ -1,49 +1,47 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 1 - The spine, and the seam",
-  "last_completed_task": "D1-J1.4 (native service supervisor)",
-  "next_task": "D1-A2 (Lane A pre-flight skeleton, 40ms hard deadline)",
+  "current_phase": "Day 1 - The spine, and the seam (near complete)",
+  "last_completed_task": "D1-A4 (ledger) + gateway wiring",
+  "next_task": "D1-A3 (OpenTelemetry tracing), then D2-A1 (streaming segmenter, tests first)",
   "system_status": "Green",
   "verification": {
     "ruff": "clean",
-    "ruff_format": "clean",
-    "mypy_strict_core": "clean (8 files)",
-    "pytest": "235 passed",
-    "live_e2e": "verified: Ollama through gateway, streaming, stakes event, byte-for-byte",
+    "mypy_strict_core": "clean (9 files)",
+    "pytest": "326 passed",
+    "live_e2e": "Lane A + ledger + router verified against Ollama",
+    "router_live": "low stakes -> qwen3:4b, high stakes -> qwen3:8b",
+    "lane_a_measured_ms": "<1 (deterministic detectors)",
     "cold_start_seconds": 5.3
   },
-  "completed": [
-    "P0.1-P0.7 environment reconciliation (D-001..D-007 recorded)",
-    "D1-J1.1 repo skeleton, toolchain, CI",
-    "D1-J1.2 Contract 1 frozen (RiskEngine + core types)",
-    "D1-J1.3 Contracts 2+3 frozen (Observer HTTP, SSE wire format)",
-    "Contract 4 frozen (policy-as-code) + core ids/clock/errors",
-    "risk/objective.py (pulled forward from D3-B1; conformal filter still at D3)",
-    "D1-B1 StubRiskEngine + mock observer",
-    "D1-A1 OpenAI-compatible streaming proxy + 12 real recorded fixtures",
-    "D1-J1.4 native supervisor (replaces dropped Docker entry point)"
+  "day1_complete": [
+    "P0.1-P0.7 environment reconciliation",
+    "D1-J1.1 skeleton+CI",
+    "D1-J1.2 Contract 1",
+    "D1-J1.3 Contracts 2+3",
+    "Contract 4 policy",
+    "D1-J1.4 native supervisor",
+    "D1-J1.5 45-doc corpus",
+    "D1-A1 streaming proxy + 12 fixtures",
+    "D1-A2 Lane A",
+    "D1-A4 ledger",
+    "D1-B1 stub+mock",
+    "D1-B2 injection",
+    "D1-B3 pii+canary",
+    "D1-B4 stakes v1",
+    "risk/objective.py (pulled forward from D3-B1)"
   ],
-  "remaining_day1": [
-    "D1-J1.5 demo corpus (45 bank docs, 6 contradictory pairs)",
-    "D1-A2 Lane A pre-flight skeleton",
+  "day1_remaining": [
     "D1-A3 OpenTelemetry tracing",
-    "D1-A4 ledger writer + migration 001",
-    "D1-A5 demo application skeleton",
-    "D1-B2 injection detector",
-    "D1-B3 PII + canary detectors",
-    "D1-B4 stakes model v1",
-    "D1-B5 labelling pipeline"
+    "D1-A5 demo app UI + sqlite-vec retrieval",
+    "D1-B5 labelling pipeline + semantic-entropy job"
   ],
   "open_findings": [
-    "F-001 fixed: illustrative L5 nuisance caused over-blocking; policy raised to Rs.1500",
-    "F-002 open: objective intervenes on everything at high stakes; disciplined by the false-intervention metric, must not be tuned away",
-    "F-003 recorded: impact_inr is a base that multipliers scale, not the final figure",
-    "F-004 new: qwen3 emits <think></think> even with /no_think; the segmenter must not treat a reasoning block as answer text (blocks D2-A1)"
+    "F-001 fixed: illustrative L5 nuisance caused over-blocking",
+    "F-002 open: objective intervenes on everything at high stakes; disciplined by the false-intervention metric, must NOT be tuned away",
+    "F-003 recorded: impact_inr is a base that multipliers scale",
+    "F-004 open: qwen3 emits <think></think> even with /no_think; blocks D2-A1 segmenter",
+    "F-005 fixed: a client disconnect mid-stream left NO ledger row, so cost was incurred without a trace; record now happens in a finally"
   ],
-  "resolved_risks": [
-    "Contract 3 named-SSE-event compatibility verified against the real OpenAI SDK",
-    "Provider rate limits during the demo: Ollama is local, no limit"
-  ],
-  "updated_utc": "2026-08-25T13:40:00Z"
+  "updated_utc": "2026-08-25T15:10:00Z"
 }

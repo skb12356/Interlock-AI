@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "project": "Interlock V2",
+  "current_phase": "Phase 0 — Environment reconciliation",
+  "last_completed_task": "STAGE-1 Implementation audit + TODO.md generation",
+  "next_task": "P0.1 (git init) — gated on user confirmation of P0.2 (Docker) and Day 1 start",
+  "system_status": "Needs Attention",
+  "status_reason": "P0.2 unresolved: Docker is not installed, but the plan makes `docker compose up` the judge-facing entry point. Awaiting user ruling.",
+  "audit": {
+    "documents_read": [
+      "Implementation/Implementation01.md (5-day plan, 293 lines)",
+      "Implementation/Implementation02.md (system design, 351 lines)",
+      "Implementation/Implementation03.md (frozen contracts 1-5, 240 lines)",
+      "Implementation/Implementation04.md (ADR-001..009, 186 lines)",
+      "CLAUDE.md (171 lines)",
+      "Interlock-v2.pdf (15 pages, full text extracted)",
+      "Implementation/d8ea6c0d-*.jpg (request-lifecycle sequence diagram)",
+      "Implementation/dc4314da-*.jpg (tool-interlock decision tree)"
+    ],
+    "contracts_parsed": [
+      "Contract 1: RiskEngine Protocol + core/types.py (Implementation03 §2)",
+      "Contract 2: Observer HTTP POST /v1/observe + /v1/judge (Implementation03 §3)",
+      "Contract 3: SSE wire format, interlock.stakes|signal|decision|hold (Implementation03 §4)",
+      "Contract 4: Policy YAML schema, banking-v3 (Implementation03 §5)",
+      "Contract 5: DB access rules, A-writes/B-reads-via-DuckDB (Implementation03 §6)"
+    ],
+    "adrs_parsed": 9,
+    "target_metrics": {
+      "pre_action_catch_rate": ">=0.90",
+      "added_p95_latency_ms": "<=120",
+      "verification_cost_share_of_model_spend": "<=0.05",
+      "net_spend_change": "~-0.30",
+      "ungrounded_escape_rate": "<=0.01 at 90% confidence (conformal)",
+      "false_intervention_rate": "<=0.02"
+    }
+  },
+  "environment": {
+    "platform": "win32 / Windows 11",
+    "repo_path": "C:\\Users\\saksh\\OneDrive\\Desktop\\Projects\\AIC",
+    "git_root_detected": "C:/Users/saksh",
+    "git_repo_for_project": false,
+    "python_system": "3.13.1",
+    "python_target": "3.12.11 (present, via uv)",
+    "uv": "0.8.13",
+    "node": "v22.13.1",
+    "docker": null,
+    "gpu": null,
+    "ollama": {
+      "path": "C:\\Users\\saksh\\AppData\\Local\\Programs\\Ollama\\ollama.exe",
+      "endpoint": "http://127.0.0.1:11434/v1",
+      "models": ["qwen3:8b", "qwen3:4b"],
+      "role": "upstream generator (both router tiers) + Lane C judge anchor",
+      "cannot_serve": "observer probes - exposes no hidden states; observer runs under HF transformers"
+    }
+  },
+  "deviations_recorded": [
+    "P0.1 git root is the user home directory; project needs its own repo",
+    "P0.2 Docker absent; compose is a scored artefact but native uv is the primary dev path",
+    "P0.3 no GPU; ADR-006 CPU observer profile promoted from fallback to primary",
+    "P0.4 Ollama supplies keyless upstream + a genuine two-tier router (qwen3:4b cheap / qwen3:8b strong)",
+    "P0.5 pin Python 3.12.11 via uv",
+    "P0.6 all starter/ and docs/ files referenced by the plan are missing; reconstruct from Implementation03 §2/§5 and Implementation02 §4.2/§4.3",
+    "P0.7 solo engineer; A/B become work-stream labels, contract seam and stub-first unblocking retained"
+  ],
+  "invariants_asserted": 9,
+  "tasks_total": 52,
+  "tasks_completed": 0,
+  "updated_utc": "2026-08-25T12:40:00Z"
+}

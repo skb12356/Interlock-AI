@@ -79,7 +79,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 ## D1-A — Stream & Enforcement
 
-- `[ ]` **D1-A1 — `gateway/openai_compat.py`: the passthrough**
+- `[x]` **D1-A1 — the passthrough** — *done 2026-08-25 as `gateway/{app,providers,config}.py`. Streaming + non-streaming, pooled `httpx.AsyncClient`, `X-Accel-Buffering: no`. Adapters: Ollama (default, keyless), OpenAI, Anthropic. **12 real SSE fixtures recorded from live Ollama** via `scripts/record_streams.py`; 53 contract tests replay them byte-for-byte. Verified live end-to-end against Ollama. **Contract 3 risk resolved: the real OpenAI SDK reads our stream and ignores the named events** (`test_the_real_openai_sdk_can_read_our_stream`).*
   - *Output:* `POST /v1/chat/completions` streaming + non-streaming; `httpx.AsyncClient` with pooling; correct SSE (`text/event-stream`, chunked, `X-Accel-Buffering: no`); provider adapters behind one interface — **Ollama (primary, no keys), OpenAI, Anthropic**.
   - *Test:* 12 recorded real SSE responses → `tests/fixtures/streams/*.jsonl`; a contract test replays them; byte-for-byte passthrough assertion. **These fixtures are the D1-B unblocking artefact.**
 - `[ ]` **D1-A2 — `gateway/laneA.py`: pre-flight skeleton**

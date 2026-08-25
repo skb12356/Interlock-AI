@@ -1,0 +1,343 @@
+"""F1 — accept any OpenAI-compatible request and proxy it unmodified.
+
+Replays the recorded fixtures (`scripts/record_streams.py`) through the gateway. They
+are **real provider output**, not hand-written idealisations: a hand-written fixture
+agrees with your assumptions, which is exactly why it misses the bug that stops the demo.
+
+The most important test in this file is `test_the_real_openai_sdk_can_read_our_stream`.
+Contract 3 *asserts* that standard clients ignore named SSE events; this verifies it
+against the actual SDK rather than trusting the assertion.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterator
+from pathlib import Path
+
+import httpx
+import pytest
+import respx
+from fastapi.testclient import TestClient
+
+from interlock.gateway.app import create_app
+from interlock.gateway.config import Settings
+
+FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "streams"
+UPSTREAM = "http://127.0.0.1:11434/v1/chat/completions"
+
+
+def fixture_names() -> list[str]:
+    return sorted(p.stem for p in FIXTURE_DIR.glob("*.jsonl"))
+
+
+def load_fixture(name: str) -> tuple[dict, list[str]]:
+    """Return (meta, raw SSE payload strings) for a recorded stream."""
+    lines = [
+        json.loads(line)
+        for line in (FIXTURE_DIR / f"{name}.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    return lines[0]["_meta"], [entry["raw"] for entry in lines[1:]]
+
+
+def sse_bytes(raws: list[str]) -> bytes:
+    """Re-frame recorded payloads as an upstream would send them."""
+    return "".join(f"data: {raw}\n\n" for raw in raws).encode("utf-8")
+
+
+def assembled_text(raws: list[str]) -> str:
+    out = []
+    for raw in raws:
+        if raw == "[DONE]":
+            continue
+        try:
+            chunk = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        for choice in chunk.get("choices", []):
+            out.append(choice.get("delta", {}).get("content") or "")
+    return "".join(out)
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    with TestClient(create_app(Settings())) as test_client:
+        yield test_client
+
+
+def _request(**overrides: object) -> dict[str, object]:
+    body: dict[str, object] = {
+        "model": "qwen3:4b",
+        "messages": [{"role": "user", "content": "Does prepaying my home loan attract a penalty?"}],
+        "stream": True,
+    }
+    body.update(overrides)
+    return body
+
+
+def parse_stream(text: str) -> tuple[list[str], list[tuple[str, dict]]]:
+    """Split our response into (unnamed data payloads, named interlock events)."""
+    data_payloads: list[str] = []
+    events: list[tuple[str, dict]] = []
+    for block in text.split("\n\n"):
+        if not block.strip():
+            continue
+        lines = block.split("\n")
+        if lines[0].startswith("event: "):
+            name = lines[0][len("event: ") :]
+            events.append((name, json.loads(lines[1][len("data: ") :])))
+        elif lines[0].startswith("data: "):
+            data_payloads.append(lines[0][len("data: ") :])
+    return data_payloads, events
+
+
+# --------------------------------------------------------------------------- #
+# There must actually be fixtures, and they must be real
+# --------------------------------------------------------------------------- #
+
+
+def test_twelve_streams_were_recorded() -> None:
+    assert len(fixture_names()) == 12
+
+
+@pytest.mark.parametrize("name", fixture_names())
+def test_every_fixture_is_real_provider_output(name: str) -> None:
+    meta, raws = load_fixture(name)
+    assert meta["provider"] == "ollama"
+    assert meta["line_count"] == len(raws)
+    assert raws[-1] == "[DONE]"
+
+
+def test_the_fixtures_cover_the_segmentation_edge_cases() -> None:
+    """These are the cases that break a naive regex on [.!?] and stop the demo."""
+    corpus = " ".join(assembled_text(load_fixture(n)[1]) for n in fixture_names())
+    assert "Rs. 40,000" in corpus  # currency with an embedded period
+    assert "Clause 7.4" in corpus  # a clause number
+    assert "Dr. Rao" in corpus  # an honorific
+    assert "8.75" in corpus  # a decimal
+    assert "1." in corpus  # a numbered list
+    assert "```" in corpus  # a code fence
+
+
+def test_recorded_output_contains_reasoning_blocks() -> None:
+    """Discovered while recording: qwen3 emits <think></think> even with /no_think.
+
+    The segmenter and the gate must not treat a reasoning block as answer text, or the
+    first 'sentence' of every high-stakes answer is an empty think tag. Pinned here so
+    the constraint is visible to D2-A1 rather than found on stage.
+    """
+    corpus = " ".join(assembled_text(load_fixture(n)[1]) for n in fixture_names())
+    assert "<think>" in corpus
+
+
+# --------------------------------------------------------------------------- #
+# Passthrough: never drop a token, never rewrite one
+# --------------------------------------------------------------------------- #
+
+
+@respx.mock
+@pytest.mark.parametrize("name", fixture_names())
+def test_fixture_replays_byte_for_byte(client: TestClient, name: str) -> None:
+    """The `data:` channel must carry exactly what the upstream sent. Re-serialising a
+    provider's JSON is a needless way to break a client's parser."""
+    _, raws = load_fixture(name)
+    respx.post(UPSTREAM).mock(
+        return_value=httpx.Response(
+            200, content=sse_bytes(raws), headers={"content-type": "text/event-stream"}
+        )
+    )
+
+    response = client.post("/v1/chat/completions", json=_request())
+    assert response.status_code == 200
+
+    payloads, _ = parse_stream(response.text)
+    expected = [raw for raw in raws if raw != "[DONE]"]
+    assert payloads[: len(expected)] == expected
+
+
+@respx.mock
+@pytest.mark.parametrize("name", fixture_names())
+def test_no_token_is_lost(client: TestClient, name: str) -> None:
+    _, raws = load_fixture(name)
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    response = client.post("/v1/chat/completions", json=_request())
+    payloads, _ = parse_stream(response.text)
+    assert assembled_text(payloads) == assembled_text(raws)
+
+
+@respx.mock
+def test_the_stream_terminates_with_done(client: TestClient) -> None:
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    assert client.post("/v1/chat/completions", json=_request()).text.endswith("data: [DONE]\n\n")
+
+
+@respx.mock
+def test_an_unparseable_upstream_chunk_is_still_forwarded(client: TestClient) -> None:
+    """An unparseable chunk is the provider's business. Dropping it would silently lose
+    the customer's tokens."""
+    body = (
+        b'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: <<not json>>\n\ndata: [DONE]\n\n'
+    )
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=body))
+    payloads, _ = parse_stream(client.post("/v1/chat/completions", json=_request()).text)
+    assert "<<not json>>" in payloads
+
+
+@respx.mock
+def test_streaming_headers_defeat_proxy_buffering(client: TestClient) -> None:
+    """nginx and several PaaS proxies buffer SSE by default, which turns a working
+    commit gate into a demo that appears to freeze then dump the whole answer."""
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    response = client.post("/v1/chat/completions", json=_request())
+    assert response.headers["x-accel-buffering"] == "no"
+    assert "no-transform" in response.headers["cache-control"]
+    assert response.headers["content-type"].startswith("text/event-stream")
+
+
+@respx.mock
+def test_the_response_carries_a_request_id(client: TestClient) -> None:
+    """So a trace row can be found from the client side."""
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    response = client.post("/v1/chat/completions", json=_request())
+    assert response.headers["x-interlock-request-id"].startswith("req_")
+
+
+# --------------------------------------------------------------------------- #
+# Interlock metadata rides alongside
+# --------------------------------------------------------------------------- #
+
+
+@respx.mock
+def test_a_stakes_event_precedes_the_tokens(client: TestClient) -> None:
+    """F2: a stakes estimate is emitted before the upstream model is called."""
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    text = client.post("/v1/chat/completions", json=_request()).text
+    assert text.startswith("event: interlock.stakes\n")
+    _, events = parse_stream(text)
+    name, payload = events[0]
+    assert name == "interlock.stakes"
+    assert payload["stakes_id"].startswith("stk_")
+    assert payload["mode"] in {"buffered", "unbuffered"}
+
+
+@respx.mock
+def test_a_client_can_opt_out_of_named_events(client: TestClient) -> None:
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    text = client.post(
+        "/v1/chat/completions", json=_request(), headers={"X-Interlock-Events": "off"}
+    ).text
+    _, events = parse_stream(text)
+    assert events == []
+    assert "event:" not in text
+
+
+@respx.mock
+def test_opting_out_still_delivers_every_token(client: TestClient) -> None:
+    """The escape hatch governs what the client sees, never what the gate does."""
+    _, raws = load_fixture("multi_sentence")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    text = client.post(
+        "/v1/chat/completions", json=_request(), headers={"X-Interlock-Events": "off"}
+    ).text
+    payloads, _ = parse_stream(text)
+    assert assembled_text(payloads) == assembled_text(raws)
+
+
+# --------------------------------------------------------------------------- #
+# The claim Contract 3 makes, verified against the real SDK
+# --------------------------------------------------------------------------- #
+
+
+async def test_the_real_openai_sdk_can_read_our_stream() -> None:
+    """Contract 3 asserts standard clients ignore named events. Verify, don't trust.
+
+    This is the risk recorded when Contract 3 was frozen: some SDK stream decoders cast
+    every `data:` payload to a chunk type regardless of the event name, which would make
+    our metadata poison a strict client. If this test fails, the default must flip to
+    events-off and the console must read decisions over its websocket instead.
+    """
+    openai = pytest.importorskip("openai")
+
+    _, raws = load_fixture("prepayment_penalty")
+    app = create_app(Settings())
+
+    with respx.mock(assert_all_called=False) as mock:
+        mock.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://gateway") as http:
+            sdk = openai.AsyncOpenAI(
+                base_url="http://gateway/v1", api_key="local", http_client=http
+            )
+            collected = []
+            async with app.router.lifespan_context(app):
+                stream = await sdk.chat.completions.create(
+                    model="qwen3:4b",
+                    messages=[{"role": "user", "content": "hi"}],
+                    stream=True,
+                )
+                async for chunk in stream:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        collected.append(chunk.choices[0].delta.content)
+
+    assert "".join(collected) == assembled_text(raws)
+
+
+# --------------------------------------------------------------------------- #
+# Non-streaming, errors, and the plain endpoints
+# --------------------------------------------------------------------------- #
+
+
+@respx.mock
+def test_non_streaming_completion(client: TestClient) -> None:
+    upstream = {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": "No penalty."}}],
+    }
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, json=upstream))
+    response = client.post("/v1/chat/completions", json=_request(stream=False))
+    assert response.status_code == 200
+    assert response.json()["choices"][0]["message"]["content"] == "No penalty."
+
+
+@respx.mock
+def test_an_upstream_error_becomes_an_openai_shaped_error(client: TestClient) -> None:
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(429, json={"error": "slow down"}))
+    response = client.post("/v1/chat/completions", json=_request(stream=False))
+    assert response.status_code == 429
+    assert response.json()["error"]["type"] == "interlock_error"
+
+
+@respx.mock
+def test_a_mid_stream_upstream_failure_ends_cleanly(client: TestClient) -> None:
+    """The client already has a 200 and some tokens, so the only honest thing left is an
+    in-band error chunk followed by [DONE] -- never a hang."""
+    respx.post(UPSTREAM).mock(side_effect=httpx.ConnectError("boom"))
+    text = client.post("/v1/chat/completions", json=_request()).text
+    assert "upstream_error" in text
+    assert text.endswith("data: [DONE]\n\n")
+
+
+def test_a_request_without_messages_is_rejected(client: TestClient) -> None:
+    response = client.post("/v1/chat/completions", json={"model": "qwen3:4b"})
+    assert response.status_code == 400
+    assert response.json()["error"]["type"] == "invalid_request_error"
+
+
+def test_health_reports_the_policy_version(client: TestClient) -> None:
+    body = client.get("/health").json()
+    assert body["ok"] is True
+    assert body["policy_version"].startswith("banking-v3@sha256:")
+    assert "ollama" in body["providers"]
+
+
+def test_models_advertises_both_tiers(client: TestClient) -> None:
+    """Two local models are what make the router a real two-tier router."""
+    ids = {m["id"] for m in client.get("/v1/models").json()["data"]}
+    assert ids == {"qwen3:4b", "qwen3:8b"}

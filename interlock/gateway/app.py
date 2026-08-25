@@ -52,6 +52,8 @@ from interlock.gate.sentence_gate import CommitGate, Emission
 from interlock.gateway.config import Settings, load_settings
 from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.providers import Provider, build_providers
+from interlock.interlock_tools.holds import ToolInterlock
+from interlock.interlock_tools.streaming import ToolCallAccumulator
 from interlock.ledger.writer import Ledger, RequestBatch
 from interlock.retrieval.embedder import load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever
@@ -116,6 +118,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.providers = build_providers(settings, client)
         app.state.risk_engine = StubRiskEngine(policy=policy)
         app.state.retriever = _open_retriever(settings)
+        app.state.tool_interlock = ToolInterlock(policy=policy, ledger=ledger)
         app.state.lane_a = LaneA(
             policy=policy,
             detectors=[
@@ -169,7 +172,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def holds() -> dict[str, Any]:
         """Pending review cards. Read straight from the durable table, which is what
         makes them survive a restart (F6/F7)."""
-        return {"holds": app.state.ledger.pending_holds()}
+        return {"holds": app.state.tool_interlock.pending_cards()}
+
+    @app.post("/v1/holds/{hold_id}/approve")
+    async def approve_hold(hold_id: str, request: Request) -> Any:
+        """Release a frozen tool call. Requires the resume token.
+
+        The hold id travels in console URLs and log lines; the token does not. Knowing
+        that a hold exists must not be the same as being able to release it.
+        """
+        return await _resolve_hold(app, hold_id, request, state="approved")
+
+    @app.post("/v1/holds/{hold_id}/reject")
+    async def reject_hold(hold_id: str, request: Request) -> Any:
+        """Cancel a frozen tool call. Deliberately does NOT require the token: a
+        reviewer who cannot produce a secret must still be able to stop a pending
+        irreversible action."""
+        return await _resolve_hold(app, hold_id, request, state="rejected")
 
     @app.post("/v1/chat/completions")
     async def chat_completions(
@@ -328,6 +347,13 @@ async def _stream_response(
             retrieved=lane.fragments,
         ),
     )
+    # Tool calls stream one *call* behind, for the same reason text streams one
+    # sentence behind: there is no moment during the stream when a half-assembled
+    # call could be judged. `{"to":` is not an argument.
+    tool_calls = ToolCallAccumulator()
+    interlock: ToolInterlock = app.state.tool_interlock
+    interlock.observe(request_id, lane.fragments)
+
     chunk_id = f"chatcmpl-{request_id}"
 
     if options.allows(EVENT_STAKES):
@@ -367,6 +393,9 @@ async def _stream_response(
                 if event.data:
                     for choice in event.data.get("choices", []):
                         finish_reason = choice.get("finish_reason") or finish_reason
+                # Withheld, not dropped: replayed below if the interlock clears them.
+                if tool_calls.absorb(event.data):
+                    continue
                 # A chunk we could not parse carries text we cannot segment, verify or
                 # repair. Dropping it would violate "never drop a token", so it is
                 # forwarded raw and unverified -- an honest, narrow gap, and better than
@@ -389,6 +418,52 @@ async def _stream_response(
         # would silently truncate the answer.
         for frame in _render(await gate.finish(), options, chunk_id, model, lane):
             yield frame
+
+        # ---- the tool-call interlock -------------------------------------- #
+        #
+        # Every assembled call is judged before any of them is released. A turn that
+        # requests two calls is one decision: releasing the safe one while freezing the
+        # other leaves the client having executed half a plan, which is a state no
+        # agent loop is written to recover from.
+        released: list[dict[str, Any]] = []
+        for call in tool_calls.assemble():
+            decision, held = await interlock.check(call, lane.fragments, request_id=request_id)
+            if held is not None:
+                finish_reason = "tool_call_held"
+                if options.allows(EVENT_HOLD):
+                    yield format_event(
+                        EVENT_HOLD,
+                        HoldEvent(
+                            hold_id=held.hold_id,
+                            kind="tool_call",
+                            reason=decision.reason,
+                            tool=call.name,
+                        ),
+                    )
+                released = []
+                break
+            released.append(call.call_id)
+
+        if tool_calls.saw_any and finish_reason != "tool_call_held":
+            # Cleared. Replay the assembled calls as a single chunk -- the client sees
+            # one complete tool_calls message instead of the fragments we absorbed.
+            yield format_data(
+                json.dumps(
+                    {
+                        "id": chunk_id,
+                        "object": "chat.completion.chunk",
+                        "model": model,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"tool_calls": tool_calls.raw_entries()},
+                                "finish_reason": "tool_calls",
+                            }
+                        ],
+                    },
+                    separators=(",", ":"),
+                )
+            )
 
         # Any sentence the gate withheld for human review becomes a durable hold, so it
         # survives a restart (F6/F7). Awaited, not queued -- see ledger/writer.py.
@@ -448,6 +523,10 @@ async def _stream_response(
             )
         )
         engine.disarm(request_id)
+        # Taint is per-request state on a long-lived process; leaving it would grow
+        # without bound and, worse, leak one customer's poisoned upload into the next
+        # request that happened to reuse the id.
+        interlock.forget(request_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -572,6 +651,30 @@ def _flatten_prompt(body: dict[str, Any]) -> str:
 def _usage(result: dict[str, Any], key: str) -> int:
     usage = result.get("usage")
     return int(usage.get(key, 0)) if isinstance(usage, dict) else 0
+
+
+async def _resolve_hold(app: FastAPI, hold_id: str, request: Request, *, state: str) -> Any:
+    """Shared approve/reject handling."""
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    ok, why = await app.state.tool_interlock.resolve(
+        hold_id,
+        state=state,
+        resolved_by=str(payload.get("resolved_by") or "operator"),
+        resume_token=payload.get("resume_token"),
+    )
+    if not ok:
+        # 404 for "no such hold", 409 for everything else: a wrong token and an
+        # already-resolved hold are both "your view of the world is stale", which is
+        # a conflict, not a missing resource.
+        status = 404 if "no pending hold" in why else 409
+        return _error_response(why, status=status, code="hold_not_resolved")
+    return {"hold_id": hold_id, "state": state}
 
 
 def _retrieval_health(retriever: Retriever | NullRetriever) -> dict[str, Any]:

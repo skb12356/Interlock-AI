@@ -85,6 +85,10 @@ class Settings:
     observe_deadline_ms: float = 120.0
     #: The gate's per-sentence watchdog: if the model stalls mid-sentence, flush.
     sentence_watchdog_s: float = 8.0
+    #: How long Ollama keeps a model resident after a request. See F-014: the default
+    #: 5 minutes means a demo that pauses between scenes pays a 12-21 s cold start on
+    #: the next one, which swamps every latency number Interlock is trying to measure.
+    ollama_keep_alive: str = "30m"
     upstream_connect_timeout_s: float = 10.0
     upstream_read_timeout_s: float = 120.0
 
@@ -133,6 +137,7 @@ def load_settings() -> Settings:
             _env("INTERLOCK_STRONG_MODEL", "qwen3:8b"),
         ),
         observer_base_url=_env("INTERLOCK_OBSERVER_URL", "http://127.0.0.1:8081"),
+        ollama_keep_alive=_env("INTERLOCK_OLLAMA_KEEP_ALIVE", "30m"),
         lane_a_deadline_ms=_env_float("INTERLOCK_LANE_A_DEADLINE_MS", 120.0),
         observe_deadline_ms=_env_float("INTERLOCK_OBSERVE_DEADLINE_MS", 120.0),
         sentence_watchdog_s=_env_float("INTERLOCK_SENTENCE_WATCHDOG_S", 8.0),

@@ -1,0 +1,28 @@
+[
+  {
+    "action": "L2_repair",
+    "model": "qwen3:8b",
+    "provider": "ollama",
+    "runs": 3,
+    "samples_ms": [
+      13704.0,
+      14250.0,
+      13640.0
+    ],
+    "median_ms": 13704.0,
+    "max_ms": 14250.0
+  },
+  {
+    "action": "L3_reroute",
+    "model": "qwen3:8b",
+    "provider": "ollama",
+    "runs": 3,
+    "samples_ms": [
+      30719.0,
+      30953.0,
+      30609.0
+    ],
+    "median_ms": 30719.0,
+    "max_ms": 30953.0
+  }
+]

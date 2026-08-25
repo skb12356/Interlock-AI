@@ -106,11 +106,22 @@ class OpenAICompatProvider:
         base_url: str,
         client: httpx.AsyncClient,
         api_key: str | None = None,
+        extra_body: dict[str, Any] | None = None,
     ) -> None:
         self.name = name
         self._base_url = base_url.rstrip("/")
         self._client = client
         self._api_key = api_key
+        #: Vendor-specific fields merged into every request to THIS provider only.
+        #: Ollama's ``keep_alive`` is the reason this exists: without it the model is
+        #: unloaded between calls and the next one pays a 12-21 s cold start (finding
+        #: F-014, measured). It is not an OpenAI field, so it must not leak into a
+        #: request bound for OpenAI -- hence per-provider rather than global. The
+        #: client's own body always wins, because a caller who set a field meant it.
+        self._extra_body = dict(extra_body or {})
+
+    def _body(self, body: dict[str, Any]) -> dict[str, Any]:
+        return {**self._extra_body, **body}
 
     def _headers(self) -> dict[str, str]:
         headers = {"content-type": "application/json"}
@@ -119,7 +130,7 @@ class OpenAICompatProvider:
         return headers
 
     async def stream(self, body: dict[str, Any]) -> AsyncIterator[StreamEvent]:
-        payload = {**body, "stream": True}
+        payload = {**self._body(body), "stream": True}
         url = f"{self._base_url}/chat/completions"
         try:
             async with self._client.stream(
@@ -143,7 +154,7 @@ class OpenAICompatProvider:
             raise UpstreamError(f"{self.name} transport error: {exc}", provider=self.name) from exc
 
     async def complete(self, body: dict[str, Any]) -> dict[str, Any]:
-        payload = {**body, "stream": False}
+        payload = {**self._body(body), "stream": False}
         url = f"{self._base_url}/chat/completions"
         try:
             response = await self._client.post(url, json=payload, headers=self._headers())
@@ -327,7 +338,16 @@ def build_providers(settings: Any, client: httpx.AsyncClient) -> dict[str, Provi
     """
     providers: dict[str, Provider] = {
         "ollama": OpenAICompatProvider(
-            name="ollama", base_url=settings.ollama_base_url, client=client
+            name="ollama",
+            base_url=settings.ollama_base_url,
+            client=client,
+            # See F-014. Ollama unloads an idle model after 5 minutes by default, so
+            # the first request after a quiet spell -- which on a demo day is every
+            # request -- pays a cold start measured at 12 s (qwen3:4b) and 21 s
+            # (qwen3:8b). That is not the model being slow; it is the model not being
+            # there. Holding both tiers resident is what makes the two-tier router's
+            # latency numbers mean anything.
+            extra_body={"keep_alive": settings.ollama_keep_alive},
         ),
         "openai": OpenAICompatProvider(
             name="openai",

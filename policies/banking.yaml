@@ -86,11 +86,26 @@ compute_tokens:
 price_inr_per_1k_tokens: 0.60
 
 # Term (4): added latency per action, in milliseconds.
+#
+# THESE ARE HARDWARE FACTS, NOT PRODUCT CONSTANTS. A deployment on different silicon
+# must re-run `scripts/measure_action_latency.py` and edit this block. Leaving the
+# plan's illustrative figures here would have the optimiser doing exact arithmetic on
+# invented inputs, which is worse than no arithmetic because it looks rigorous.
 latency_ms:
   L0_pass: 0
-  L1_annotate: 5
-  L2_repair: 280
-  L3_reroute: 1400
+  L1_annotate: 5      # a deterministic string transform; not worth measuring
+  # MEASURED 2026-08-25 (finding F-014), qwen3:8b via Ollama on the build laptop,
+  # 3 runs each plus a discarded warm-up. Raw samples: artifacts/action_latency.json.
+  # Cold starts (12-21 s) are excluded -- `keep_alive` holds both tiers resident, so a
+  # cold load measures how long the model took to arrive, not what the action costs.
+  #
+  # The plan's illustrative figures were 280 and 1,400. Both were datacenter-class and
+  # both under-charged by one to two orders of magnitude. Note they were ALSO wrong
+  # relative to each other by less than the truth: measured, a reroute costs 2.2x a
+  # repair, not 5x. Term (4) was mispricing the *choice between them*, not just the
+  # absolute cost -- which is the part that changes which rung the optimiser picks.
+  L2_repair: 13704      # median 13,704 ms   (max 14,250)
+  L3_reroute: 30719     # median 30,719 ms   (max 30,953)
   L4_hold: 240000     # a human SLA, priced honestly rather than hidden
   L5_block: 0
 

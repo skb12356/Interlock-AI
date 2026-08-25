@@ -98,7 +98,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 ## D1-B — Signals & Decisions
 
-- `[ ]` **D1-B1 — `risk/stub.py` + `observer/mock_server.py` (the unblocking trick — ship before anything else in this stream)**
+- `[x]` **D1-B1 — `risk/stub.py` + `observer/mock_server.py` (the unblocking trick)** — *done 2026-08-25. StubRiskEngine satisfies the Protocol (`isinstance` asserted), driven by `X-Interlock-Force: <defect>@<idx>[:<prob>]`; real policy, real four-term loss table, real hard-rule pre-pass, fake probabilities only. Mock observer implements Contract 2 with scriptable `[[HALLUCINATE]]` / `[[SLOW:n]]` / `[[DEGRADE]]` and a real LRU prefix-key set so cache-miss paths are exercised. 182 tests.*
   - *Output:* `StubRiskEngine` reads header `X-Interlock-Force: <defect>@<sentence_idx>` and returns a **fully populated `Decision`** — real loss table, fake probabilities. The mock observer returns scripted signals with a configurable sleep to exercise the deadline path.
   - *Contract validation:* satisfies the `RiskEngine` Protocol; swapping to the real engine on Day 3 must be a **one-line DI change**.
   - *Test:* `X-Interlock-Force: ungrounded@2` → a stub L2 decision visible in the trace.
@@ -181,7 +181,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[ ]` **D3-A6 — Latency instrumentation** — `overhead_ms` per request, split by lane, exported as a histogram. *The Day-5 p95 must be measured, not estimated.*
 
 ## D3-B — The risk engine, for real
-- `[ ]` **D3-B1 — `risk/objective.py`** — the four-term expected loss; `Impact_d = stakes.impact_inr × class_multiplier[d] × reversibility_multiplier[...]`, all three from the versioned policy; **hard-constraint pre-pass before the argmin** (ADR-008); conformal feasibility filter; **the full `LossRow` table returned always — the table is the explanation.**
+- `[~]` **D3-B1 — `risk/objective.py`** — *four-term arithmetic + hard-constraint pre-pass built early at D1-B1 (the stub needs a real loss table); reproduces the pitch's three-case table exactly. **Remaining at D3: the conformal feasibility filter**, which needs the calibration artefacts.* — original scope: — the four-term expected loss; `Impact_d = stakes.impact_inr × class_multiplier[d] × reversibility_multiplier[...]`, all three from the versioned policy; **hard-constraint pre-pass before the argmin** (ADR-008); conformal feasibility filter; **the full `LossRow` table returned always — the table is the explanation.**
 - `[ ]` **D3-B2 — `signals/fusion.py`** — logistic fusion over calibrated signals → `P(d)` per defect class, cross-fitted on the same folds as calibration.
 - `[ ]` **D3-B3 — `risk/engine.py`** — the real `RiskEngine` behind the identical Protocol. Deadline-aware (a short deadline skips the verifier and prices with probe-only probabilities, marking `degraded`). **Never raises** — returns `L0_pass` with `why=["degraded: …"]` on any internal failure.
 - `[ ]` **D3-B4 — THE BIG INTEGRATION** — swap `StubRiskEngine → RealRiskEngine` in one line of DI wiring. *If the contracts were honoured this just works. Budget 30 minutes of pain anyway.*

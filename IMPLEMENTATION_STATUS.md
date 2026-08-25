@@ -13,14 +13,32 @@ Task-level state lives in `TODO.md`; machine-readable resume state in `STATE_CHE
 
 | Component | State | Evidence |
 |---|---|---|
-| Repo skeleton, toolchain, CI | **built** | `ruff` + `ruff format` + `mypy --strict interlock/core` + `pytest` all green; 16 tests |
-| `interlock/core/` contracts | not started | — |
+| Repo skeleton, toolchain, CI | **built** | `ruff` + `ruff format` + `mypy --strict interlock/core` + `pytest`, all green |
+| Contract 1 — `RiskEngine` + types | **frozen** | `tests/contract/test_contract1_types.py` |
+| Contract 2 — Observer HTTP | **frozen** | `tests/contract/test_contract2_observer.py` |
+| Contract 3 — SSE wire format | **frozen** | `tests/contract/test_contract3_sse.py` |
+| Contract 4 — policy as code | **frozen** | `tests/contract/test_contract4_policy.py`, `policies/banking.yaml` |
+| `core/` ids, clock, errors | **built** | `tests/unit/test_core_ids_clock.py` |
+| Expected-loss objective | **built** | `tests/unit/test_objective.py` — reproduces the pitch's three-case table |
+| Stub risk engine | **built** | `tests/unit/test_stub_and_mock.py` — satisfies Contract 1 |
+| Mock observer | **built** | `tests/unit/test_stub_and_mock.py` — Contract 2, scriptable latency/failure |
 | Gateway / Lane A | not started | — |
 | Commit gate | not started | — |
-| Observer | not started | — |
-| Risk engine | not started | — |
+| Real observer | not started | — |
+| Calibration | not started | — |
 | Ledger | not started | — |
 | Console | not started | — |
+
+**Test count:** 182 passing.
+
+### Sequencing change
+
+`risk/objective.py` was built at D1-B1 rather than D3-B1. The plan requires the stub to
+return "a fully populated Decision (real loss table, fake probabilities)", which is not
+possible without the real four-term arithmetic. Building it early is also strictly
+better: the enforcement path is priced correctly from the first day rather than against
+placeholder numbers. The parts of D3-B1 that genuinely need calibration artefacts — the
+conformal feasibility filter — remain at D3-B1.
 
 ## 2. What is measured
 
@@ -130,6 +148,58 @@ directory was a git repository, and this project was an untracked subdirectory o
 **Chosen instead:** `git init` in the project directory so commits land here and never touch
 the home repository. `.gitignore` covers secrets, runtime state (`*.db`), and regenerated
 artefacts.
+
+---
+
+## 4b. Open findings
+
+Things the build has surfaced that are not yet resolved. Each has a test pinning the
+current behaviour so a regression is noticed here rather than on stage.
+
+### F-001 — The illustrative L5 nuisance caused the optimiser to over-block *(fixed)*
+The plan's example policy prices a false block at ₹900. With the four-term objective and
+the shipped multipliers, the high-stakes case (₹40,000 loan question at P(ungrounded)=0.31)
+priced **block at ₹621 against hold at ₹868** — so the optimiser chose to block, on exactly
+the traffic where the design says blocking should be rare, and where the pitch's own worked
+example chooses *hold*.
+
+Fixed in the policy file, not in code: `L5_block` nuisance raised to ₹1,500, on the reasoning
+that refusing to answer a customer costs more than making them wait — you lose the interaction
+*and* still escalate to a human. With that, the three cases from the pitch reproduce exactly:
+**Hold / Repair / Pass**. `L1_annotate` efficacy on `ungrounded` was also lowered from 0.25 to
+0.20, because above ≈0.2485 the arithmetic annotates traffic that should simply pass, which
+erodes the "L0 is free" property the whole latency budget depends on.
+
+Pinned by `test_blocking_is_never_chosen_by_the_optimiser_on_these_cases`.
+
+### F-002 — The objective intervenes on everything at high stakes *(open, by design for now)*
+At ₹40,000 impact, even **P(ungrounded)=0.001** puts ₹100 of expected harm against a repair
+that costs ₹2.18 and removes 80% of it. The argmin therefore repairs *every* sentence in a
+high-stakes domain. This is arithmetically correct and operationally unusable.
+
+It is not a bug in the objective; it is the reason the design has two further mechanisms that
+are not yet built:
+
+* the **conformal feasibility filter** (D3-B1), which restricts the argmin to actions meeting
+  the certified risk constraint rather than letting it optimise freely, and
+* **measured efficacy** (D3-B6), which will almost certainly reduce the assumed 0.80 repair
+  efficacy and so reduce the incentive to repair.
+
+The **false-intervention rate (≤ 2%)** is the metric that disciplines this, and it is measured
+at D3-B7 and reported at D5-B1. **This must not be quietly tuned away** — if the measured rate
+comes out high, that is the finding, and the honest response is to report it with the
+break-even analysis rather than to adjust the policy until the number looks good.
+
+Pinned by `test_a_nonzero_baseline_would_intervene_on_everything_at_high_stakes`.
+
+### F-003 — `impact_inr` is a base, not the final impact *(recorded)*
+`Impact_d = impact_inr × defect_multiplier × reversibility_multiplier` (Implementation02 §4.2),
+so `loan_terms` at ₹40,000 with `costly` derives to ₹100,000. The pitch's Case A instead treats
+₹40,000 as the *final* impact. The formula is followed as specified — it is the documented
+contract — but the domain figures in `policies/banking.yaml` are therefore **base** values that
+the multipliers scale, and the three-case table on the slide must be regenerated from the real
+policy at D5-B2 rather than quoted from the deck. The plan already anticipates this ("rather
+than the slide's illustrative numbers").
 
 ---
 

@@ -136,6 +136,9 @@ class Policy(_Strict):
     stakes: StakesPolicy
     nuisance_inr: dict[Action, float]
     latency_ms: dict[Action, float]
+    compute_tokens: dict[Action, float]
+    #: Blended token price for term (3). D4-A1 replaces this with per-model pricing.
+    price_inr_per_1k_tokens: float = Field(default=0.0, ge=0)
     efficacy: dict[Action, dict[Defect, EfficacyEntry]] = Field(default_factory=dict)
     tools: dict[str, ToolPolicy]
     human_review: HumanReview
@@ -148,7 +151,7 @@ class Policy(_Strict):
 
     # -- validation ------------------------------------------------------- #
 
-    @field_validator("nuisance_inr", "latency_ms")
+    @field_validator("nuisance_inr", "latency_ms", "compute_tokens")
     @classmethod
     def _every_action_is_priced(cls, value: dict[Action, float]) -> dict[Action, float]:
         """A missing row would silently make an action look free.

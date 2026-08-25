@@ -60,7 +60,26 @@ nuisance_inr:
   L2_repair: 2.0
   L3_reroute: 4.0
   L4_hold: 220.0
-  L5_block: 900.0
+  # Raised from the plan's illustrative 900. At 900 the arithmetic prefers BLOCKING to
+  # HOLDING on high-stakes traffic (a Rs.40,000 loan question at P=0.31 priced block at
+  # Rs.621 against hold at Rs.868) -- i.e. the policy over-blocks exactly where the
+  # design says blocking should be rare. Blocking a correct answer costs more than
+  # making the customer wait: you lose the interaction AND still escalate to a human.
+  # Pricing that honestly restores "hold beats block" without touching a line of code.
+  L5_block: 1500.0
+
+# Term (3): the compute each action spends, in tokens. A repair is one short
+# re-generation with evidence injected; a reroute pays for a whole answer again.
+# D4-A1 replaces the blended price below with per-model pricing from the ledger.
+compute_tokens:
+  L0_pass: 0
+  L1_annotate: 0        # a deterministic string transform -- no model in the loop
+  L2_repair: 120        # ~40 prompt + max_tokens 80
+  L3_reroute: 900       # re-retrieve and regenerate on a stronger tier
+  L4_hold: 0
+  L5_block: 0
+
+price_inr_per_1k_tokens: 0.60
 
 # Term (4): added latency per action, in milliseconds.
 latency_ms:
@@ -81,9 +100,13 @@ efficacy:
   L0_pass:
     {}                       # by definition, removes nothing
   L1_annotate:
-    ungrounded:    {value: 0.25, source: prior}
-    contradicted:  {value: 0.20, source: prior}
-    overconfident: {value: 0.55, source: prior}
+    # Annotating tells the reader which sentence to distrust, but "confidence is the
+    # instruction humans follow", so a citation removes only a little of the harm of an
+    # ungrounded claim. Above ~0.25 the arithmetic starts annotating traffic that should
+    # simply pass, which burns the L0-is-free property the latency budget depends on.
+    ungrounded:    {value: 0.20, source: prior}
+    contradicted:  {value: 0.15, source: prior}
+    overconfident: {value: 0.55, source: prior}   # hedge-softening genuinely fixes this
   L2_repair:
     ungrounded:    {value: 0.80, source: prior}
     contradicted:  {value: 0.85, source: prior}

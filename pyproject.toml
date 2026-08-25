@@ -115,7 +115,11 @@ warn_return_any = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-filterwarnings = ["ignore::DeprecationWarning"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    # pysbd ships regexes with unescaped backslashes; not ours to fix.
+    "ignore::SyntaxWarning",
+]
 markers = [
     "contract: validates a frozen interface contract (1-5)",
     "property: Hypothesis property test",

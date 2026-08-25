@@ -130,7 +130,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 ## D2-A — The commit gate (hardest block of the sprint)
 
-- `[ ]` **D2-A1 — `gate/segmenter.py` (TESTS FIRST — this is the "demo froze" risk)**
+- `[x]` **D2-A1 — `gate/segmenter.py`** — *done 2026-08-25, **tests written first and confirmed failing** before implementation. 44 tests, all edge cases drawn from the real recorded fixtures. Chunk-order independence proven at chunk sizes 1/2/3/5/13/64. **F-004 resolved:** `<think>` blocks are excluded from answer text (with a carry buffer so a tag split across chunks is still caught) but kept and recoverable for the console.*
   - *Output:* incremental sentence segmentation, `pysbd` streaming mode + a character accumulator, hard flush at **240 chars** or `\n\n`, abbreviation guards.
   - *Test (write before the implementation):* `Rs. 40,000` · `Clause 7.4` · `e.g.` · `Dr. Rao` · `1. 2. 3.` lists · code fences · **mid-word chunk splits**.
 - `[ ]` **D2-A2 — `gate/sentence_gate.py`: the state machine**

@@ -1,37 +1,47 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 1/2 - retrieval is live and F-010 is closed",
-  "last_completed_task": "D1-A5 retrieval half: hybrid FTS5 + sqlite-vec index over the 45-doc corpus, wired into Lane A, evidence reaching L2 repair",
-  "next_task": "D1-A5 remainder (bank assistant UI), then D1-A3 (OpenTelemetry spans). D2-B1 calibration is the next never-cut item.",
+  "current_phase": "Day 2/3 - retrieval, tool interlock and calibration are live; three of the four never-cut items are built",
+  "last_completed_task": "D2-B1 + D2-B2 (isotonic calibration and conformal threshold selection), with D1-B5's induced-failure labelling underneath them",
+  "next_task": "D3-B7 (seeded eval set, never-cut) then D3-B3/B4 (the real RiskEngine, a one-line DI swap from StubRiskEngine)",
   "system_status": "Green",
   "verification": {
-    "ruff": "clean",
-    "mypy_strict": "clean on interlock/core + interlock/retrieval",
-    "pytest": "486 passed",
-    "live_e2e": "Scene 1 repair now cites the real clause: 'Prepayment of a floating-rate home loan does not attract a foreclosure charge as Clause 9.1 explicitly states that no prepayment charge applies to such loans. [Clause 9.1]'",
-    "retrieval": "45 docs -> 47 chunks; top-1 correct on all four demo questions; d044 (poisoned) retrieved and labelled untrusted rather than filtered",
-    "routing": "stakes now derived from the RETRIEVED domain: the prepayment question prices at Rs.40,000/prepayment, not Rs.3,000/fees"
+    "ruff": "clean across interlock/, tests/, scripts/",
+    "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
+    "pytest": "583 passed",
+    "calibration": "out-of-fold n=2000: ECE 0.0451 (target <0.05 PASS), Brier 0.0863, AUROC 0.9205",
+    "conformal": "certified: <=1% ungrounded escapes at 90% confidence, threshold 0.145, n=1000 -- at a 100% intervention rate",
+    "tool_interlock": "Scene 2 runs through the proxy: poisoned doc -> email frozen -> durable review card; the client never receives the frozen call",
+    "holds": "kill-and-restart survival test passes",
+    "action_latency": "MEASURED on this hardware: L2_repair 13,704 ms median, L3_reroute 30,719 ms median"
+  },
+  "never_cut_status": {
+    "calibration_step": "BUILT (D2-B1/B2) -- isotonic + conformal, artefacts in artifacts/calibration/",
+    "commit_gate": "BUILT (D2-A4/A5) -- text streams one sentence behind; tool calls now stream one call behind",
+    "tool_interlock": "BUILT (D3-A1/A2) -- taint x reversibility, durable holds, approve/reject endpoints",
+    "seeded_eval_set": "NOT BUILT (D3-B7) -- this is the remaining never-cut item and the next task"
   },
   "open_findings": [
-    "F-001 fixed: L5 nuisance caused over-blocking",
     "F-002 open: high-stakes intervention rate; disciplined by the false-intervention metric, must NOT be tuned away",
     "F-003 recorded: impact_inr is a base that multipliers scale",
-    "F-004 fixed: <think> excluded from answer text (segmenter) and from repairs",
-    "F-005 fixed: client disconnect left no ledger row",
-    "F-006 fixed: unbuffered finish() leaked a dangling evaluation task",
-    "F-007 fixed: human review charged as a false-alarm cost made L2_repair UNREACHABLE at every operating point",
-    "F-008 fixed: repair shipped the literal string '<think>' as the corrected sentence",
-    "F-009 fixed: the plan's stop=newline fires inside the reasoning block",
-    "F-010 CLOSED: repair now corrects against real retrieved evidence and cites the clause",
-    "F-011 fixed: the repair's fallback evidence included UNTRUSTED passages -- the guardrail would have rewritten a correct answer into agreement with the poisoned document and cited it. Now filtered; regression test added.",
-    "F-012 fixed: qwen3:8b spent its whole 176-token repair budget thinking, so every repair returned None after ~95s. '/no_think' in the repair system prompt fixes it; chat_template_kwargs.enable_thinking is silently ignored by Ollama's OpenAI shim (measured both ways).",
-    "F-013 fixed: RepairResult reported 'failed verification' when the model had produced no text at all -- two different incidents pointing at two different escalations.",
-    "F-014 OPEN, MEASURED: a verified repair takes ~46s against local qwen3:8b. The plan budgets 150-400ms and term (4) of the objective prices it at 280ms, so the objective is charging a fiction on this hardware. Options: a small warm-loaded repair model, or re-price latency_ms.L2_repair from measurement. Must be resolved before any latency claim is published.",
-    "F-015 OPEN: on an L4_hold at sentence 0 the held sentence is suppressed but later sentences still stream. Whether a hold terminates the response or holds only the flagged span is a decision-layer question, not yet settled."
+    "F-014 RESOLVED by measurement: the 46 s repair was mostly Ollama cold-loading. keep_alive removes it; the residual 13.7 s is real and is now what the policy charges.",
+    "F-015 open: on an L4_hold at sentence 0 the held sentence is suppressed but later sentences still stream. Whether a hold terminates the response or holds only the flagged span is a decision-layer question, not yet settled.",
+    "F-016 OPEN, MEASURED: the conformal bound is certified only at a 100% intervention rate, because 'unanswerable' is invisible to the deterministic grounding signals (0.203 vs a clean baseline of 0.191). The guarantee is real and operationally useless until the observer probe (D2-B4/B7) lands. Do NOT present the bound without the intervention rate beside it.",
+    "F-017 OPEN: calibrated probabilities are bimodal -- nothing between 0.25 and 0.85 -- so the ECE of 0.0451 rests on four populated bins. Visible in the reliability histogram. A richer signal set should spread this out; until it does, the ECE means less than a single number suggests.",
+    "F-018 OPEN: the semantic-entropy labelling job (D1-B5's second half) is not run. 10 samples x N questions at 3-14 s each is unaffordable on this hardware; the pipeline that consumes those scores is built and will take them."
+  ],
+  "fixed_this_session": [
+    "F-010 closed: repair corrects against real retrieved evidence and cites the clause",
+    "F-011: repair fallback evidence included UNTRUSTED passages -- the guardrail would have rewritten a correct answer into agreement with the poisoned document and cited it",
+    "F-012: qwen3 spent its whole repair budget thinking; '/no_think' fixes it (chat_template_kwargs is ignored by Ollama's OpenAI shim -- measured both ways)",
+    "F-013: RepairResult reported 'failed verification' when the model had produced no text at all",
+    "conformal fixed-sequence grid was ordered backwards, so EVERY input reported 'not certified'; it neither raised nor looked wrong",
+    "tool-call argument matching used raw substring, so {'currency': 'en'} matched 'prepaym-en-t' and traced every call to every document",
+    "induced-failure taxonomy silently rebalanced when a chunk could not host a mode"
   ],
   "deviations_recorded": [
-    "D-009: the dense retrieval arm is a deterministic hashed lexical vector, not bge-small-en-v1.5, because torch is not installed. BM25 carries retrieval; the dense arm declares semantic=False and is weighted at half a vote. One config string swaps in the real model."
+    "D-009: the dense retrieval arm is a deterministic hashed lexical vector, not bge-small-en-v1.5 (no torch). BM25 carries retrieval; the dense arm declares semantic=False and gets half a vote. One config string swaps in the real model.",
+    "D-010: calibration is fitted on INDUCED failures, not human labels. It calibrates; it does not audit. D2-B3's hand-labelled 300 remains outstanding and is what the meta-monitor must re-score."
   ],
-  "updated_utc": "2026-08-25T19:30:00Z"
+  "updated_utc": "2026-08-25T22:00:00Z"
 }

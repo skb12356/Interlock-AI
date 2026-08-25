@@ -5,7 +5,9 @@ Live record of what is **built**, what is **measured**, what is **stubbed**, and
 
 Task-level state lives in `TODO.md`; machine-readable resume state in `STATE_CHECKPOINT.json`.
 
-**Last updated:** 2026-08-25 · **Phase:** Day 2 — the commit gate and the ladder are built and wired
+**Last updated:** 2026-08-25 · **Phase:** Day 2/3 — retrieval, the tool interlock and the
+calibration layer are built. Three of the four never-cut items are done; the seeded eval
+set is the outstanding one.
 
 ---
 
@@ -31,14 +33,19 @@ Task-level state lives in `TODO.md`; machine-readable resume state in `STATE_CHE
 | Segmenter | **built** | tests written first; chunk-order independent |
 | Commit gate + property test | **built** | `tests/property/test_commit_gate.py` |
 | Ladder L1/L2/L4/L5 | **built** | verified live end to end |
-| **Observer (real weights)** | not started | D2-B4 |
-| **Calibration + conformal** | not started | D2-B1..B3 — **on the never-cut list** |
-| **Retrieval + demo app** | not started | D1-A5 — blocks F-010 |
-| **Tool interlock** | not started | D3-A1..A2 — **on the never-cut list** |
-| **Seeded eval set** | not started | D3-B7 — **on the never-cut list** |
+| Retrieval (hybrid FTS5 + sqlite-vec) | **built** | 45 docs → 47 chunks; top-1 correct on all four demo questions |
+| Grounding signals (6, deterministic) | **built** | `tests/unit/test_calibration.py`; measured AUROC per signal |
+| Induced-failure labelling | **built** | six modes, exact proportions, zero fallbacks, deterministic |
+| **Calibration + conformal** | **built** | D2-B1/B2 — **never-cut item done**; artefacts in `artifacts/calibration/` |
+| **Tool interlock + durable holds** | **built** | D3-A1/A2 — **never-cut item done**; kill-and-restart test passes |
+| **Observer (real weights)** | not started | D2-B4 — needs torch |
+| **Seeded eval set** | not started | D3-B7 — **the remaining never-cut item** |
+| Hand-labelled anchor set (300) | not started | D2-B3 — calibration currently runs on induced data (D-010) |
+| Real `RiskEngine` (swap from stub) | not started | D3-B3/B4 — a one-line DI change if the contracts held |
+| Demo app UI | not started | D1-A5 remainder |
 | **Governor / Lane C / console** | not started | D2-A6, D4 |
 
-**Test count:** 448 passing.
+**Test count:** 583 passing.
 
 ### Sequencing change
 
@@ -51,9 +58,9 @@ conformal feasibility filter — remain at D3-B1.
 
 ## 2. What is measured
 
-Nothing yet. The six target metrics are measured from the first working phase and reported
-by `make eval` — **never reported as achieved without a run that produced the number**
-(CLAUDE.md §8).
+The six headline metrics still need `make eval` (D3-B7), which does not exist yet — so
+five of the six remain blank. **Never reported as achieved without a run that produced
+the number** (CLAUDE.md §8).
 
 | Metric | Target | Measured |
 |---|---|---|
@@ -61,12 +68,39 @@ by `make eval` — **never reported as achieved without a run that produced the 
 | Added p95 latency | ≤ 120 ms | — |
 | Verification cost | ≤ 5% of model spend | — |
 | Net spend change | ≈ −30% | — |
-| Ungrounded escapes | ≤ 1% @ 90% confidence | — |
+| Ungrounded escapes | ≤ 1% @ 90% confidence | **certified — but at a 100% intervention rate** (see below) |
 | False interventions | ≤ 2% | — |
+
+### Measured this phase
+
+Numbers that exist because a run produced them, with the caveat each one carries.
+
+| Quantity | Value | Caveat |
+|---|---|---|
+| Calibration ECE (out-of-fold, n=2000) | **0.0451** | target < 0.05 → PASS. Rests on four populated bins (F-017) |
+| Brier / AUROC | 0.0863 / 0.9205 | 5-fold cross-fitted; induced data, not human labels (D-010) |
+| Conformal threshold | **0.145 @ α=0.01, δ=0.10** | certified on n=1000 defective items |
+| Intervention rate at that threshold | **100%** | the bound holds and is useless (F-016) |
+| L2 repair latency | **13,704 ms median** | qwen3:8b on the build laptop; `artifacts/action_latency.json` |
+| L3 reroute latency | **30,719 ms median** | same; both re-priced into the policy |
+| Ollama cold start | 12 s (4b) / 21 s (8b) | eliminated by `keep_alive`, not by making anything faster |
+
+**The one that must not be quoted alone** is the conformal bound. "At most 1% ungrounded
+escapes at 90% confidence" is true and certified. It is achieved by intervening on every
+request, because `unanswerable` failures are invisible to the deterministic grounding
+signals. Presenting the bound without the intervention rate beside it would be the exact
+kind of technically-true claim this project exists to avoid.
 
 ## 3. What is stubbed
 
-Nothing yet. Planned stubs, per the plan's own unblocking design:
+- **The dense retrieval arm** is a deterministic hashed lexical vector, not
+  `bge-small-en-v1.5` (D-009). It declares `semantic=False`, gets half a vote in the
+  fusion, and the build script prints the caveat on every run. BM25 is carrying retrieval.
+- **Calibration data is induced, not human** (D-010). It calibrates; it does not audit.
+- **The semantic-entropy labelling job** is not run (F-018): 10 samples × N questions at
+  3–14 s each is unaffordable here. The pipeline that consumes those scores is built.
+
+Planned stubs, per the plan's own unblocking design:
 
 - `risk/stub.py` — `StubRiskEngine`, header-driven forced decisions. **Replaced by the real
   engine at D3-B4** (a one-line DI change; the Protocol is identical).
@@ -171,6 +205,35 @@ the home repository. `.gitignore` covers secrets, runtime state (`*.db`), and re
 artefacts.
 
 ---
+
+### D-009 — The dense retrieval arm is a lexical stand-in, not `bge-small-en-v1.5`
+**Plan:** `bge-small-en-v1.5` embeddings over the corpus, in `sqlite-vec`.
+**Reality:** that is a 130 MB model on top of a ~2.5 GB torch install, and the user
+instructed that time-consuming installs be skipped.
+**Chosen instead:** a deterministic hashed lexical vector behind the identical `Embedder`
+interface, hashed with blake2b rather than `hash()` so an index built in one process
+matches queries embedded in the next. It declares `semantic=False`, and the fusion weights
+the dense arm at **half a vote** when that flag is false — two lexical arms voting equally
+is not a second opinion, it is the arm without IDF dragging the arm that has it.
+**Cost of the choice, stated plainly:** retrieval cannot connect "foreclosure" to
+"prepayment" unless the words co-occur. BM25 over 45 clause-formatted documents is
+genuinely strong and top-1 is correct on all four demo questions, but paraphrase
+robustness is **not** demonstrated and must not be claimed. One config string
+(`INTERLOCK_EMBEDDER`) swaps in the real model; the index refuses to open against a
+mismatched embedder rather than returning confident nonsense.
+
+### D-010 — Calibration is fitted on induced failures, not human labels
+**Plan:** D2-B3 hand-labels 300 items as the anchor set, and calibration is fitted with
+them in the mix.
+**Reality:** the hand-labelling task has not been done. `eval/induce.py` constructs
+labelled failures instead — the ground truth is exact, because the generator is what broke
+each item.
+**Cost of the choice, stated plainly:** induced data comes from a generator, so a detector
+can in principle learn the generator's fingerprint rather than the defect. **Induced data
+calibrates; human data audits.** D2-B3 stays on the never-cut list, and the meta-monitor
+(D4-B3) must re-score the *human* anchor set, never this one. The published ECE is honest
+about what it was measured on — `artifacts/calibration/dataset.json` carries the warning
+alongside the numbers.
 
 ## 4b. Open findings
 

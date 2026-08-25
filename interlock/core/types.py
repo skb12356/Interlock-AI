@@ -147,6 +147,11 @@ class Fragment(_Frozen):
     role: str = "retrieved"
     doc_id: str | None = None
     score: float | None = None  # retrieval similarity, when it came from the index
+    #: The policy domain this document belongs to, labelled at ingestion alongside
+    #: provenance. The stakes model reads it, so what was actually *retrieved* prices
+    #: the request rather than what the question claimed to be about.
+    #: (Additive optional field, permitted by the Contract 1 change rule.)
+    domain: str | None = None
 
 
 class Stakes(_Frozen):

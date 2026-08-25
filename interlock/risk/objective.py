@@ -26,6 +26,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from interlock.core.money import format_inr
 from interlock.core.policy import Policy
 from interlock.core.types import ACTIONS, Action, Defect, LossRow, Stakes
 
@@ -234,20 +235,20 @@ def _explain(
 ) -> list[str]:
     """Ordered, human-readable. The console renders these verbatim."""
     why = [
-        f"stakes: {stakes.domain} at Rs.{stakes.impact_inr:,.0f} ({stakes.reversibility})",
+        f"stakes: {stakes.domain} at {format_inr(stakes.impact_inr)} ({stakes.reversibility})",
     ]
     ranked = sorted(probs.items(), key=lambda item: item[1], reverse=True)
     for defect, probability in ranked[:3]:
         if probability > 0.0:
             why.append(f"P({defect}) = {probability:.2f}")
     why.append(
-        f"{best.action} costs Rs.{best.total:,.2f} "
+        f"{best.action} costs {format_inr(best.total, 2)} "
         f"(harm {best.residual_harm:,.2f} + nuisance {best.nuisance:,.2f} "
         f"+ compute {best.compute:,.2f} + latency {best.latency:,.2f})"
     )
     if runner_up is not None:
         why.append(
-            f"next best {runner_up.action} at Rs.{runner_up.total:,.2f} "
-            f"(margin Rs.{runner_up.total - best.total:,.2f})"
+            f"next best {runner_up.action} at {format_inr(runner_up.total, 2)} "
+            f"(margin {format_inr(runner_up.total - best.total, 2)})"
         )
     return why

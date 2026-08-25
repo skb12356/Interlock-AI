@@ -73,7 +73,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[x]` **D1-J1.4 — Native service supervisor + make targets** — *done 2026-08-25. `scripts/up.ps1` starts observer + gateway and polls `/health`; **cold start measured at 5.3 s** against a 90 s target. `scripts/down.ps1` matches by command line (survives a crash, cannot kill an unrelated process) and leaves no orphans. `.env.example` defaults to keyless Ollama.* *(replaces the compose task; see P0.2)*
   - *Output:* `scripts/up.ps1` launches gateway:8080 + observer:8081 + console:5173 as supervised local processes, polls each `/health` until ready, and prints a status table; `scripts/down.ps1` stops them cleanly. `make up|demo|eval` (and `.ps1` twins) exist — may print TODO initially. `.env.example` for provider keys, defaulting to Ollama so no key is needed.
   - *Test:* `scripts/up.ps1` reaches all-healthy from a cold start in < 90 s and `scripts/down.ps1` leaves no orphan processes.
-- `[ ]` **D1-J1.5 — Demo corpus: 45 bank documents**
+- `[x]` **D1-J1.5 — Demo corpus: 45 bank documents** — *done 2026-08-25 via `scripts/build_corpus.py`. 6 contradictory pairs (Clause 9.1 vs 7.4 is Scene 1), 1 poisoned claims PDF with white-text injection (Scene 2), plus **a benign untrusted upload as a control** so 'untrusted' is not perfectly correlated with 'malicious' in the eval set. Every doc carries a domain that exists in the policy.*
   - *Output:* `corpus/` + `manifest.json` — loan T&C, prepayment, claims, branch info, fee schedule, **6 deliberately contradictory pairs** (Clause 7.4 vs Clause 9.1 is the Scene-1 pair).
   - *Test:* manifest validates; contradictory pairs are machine-identifiable for the seeded eval set.
 
@@ -82,7 +82,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[x]` **D1-A1 — the passthrough** — *done 2026-08-25 as `gateway/{app,providers,config}.py`. Streaming + non-streaming, pooled `httpx.AsyncClient`, `X-Accel-Buffering: no`. Adapters: Ollama (default, keyless), OpenAI, Anthropic. **12 real SSE fixtures recorded from live Ollama** via `scripts/record_streams.py`; 53 contract tests replay them byte-for-byte. Verified live end-to-end against Ollama. **Contract 3 risk resolved: the real OpenAI SDK reads our stream and ignores the named events** (`test_the_real_openai_sdk_can_read_our_stream`).*
   - *Output:* `POST /v1/chat/completions` streaming + non-streaming; `httpx.AsyncClient` with pooling; correct SSE (`text/event-stream`, chunked, `X-Accel-Buffering: no`); provider adapters behind one interface — **Ollama (primary, no keys), OpenAI, Anthropic**.
   - *Test:* 12 recorded real SSE responses → `tests/fixtures/streams/*.jsonl`; a contract test replays them; byte-for-byte passthrough assertion. **These fixtures are the D1-B unblocking artefact.**
-- `[ ]` **D1-A2 — `gateway/laneA.py`: pre-flight skeleton**
+- `[x]` **D1-A2 — `gateway/lane_a.py`: pre-flight** — *done 2026-08-25. Detectors race under a hard deadline via `asyncio.wait` + cancel; a slow detector is **cancelled, not awaited**, and recorded with `prob=None`. Stakes and the router run inline (dropping stakes would leave the request with no budget at all). Deadline 120 ms per D-008.*
   - *Output:* `asyncio.gather` over injection · PII · canary · stakes · cache · route with a **40 ms hard `asyncio.wait_for`**. A detector that misses the deadline is **dropped, not awaited**; its absence is recorded as a signal with `prob=None`.
   - *Test:* a deliberately slow detector proves drop-not-await; a Lane A span is present on 100% of requests (F2).
 - `[ ]` **D1-A3 — OpenTelemetry tracing**
@@ -102,13 +102,13 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
   - *Output:* `StubRiskEngine` reads header `X-Interlock-Force: <defect>@<sentence_idx>` and returns a **fully populated `Decision`** — real loss table, fake probabilities. The mock observer returns scripted signals with a configurable sleep to exercise the deadline path.
   - *Contract validation:* satisfies the `RiskEngine` Protocol; swapping to the real engine on Day 3 must be a **one-line DI change**.
   - *Test:* `X-Interlock-Force: ungrounded@2` → a stub L2 decision visible in the trace.
-- `[ ]` **D1-B2 — `signals/injection.py`**
+- `[x]` **D1-B2 — `signals/injection.py`** — *done 2026-08-25. Deterministic pattern backend (default) + lazily-imported transformer backend behind one interface. Scans the user turn **and every retrieved chunk separately** — proven by a test where a clean prompt + poisoned chunk still scores >0.9. Zero false positives across all 43 trusted corpus documents.*
   - *Output:* `protectai/deberta-v3-base-prompt-injection-v2` via transformers on CPU, ONNX-exported (~8 ms). Runs on the last user turn **and on every retrieved chunk separately** — this is what catches the poisoned PDF.
   - *Test:* known-injection corpus; the per-chunk scan proven by a test with a clean prompt and a poisoned chunk.
-- `[ ]` **D1-B3 — `signals/pii.py` + `signals/canary.py`**
+- `[x]` **D1-B3 — `signals/pii.py` + `signals/canary.py`** — *done 2026-08-25. PII is **checksum-first**: Verhoeff for Aadhaar, Luhn for cards, strict formats for PAN/IFSC — verified against the textbook Verhoeff vector. Canary uses Aho-Corasick, planted in system prompt AND corpus, matched on egress, deterministic L5, cross-tenant leaks flagged, zero false positives over the whole corpus, never logged in full.*
   - *Output:* Presidio (en) with custom recognisers for **PAN / Aadhaar / IFSC / account numbers**. Per-tenant canary registry, egress Aho-Corasick match (`pyahocorasick`, O(n), zero false positives), planted in **both the system prompt and the corpus**.
   - *Test:* canary match → deterministic L5 with no model in the loop (invariant 6); zero-false-positive assertion over the clean corpus.
-- `[ ]` **D1-B4 — `signals/stakes.py` v1 (ADR-005: deterministic, no LLM)**
+- `[x]` **D1-B4 — `signals/stakes.py` v1** — *done 2026-08-25. Deterministic feature scorer: retrieved domain (outranks keywords — keywords are the part an attacker controls), monetary magnitude with lakh/crore scaling and Indian grouping, tool reversibility, user role, conversation depth. Every term emits a readable rationale line; `features` makes it replayable.*
   - *Output:* feature scorer — retrieved-doc domain, monetary regex magnitude, intent keywords, user role from headers, tool schemas present, conversation depth. Domain table from the policy file. Emits `Stakes` **with a human-readable `rationale` list** and `features` for replay.
   - *Test:* the three-case table from the PDF (loan penalty ₹40,000 / internal ticket ₹200 / same at 1% risk) reproduces from the real policy file.
 - `[ ]` **D1-B5 — Labelling pipeline + overnight semantic-entropy job**

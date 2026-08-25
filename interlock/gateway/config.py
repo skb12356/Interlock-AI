@@ -72,7 +72,15 @@ class Settings:
 
     # -- budgets ------------------------------------------------------------ #
     #: Lane A's hard deadline. A detector that misses it is dropped, not awaited.
-    lane_a_deadline_ms: float = 40.0
+    #:
+    #: The plan specifies a ~25 ms budget with a 40 ms hard deadline. Raised to 120 ms
+    #: for this build (deviation D-008) because the CPU-only profile has no ONNX-
+    #: accelerated detectors. **The consequence is a claim, not just a number:** the
+    #: low-stakes tail may now reach 120 ms, which breaks the "<= 40 ms added p95 on
+    #: low-stakes traffic" target and spends the whole headline budget here. Lower it
+    #: with INTERLOCK_LANE_A_DEADLINE_MS once the detectors are ONNX-exported, and
+    #: report the *measured* p95 at D5-A2 either way.
+    lane_a_deadline_ms: float = 120.0
     #: What the observer is given per sentence; its own timeout adds a 30 ms margin.
     observe_deadline_ms: float = 120.0
     #: The gate's per-sentence watchdog: if the model stalls mid-sentence, flush.
@@ -115,7 +123,7 @@ def load_settings() -> Settings:
             _env("INTERLOCK_STRONG_MODEL", "qwen3:8b"),
         ),
         observer_base_url=_env("INTERLOCK_OBSERVER_URL", "http://127.0.0.1:8081"),
-        lane_a_deadline_ms=_env_float("INTERLOCK_LANE_A_DEADLINE_MS", 40.0),
+        lane_a_deadline_ms=_env_float("INTERLOCK_LANE_A_DEADLINE_MS", 120.0),
         observe_deadline_ms=_env_float("INTERLOCK_OBSERVE_DEADLINE_MS", 120.0),
         sentence_watchdog_s=_env_float("INTERLOCK_SENTENCE_WATCHDOG_S", 8.0),
         db_path=Path(_env("INTERLOCK_DB_PATH", str(REPO_ROOT / "data" / "interlock.db"))),

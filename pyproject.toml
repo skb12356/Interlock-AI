@@ -83,10 +83,17 @@ select = [
 ignore = [
     "E501",   # line length is handled by the formatter
     "B008",   # FastAPI Depends() in defaults is idiomatic
+    # The objective is documented in the notation the spec uses -- minus signs,
+    # multiplication signs, Sigma, lambda. Do not ASCII-mangle the formulas.
+    "RUF002",
+    "RUF003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B011"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["interlock"]
 
 # ---------------------------------------------------------------- mypy ----
 # Strict on core/ -- it is the frozen contract every other module compiles

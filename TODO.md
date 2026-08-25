@@ -63,11 +63,11 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[x]` **D1-J1.1 — Repo skeleton + CI** — *done 2026-08-25. ruff + ruff format + mypy --strict(core) + pytest all green; 16 tests. Markdown excluded from ruff format so the frozen spec docs are never rewritten.*
   - *Output:* `pyproject.toml` (uv, py3.12), `ruff.toml`, `mypy.ini` (strict on `interlock/core`), `.pre-commit-config.yaml`, `.github/workflows/ci.yml`, `Makefile` + `scripts/*.ps1` with `up`/`demo`/`eval` targets, full directory tree per Implementation01.
   - *Owner:* Joint · *Test:* CI green on an empty repo; `ruff && mypy && pytest` all exit 0.
-- `[ ]` **D1-J1.2 — FREEZE `interlock/core/types.py` (Contract 1)**
+- `[x]` **D1-J1.2 — FREEZE `interlock/core/types.py` (Contract 1)** — *done 2026-08-25. All 12 models + the Protocol, verbatim from Implementation03 §2. 24 contract tests: ladder/defect/lattice enumerations pinned, round-trip on every model, `extra=forbid` so drift fails loudly, Protocol conformance checked positively and negatively. Added `max_provenance()` (the lattice join) and `GateMode`.*
   - *Output:* `Action`, `Defect`, `Reversibility`, `Provenance`, `Fragment`, `Stakes`, `SignalReading`, `RiskContext`, `LossRow`, `Decision`, `RepairHint`, `RiskEngine` Protocol — verbatim from Implementation03 §2.
   - *Contract validation:* `mypy --strict` clean; round-trip pydantic serialisation test for every model; the `RiskEngine` Protocol structurally satisfied by both the stub and the real engine.
   - *Owner:* Joint · **Frozen after this task. Edits only at a checkpoint.**
-- `[ ]` **D1-J1.3 — FREEZE Observer HTTP (Contract 2) + SSE events (Contract 3)**
+- `[x]` **D1-J1.3 — FREEZE Observer HTTP (Contract 2) + SSE events (Contract 3)** — *done 2026-08-25. `core/observer_api.py` + `core/sse.py` + `docs/contracts/README.md`; 34 contract tests. Observer returns 200-always with in-band `degraded`; `RawSignal` has no `prob` field, so calibration cannot be bypassed. **Recorded risk:** the contract assumes SDKs ignore named SSE events, which is not universally true of SDK stream decoders — added an additive `X-Interlock-Events: off` opt-out and deferred verification against a real SDK to D1-A1.*
   - *Output:* `docs/contracts/observer_http.md` + pydantic request/response models; SSE event names `interlock.stakes|signal|decision|hold` with exact payload shapes.
   - *Contract validation:* schema test asserting `POST /v1/observe` returns 200 **always** unless malformed, and `degraded: true` + empty `signals[]` on internal failure; the `data:` channel stays byte-compatible with what the OpenAI SDK expects.
 - `[ ]` **D1-J1.4 — Native service supervisor + make targets** *(replaces the compose task; see P0.2)*

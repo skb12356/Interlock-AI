@@ -5,7 +5,7 @@ Live record of what is **built**, what is **measured**, what is **stubbed**, and
 
 Task-level state lives in `TODO.md`; machine-readable resume state in `STATE_CHECKPOINT.json`.
 
-**Last updated:** 2026-08-25 · **Phase:** Day 1 — The spine, and the seam
+**Last updated:** 2026-08-25 · **Phase:** Day 2 — the commit gate and the ladder are built and wired
 
 ---
 
@@ -13,23 +13,32 @@ Task-level state lives in `TODO.md`; machine-readable resume state in `STATE_CHE
 
 | Component | State | Evidence |
 |---|---|---|
-| Repo skeleton, toolchain, CI | **built** | `ruff` + `ruff format` + `mypy --strict interlock/core` + `pytest`, all green |
+| Repo skeleton, toolchain, CI | **built** | ruff + ruff format + mypy --strict + pytest, all green |
 | Contract 1 — `RiskEngine` + types | **frozen** | `tests/contract/test_contract1_types.py` |
 | Contract 2 — Observer HTTP | **frozen** | `tests/contract/test_contract2_observer.py` |
-| Contract 3 — SSE wire format | **frozen** | `tests/contract/test_contract3_sse.py` |
-| Contract 4 — policy as code | **frozen** | `tests/contract/test_contract4_policy.py`, `policies/banking.yaml` |
-| `core/` ids, clock, errors | **built** | `tests/unit/test_core_ids_clock.py` |
-| Expected-loss objective | **built** | `tests/unit/test_objective.py` — reproduces the pitch's three-case table |
-| Stub risk engine | **built** | `tests/unit/test_stub_and_mock.py` — satisfies Contract 1 |
-| Mock observer | **built** | `tests/unit/test_stub_and_mock.py` — Contract 2, scriptable latency/failure |
-| Gateway / Lane A | not started | — |
-| Commit gate | not started | — |
-| Real observer | not started | — |
-| Calibration | not started | — |
-| Ledger | not started | — |
-| Console | not started | — |
+| Contract 3 — SSE wire format | **frozen** | `tests/contract/test_contract3_sse.py`; verified against the real OpenAI SDK |
+| Contract 4 — policy as code | **frozen** | `tests/contract/test_contract4_policy.py` |
+| Contract 5 — DB schema | **frozen** | `migrations/001_initial.sql`; enforced by a grep test |
+| `core/` ids, clock, money, errors | **built** | `tests/unit/test_core_ids_clock.py` |
+| Expected-loss objective | **built** | reproduces the pitch's three-case table; every ladder rung reachable |
+| Stub risk engine + mock observer | **built** | the Day-1 unblocking artefacts; retained as chaos fixtures |
+| Demo corpus (45 docs) | **built** | 6 contradictory pairs, 1 poisoned PDF, 1 benign untrusted control |
+| Lane A (pre-flight) | **built** | drops slow detectors rather than awaiting them |
+| Detectors: injection, PII, canary | **built** | deterministic-first; zero false positives over the whole corpus |
+| Stakes model v1 | **built** | deterministic feature scorer with a readable rationale |
+| Ledger + migrations | **built** | one txn per request; holds awaited and restart-proof |
+| Streaming proxy + 12 real fixtures | **built** | recorded from live Ollama |
+| Segmenter | **built** | tests written first; chunk-order independent |
+| Commit gate + property test | **built** | `tests/property/test_commit_gate.py` |
+| Ladder L1/L2/L4/L5 | **built** | verified live end to end |
+| **Observer (real weights)** | not started | D2-B4 |
+| **Calibration + conformal** | not started | D2-B1..B3 — **on the never-cut list** |
+| **Retrieval + demo app** | not started | D1-A5 — blocks F-010 |
+| **Tool interlock** | not started | D3-A1..A2 — **on the never-cut list** |
+| **Seeded eval set** | not started | D3-B7 — **on the never-cut list** |
+| **Governor / Lane C / console** | not started | D2-A6, D4 |
 
-**Test count:** 182 passing.
+**Test count:** 448 passing.
 
 ### Sequencing change
 
@@ -142,6 +151,18 @@ repair, hold and interlock paths are all built and tested with no GPU and no mod
 become labels indicating which contract side a task sits on. Checkpoints become the
 per-task verification gate in `TODO.md`'s Definition of Done.
 
+### D-008 — Lane A deadline raised from 40 ms to 120 ms *(user ruling, 2026-08-25)*
+**Plan:** Lane A has a ~25 ms budget with a 40 ms hard deadline, and the non-functional
+target is "≤ 40 ms added p95 on low-stakes traffic".
+**Reality:** the user instructed 120 ms; the CPU-only profile has no ONNX-accelerated
+detectors, so the original figure assumed hardware this build does not have.
+**Cost of the choice, stated plainly:** the low-stakes tail may now reach 120 ms, which
+**breaks the ≤ 40 ms low-stakes target and spends the entire ≤ 120 ms headline budget in
+one lane.** Configurable via `INTERLOCK_LANE_A_DEADLINE_MS`; lower it once the detectors
+are ONNX-exported. Measured Lane A latency is currently **sub-millisecond** with the
+deterministic detectors, so the deadline is headroom rather than expected cost — but the
+number reported at D5-A2 must be the measured p95, never the target.
+
 ### D-007 — Project given its own git repository
 **Reality:** `git rev-parse --show-toplevel` resolved to `C:\Users\saksh` — the entire home
 directory was a git repository, and this project was an untracked subdirectory of it.
@@ -152,6 +173,11 @@ artefacts.
 ---
 
 ## 4b. Open findings
+
+**The authoritative list is `STATE_CHECKPOINT.json -> open_findings` (F-001 … F-010).**
+The three below are the ones with consequences for what we may claim on stage; the rest
+are recorded there with their resolution.
+
 
 Things the build has surfaced that are not yet resolved. Each has a test pinning the
 current behaviour so a regression is noticed here rather than on stage.

@@ -54,7 +54,9 @@ def _ctx(
             impact_inr=40000, reversibility="costly", domain="prepayment", confidence=0.9
         ),
         "already_emitted": False,
-        "remaining_deadline_ms": 120.0,
+        # Lane B runs concurrently with generation, so its budget is the time to
+        # generate the next sentence (1-3 s locally), not Lane A's 120 ms.
+        "remaining_deadline_ms": 800.0,
     }
     defaults.update(kwargs)
     return RiskContext(**defaults)
@@ -450,3 +452,143 @@ async def test_every_decision_stamps_the_versions_that_priced_it(engine: RealRis
     assert decision.policy_version.startswith("banking-")
     assert decision.calib_version == "test"
     assert decision.inputs_digest
+
+
+# --------------------------------------------------------------------------- #
+# The expensive signals: probe and verifier
+# --------------------------------------------------------------------------- #
+
+
+class _StubProbe:
+    """Stands in for the observer probe without loading 100 MB of weights."""
+
+    available = True
+
+    def __init__(self, raw: float | None = 0.9) -> None:
+        self.raw = raw
+        self.calls = 0
+
+    def reading(self, sentence: str, context: list) -> object:
+        self.calls += 1
+        if self.raw is None:
+            return None
+        from interlock.core.types import SignalReading
+
+        return SignalReading(name="observer.probe", raw=self.raw)
+
+    def health(self) -> dict:
+        return {"available": True}
+
+
+class _StubVerifier:
+    def __init__(self, span: tuple[int, int] | None = (10, 25), text: str = "a bad clause") -> None:
+        self.span = span
+        self.text = text
+        self.calls = 0
+
+    def verify(self, sentence: str, context: list) -> object:
+        self.calls += 1
+        outer = self
+
+        class _Worst:
+            text = outer.text
+
+        class _Verdict:
+            offending_span = outer.span
+            worst = _Worst() if outer.span else None
+            unjudged = 0
+
+        return _Verdict()
+
+    def health(self) -> dict:
+        return {"loaded": True}
+
+
+async def test_the_probe_is_added_as_a_feature_not_an_override(
+    calibrator: MultiDefectCalibrator,
+) -> None:
+    """A probe wired to replace the lexical signals would lose the numeric and citation
+    checks, which it is measurably worse at."""
+    probe = _StubProbe(raw=0.95)
+    engine = RealRiskEngine(policy=POLICY, calibrator=calibrator, probe=probe)
+    decision = await engine.evaluate(_ctx(GROUNDED_SENTENCE))
+    assert probe.calls == 1
+    assert decision.probs, "the lexical signals still priced the decision"
+    assert any("observer probe" in reason for reason in decision.why)
+
+
+async def test_the_probe_is_skipped_when_the_budget_is_gone(
+    calibrator: MultiDefectCalibrator,
+) -> None:
+    """A probe started with 40 ms left simply overruns. Better to decide on the free
+    signals and say the decision was degraded."""
+    probe = _StubProbe()
+    engine = RealRiskEngine(policy=POLICY, calibrator=calibrator, probe=probe)
+    decision = await engine.evaluate(_ctx(GROUNDED_SENTENCE, remaining_deadline_ms=40.0))
+    assert probe.calls == 0
+    assert any("probe skipped" in reason for reason in decision.why)
+
+
+async def test_a_probe_that_returns_nothing_does_not_read_as_clean(
+    calibrator: MultiDefectCalibrator,
+) -> None:
+    engine = RealRiskEngine(policy=POLICY, calibrator=calibrator, probe=_StubProbe(raw=None))
+    decision = await engine.evaluate(_ctx(GROUNDED_SENTENCE))
+    assert any("returned nothing" in reason for reason in decision.why)
+    assert decision.probs, "the decision still priced on the signals that did run"
+
+
+async def test_the_verifier_span_becomes_the_repair_target(
+    calibrator: MultiDefectCalibrator,
+) -> None:
+    """The whole reason the verifier exists. Repairing a whole mixed sentence risks
+    losing the half that was correct."""
+    engine = RealRiskEngine(
+        policy=POLICY, calibrator=calibrator, verifier=_StubVerifier(span=(10, 25))
+    )
+    decision = await engine.evaluate(
+        _ctx(
+            "Prepayment attracts a foreclosure charge of 2% under Clause 7.4.",
+            stakes=_repair_stakes(),
+        )
+    )
+    assert decision.repair_hint is not None
+    assert decision.repair_hint.span == (10, 25)
+    assert "a bad clause" in decision.repair_hint.unsupported_claim
+
+
+async def test_without_a_verifier_the_span_is_the_whole_sentence(
+    calibrator: MultiDefectCalibrator,
+) -> None:
+    """Degrading to the whole sentence is correct -- a repair with no span still works,
+    it is just blunter."""
+    sentence = "Prepayment attracts a foreclosure charge of 2% under Clause 7.4."
+    engine = RealRiskEngine(policy=POLICY, calibrator=calibrator)
+    decision = await engine.evaluate(_ctx(sentence, stakes=_repair_stakes()))
+    assert decision.repair_hint is not None
+    assert decision.repair_hint.span == (0, len(sentence))
+
+
+async def test_a_verifier_that_throws_does_not_take_the_request_down(
+    calibrator: MultiDefectCalibrator,
+) -> None:
+    class _Exploding:
+        def verify(self, sentence: str, context: list) -> object:
+            raise RuntimeError("model died")
+
+        def health(self) -> dict:
+            return {}
+
+    engine = RealRiskEngine(policy=POLICY, calibrator=calibrator, verifier=_Exploding())
+    decision = await engine.evaluate(_ctx(GROUNDED_SENTENCE, stakes=_low_stakes()))
+    assert decision.action == "L0_pass"
+    assert any("verifier failed" in reason for reason in decision.why)
+
+
+async def test_health_reports_both_expensive_signals(calibrator: MultiDefectCalibrator) -> None:
+    engine = RealRiskEngine(
+        policy=POLICY, calibrator=calibrator, probe=_StubProbe(), verifier=_StubVerifier()
+    )
+    health = engine.health()
+    assert health["probe"] == {"available": True}
+    assert health["verifier"] == {"loaded": True}

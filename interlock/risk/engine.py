@@ -83,9 +83,18 @@ class RealRiskEngine:
     calibrator: MultiDefectCalibrator | None = None
     conformal: ConformalResult | None = None
     canary_detector: Any | None = None
-    #: A MiniCheck-class verifier (D2-B6). Absent here; when present it supplies the
-    #: offending span, which is what L2 repair aims at.
+    #: MiniCheck-class claim verifier (D2-B6). When present it supplies the offending
+    #: SPAN, which is what turns a repair from "rewrite this sentence" into "fix this
+    #: clause" -- and stops a repair discarding the correct half of a mixed sentence.
     verifier: Any | None = None
+    #: The observer probe (D2-B4/B7). Adds ~100 ms per sentence, so it is deadline-gated:
+    #: a request whose budget has already gone is better served by the free signals than
+    #: by a better answer that arrives late.
+    probe: Any | None = None
+    #: Below this much remaining budget the expensive signals are skipped and the
+    #: decision is marked degraded. Sized from the measured cost (~100 ms/pair) plus
+    #: headroom, because a probe started with 80 ms left will simply overrun.
+    expensive_signal_budget_ms: float = 150.0
 
     #: OFF by default, and that is a recorded decision rather than an oversight.
     #: The certified threshold currently intervenes on 100% of traffic (finding F-016),
@@ -115,7 +124,14 @@ class RealRiskEngine:
         why: list[str] = []
         hard_rules = self._hard_rules(ctx, why)
         scores = grounding_signals(ctx.sentence, ctx.retrieved, question=ctx.question)
-        probs, degraded = self._probabilities(scores, why)
+
+        # The expensive signals, if there is budget for them. Both are optional and both
+        # degrade to None rather than to a clean score -- "we did not check" must never
+        # look like "we checked and found nothing".
+        probe_reading = self._probe(ctx, deadline, why)
+        verdict = self._verify(ctx, deadline, why)
+
+        probs, degraded = self._probabilities(scores, probe_reading, why)
 
         extra_unavailable = self._feasibility(probs, why)
 
@@ -139,7 +155,7 @@ class RealRiskEngine:
             signals=scores.as_readings(latency_ms=deadline.elapsed_ms),
             why=why + choice.why,
             hard_rule=choice.hard_rule,
-            repair_hint=self._repair_hint(ctx, scores, choice.action),
+            repair_hint=self._repair_hint(ctx, scores, choice.action, verdict),
             degraded=degraded,
             policy_version=self.policy.policy_version,
             calib_version=self.calib_version,
@@ -176,8 +192,44 @@ class RealRiskEngine:
 
     # -- step 2: signals -> calibrated probabilities --------------------- #
 
+    def _probe(self, ctx: RiskContext, deadline: Deadline, why: list[str]) -> Any:
+        """Run the observer probe, if it exists and there is time."""
+        if self.probe is None or not getattr(self.probe, "available", False):
+            return None
+        remaining = ctx.remaining_deadline_ms - deadline.elapsed_ms
+        if remaining < self.expensive_signal_budget_ms:
+            why.append(
+                f"observer probe skipped: {remaining:.0f} ms left, needs "
+                f"{self.expensive_signal_budget_ms:.0f}"
+            )
+            return None
+        started = deadline.elapsed_ms
+        reading = self.probe.reading(ctx.sentence, ctx.retrieved)
+        if reading is None:
+            why.append("observer probe returned nothing (no trusted context, or it failed)")
+        else:
+            why.append(f"observer probe: {reading.raw:.3f} in {deadline.elapsed_ms - started:.0f} ms")
+        return reading
+
+    def _verify(self, ctx: RiskContext, deadline: Deadline, why: list[str]) -> Any:
+        """Claim-level verification, for the repair span."""
+        if self.verifier is None:
+            return None
+        remaining = ctx.remaining_deadline_ms - deadline.elapsed_ms
+        if remaining < self.expensive_signal_budget_ms:
+            why.append("claim verifier skipped: not enough budget left")
+            return None
+        try:
+            verdict = self.verifier.verify(ctx.sentence, ctx.retrieved)
+        except Exception:
+            why.append("claim verifier failed; no span available for a repair")
+            return None
+        if verdict.unjudged:
+            why.append(f"{verdict.unjudged} claim(s) could not be judged")
+        return verdict
+
     def _probabilities(
-        self, scores: GroundingScores, why: list[str]
+        self, scores: GroundingScores, probe_reading: Any, why: list[str]
     ) -> tuple[dict[Defect, float], bool]:
         """Calibrated per-defect probabilities, or nothing at all.
 
@@ -191,6 +243,11 @@ class RealRiskEngine:
             return {}, True
 
         features = scores.as_features()
+        if probe_reading is not None:
+            # Added as a FEATURE, never as an override. The calibrator decides how much
+            # weight it earns; a probe wired to replace the lexical signals would lose
+            # the numeric and citation checks, which it is measurably worse at.
+            features[probe_reading.name] = probe_reading.raw
         raw = self.calibrator.predict(features)
         probs: dict[Defect, float] = {}
         for defect in _SUPPORTED_DEFECTS:
@@ -236,7 +293,7 @@ class RealRiskEngine:
     # -- the repair target ---------------------------------------------- #
 
     def _repair_hint(
-        self, ctx: RiskContext, scores: GroundingScores, action: Action
+        self, ctx: RiskContext, scores: GroundingScores, action: Action, verdict: Any = None
     ) -> RepairHint | None:
         """What the repair should aim at, when a repair is what was chosen.
 
@@ -269,8 +326,19 @@ class RealRiskEngine:
             if not str(fragment.provenance).endswith("untrusted")
         ][:3]
 
+        # The verifier's span if it found one, otherwise the whole sentence. The
+        # difference matters on a mixed sentence: repairing all of "the fee is Rs.500
+        # and the waiver is Rs.2 lakh" when only the waiver is invented risks losing the
+        # half that was right.
+        span = (0, len(ctx.sentence))
+        if verdict is not None and getattr(verdict, "offending_span", None):
+            span = tuple(verdict.offending_span)  # type: ignore[assignment]
+            worst = verdict.worst
+            if worst is not None and worst.text:
+                claims.insert(0, f"the clause {worst.text!r} is not supported")
+
         return RepairHint(
-            span=(0, len(ctx.sentence)),
+            span=span,
             unsupported_claim="; ".join(claims) or "not supported by the retrieved context",
             evidence=evidence,
         )
@@ -317,6 +385,8 @@ class RealRiskEngine:
             "calib_version": self.calib_version,
             "probe_version": self.probe_version,
             "calibrated_defects": sorted(self.calibrator.per_defect) if self.calibrator else [],
+            "probe": self.probe.health() if self.probe is not None else None,
+            "verifier": self.verifier.health() if self.verifier is not None else None,
             "conformal_threshold": self.conformal.threshold if self.conformal else None,
             "conformal_filter": self.conformal_filter,
             "internal_failures": self._failures,

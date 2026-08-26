@@ -81,8 +81,23 @@ class Settings:
     #: with INTERLOCK_LANE_A_DEADLINE_MS once the detectors are ONNX-exported, and
     #: report the *measured* p95 at D5-A2 either way.
     lane_a_deadline_ms: float = 120.0
-    #: What the observer is given per sentence; its own timeout adds a 30 ms margin.
-    observe_deadline_ms: float = 120.0
+    #: What Lane B is given per sentence.
+    #:
+    #: Raised from 120 ms once the observer became real. The old figure treated Lane B
+    #: as if it sat on the critical path -- but it does not: it runs CONCURRENTLY with
+    #: the generation of the next sentence, behind the commit buffer. The customer only
+    #: waits if Lane B is slower than the generator, and generating the next sentence
+    #: takes 1-3 s on this hardware.
+    #:
+    #: So the real constraint is "finish before the next sentence arrives", not "finish
+    #: in 120 ms". At 120 ms the observer probe (~100 ms) plus the claim verifier could
+    #: never both run, and the probe usually could not run at all -- a budget that
+    #: silently excluded the component it was sized for.
+    #:
+    #: 800 ms is comfortably under the generator and comfortably over both signals.
+    #: Whatever is actually spent shows up in /admin/latency under `gate_hold`, which is
+    #: the number to watch rather than this ceiling.
+    observe_deadline_ms: float = 800.0
     #: The gate's per-sentence watchdog: if the model stalls mid-sentence, flush.
     sentence_watchdog_s: float = 8.0
     #: How long Ollama keeps a model resident after a request. See F-014: the default
@@ -113,6 +128,9 @@ class Settings:
     #: false-intervention target for the escape guarantee. That is a deployment choice,
     #: not a default.
     conformal_filter: bool = False
+    #: Trained observer probe. Absent on a clean checkout, and that is fine: the
+    #: engine runs on the deterministic signals and reports the absence on /health.
+    probe_path: Path = REPO_ROOT / "artifacts" / "probes" / "probe.json"
     #: 'hashing-v1' (deterministic, no torch) or a sentence-transformers model name.
     #: Must match what built the index, or the index refuses to open -- deliberately.
     embedder: str = "hashing-v1"
@@ -153,7 +171,7 @@ def load_settings() -> Settings:
         observer_base_url=_env("INTERLOCK_OBSERVER_URL", "http://127.0.0.1:8081"),
         ollama_keep_alive=_env("INTERLOCK_OLLAMA_KEEP_ALIVE", "30m"),
         lane_a_deadline_ms=_env_float("INTERLOCK_LANE_A_DEADLINE_MS", 120.0),
-        observe_deadline_ms=_env_float("INTERLOCK_OBSERVE_DEADLINE_MS", 120.0),
+        observe_deadline_ms=_env_float("INTERLOCK_OBSERVE_DEADLINE_MS", 800.0),
         sentence_watchdog_s=_env_float("INTERLOCK_SENTENCE_WATCHDOG_S", 8.0),
         db_path=Path(_env("INTERLOCK_DB_PATH", str(REPO_ROOT / "data" / "interlock.db"))),
         policy_path=Path(
@@ -167,6 +185,9 @@ def load_settings() -> Settings:
             _env("INTERLOCK_CALIBRATION_DIR", str(REPO_ROOT / "artifacts" / "calibration"))
         ),
         conformal_filter=_env_bool("INTERLOCK_CONFORMAL_FILTER", False),
+        probe_path=Path(
+            _env("INTERLOCK_PROBE_PATH", str(REPO_ROOT / "artifacts" / "probes" / "probe.json"))
+        ),
         embedder=_env("INTERLOCK_EMBEDDER", "hashing-v1"),
         retrieval_k=int(_env_float("INTERLOCK_RETRIEVAL_K", 4.0)),
         store_prompts=_env_bool("INTERLOCK_STORE_PROMPTS", False),

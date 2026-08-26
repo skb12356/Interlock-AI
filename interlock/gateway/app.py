@@ -70,6 +70,7 @@ from interlock.signals.base import PreflightContext
 from interlock.signals.canary import CanaryDetector, CanaryRegistry
 from interlock.signals.injection import InjectionDetector, PatternInjectionBackend
 from interlock.signals.pii import PIIDetector
+from interlock.signals.probe_signal import ProbeSignal
 
 _log = logging.getLogger("interlock.gateway")
 
@@ -766,6 +767,18 @@ def _build_risk_engine(settings: Settings, policy: Any, canaries: Any) -> Any:
         )
 
     conformal = load_conformal(settings.calibration_dir / "lambda.json")
+
+    # The observer probe, if one has been trained. Loading is lazy inside ProbeSignal,
+    # so a gateway on a machine without torch still starts -- it just runs on the free
+    # deterministic signals and says so on /health.
+    probe = ProbeSignal.load(settings.probe_path)
+    if not probe.available:
+        _log.warning(
+            "no observer probe at %s -- running on the deterministic signals alone. "
+            "Train one with scripts/train_probes.py.",
+            settings.probe_path,
+        )
+
     return RealRiskEngine(
         policy=policy,
         calibrator=calibrator,
@@ -773,6 +786,7 @@ def _build_risk_engine(settings: Settings, policy: Any, canaries: Any) -> Any:
         canary_detector=CanaryDetector(registry=canaries),
         conformal_filter=settings.conformal_filter,
         calib_version=calib_version,
+        probe=probe if probe.available else None,
     )
 
 

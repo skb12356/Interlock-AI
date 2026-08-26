@@ -2,13 +2,13 @@
   "schema_version": 1,
   "project": "Interlock V2",
   "current_phase": "Day 4 backend complete + observer probe trained; console (Person 2) not started",
-  "last_completed_task": "D2-B4/B7 (observer encoder + linear probes) and the measurement that confirms the probe does not close F-019",
-  "next_task": "F-019 IS YOUR DECISION and blocks the demo -- now confirmed empirically as a policy question, not an ML one. Then: wire the cache/regret/rework onto the request path, or D2-B6 (MiniCheck verifier).",
+  "last_completed_task": "observer probe + claim verifier wired into the real risk engine and the gateway",
+  "next_task": "F-019 IS YOUR DECISION and blocks the demo. Otherwise: wire the cache/regret/rework onto the request path, or D2-B5 (observer KV cache). Console is Person 2's.",
   "system_status": "Amber -- everything builds, 653 tests pass, six metrics measured; but F-019 makes the live high-stakes path block reasonable answers, which blocks the Scene 1 demo",
   "verification": {
     "ruff": "clean across interlock/, tests/, scripts/",
     "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
-    "pytest": "812 passed (fast suite; observer tests marked slow)",
+    "pytest": "849 passed (fast suite; 7 slow tests need model weights)",
     "make_eval": "runs; prints six numbers; five PASS, false interventions MISS",
     "sensitivity": "make sensitivity: the F-019 experiment; disruptive target achievable below a 0.001% clean floor, annotation-inclusive target missed at every floor"
   },
@@ -51,7 +51,8 @@
     "rework confidence scaled from zero at the similarity bar, making the bar meaningless -- a match that just cleared it charged nothing. Now has an explicit floor.",
     "fairness extractor flagged a paraphrased approval as bias; decided-vs-unreadable is now extraction_uncertain, not disparity.",
     "judge confidence parser dropped any value with trailing punctuation ('confidence 0.85.'), silently losing every stated confidence.",
-    "TRAIN/SERVE SKEW in the observer probe: trained with untrusted passages in the premise, served without them. Cost ~0.07 AUROC (0.907 -> 0.837) and nothing errored -- it would have read as 'the probe is weak'. Training now matches serving; serving is the side that cannot move, because a poisoned document in the premise makes the attacker's own claim genuinely entailed."
+    "TRAIN/SERVE SKEW in the observer probe: trained with untrusted passages in the premise, served without them. Cost ~0.07 AUROC (0.907 -> 0.837) and nothing errored -- it would have read as 'the probe is weak'. Training now matches serving; serving is the side that cannot move, because a poisoned document in the premise makes the attacker's own claim genuinely entailed.",
+    "observe_deadline_ms was 120 ms, but the observer probe costs ~100 ms and the claim verifier another ~100 -- so the probe could NEVER have run in production, and neither could both signals together. The 120 ms figure treated Lane B as if it were on the critical path; it is not, it runs concurrently with generating the next sentence (1-3 s locally) behind the commit buffer. Raised to 800 ms, which is comfortably under the generator and over both signals. What is actually spent shows up as `gate_hold` in /admin/latency, which is the number to watch rather than the ceiling."
   ],
   "deviations_recorded": [
     "D-009: the dense retrieval arm is a hashed lexical vector, not bge-small-en-v1.5 (no torch). BM25 carries retrieval; declares semantic=False and gets half a vote.",
@@ -59,5 +60,5 @@
     "D-011: `make eval` holds generation FIXED across both arms (paired design). This is a methodological choice, not a shortcut -- it attributes every off-vs-on difference to Interlock rather than to sampling noise -- but it means generation latency and billing are modelled rather than observed.",
     "D-012: the plan names DeBERTa-v3-base for the observer. transformers 5.x cannot load its tokenizer -- it misroutes the SentencePiece model to the tiktoken parser, which fails on the binary file, and installing sentencepiece/tiktoken does not help because the routing happens before either is consulted. The encoder is configurable and defaults to an NLI cross-encoder whose tokenizer loads natively; NLI is arguably the better base since grounding IS entailment."
   ],
-  "updated_utc": "2026-08-26T12:00:00Z"
+  "updated_utc": "2026-08-26T15:00:00Z"
 }

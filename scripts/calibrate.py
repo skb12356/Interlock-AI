@@ -42,6 +42,7 @@ NEWLINE = "\n"
 
 from interlock.core.policy import load_policy  # noqa: E402
 from interlock.eval.induce import TripleGenerator  # noqa: E402
+from interlock.eval.splits import split_corpus  # noqa: E402
 from interlock.retrieval import corpus_chunks, load_corpus  # noqa: E402
 from interlock.risk.calibration import (  # noqa: E402
     MultiDefectCalibrator,
@@ -83,7 +84,11 @@ def _probe_features(triples: list[Any], model: str | None) -> np.ndarray | None:
 
 def build_dataset(items: int, seed: int) -> tuple[np.ndarray, np.ndarray, list[str], list[Any]]:
     documents = load_corpus(REPO_ROOT / "corpus" / "manifest.json", root=REPO_ROOT)
-    generator = TripleGenerator(chunks=corpus_chunks(documents), seed=seed)
+    # The CALIBRATION half only (D4-B6). Fitting on documents the eval set is built from
+    # made every reported number optimistic by an amount nobody could state.
+    split = split_corpus(corpus_chunks(documents))
+    print(f"  {split.statement()}")
+    generator = TripleGenerator(chunks=split.calibration, seed=seed)
     triples = generator.generate(items)
     if generator.fallbacks:
         print(f"  note: modes that could not be built: {generator.fallbacks}")

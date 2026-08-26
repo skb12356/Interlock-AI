@@ -330,6 +330,24 @@ class SeededSetBuilder:
 
 
 def build_seeded_set(
-    chunks: list[Chunk], *, canary: str = "", seed: int = 20260826
+    chunks: list[Chunk],
+    *,
+    canary: str = "",
+    seed: int = 20260826,
+    use_split: bool = True,
 ) -> list[EvalCase]:
+    """Build the seeded set from the EVALUATION half of the corpus.
+
+    ``use_split=True`` by default and should stay that way. Calibration and the observer
+    probe both fit on the other half, and building the eval set from documents they
+    trained on is precisely the leak D4-B6 exists to close — "different random seeds" is
+    not disjointness when both seeds index the same 45 documents.
+
+    The escape hatch is for tests that want the whole corpus and are not measuring
+    anything with it.
+    """
+    if use_split:
+        from interlock.eval.splits import split_corpus
+
+        chunks = split_corpus(chunks).evaluation
     return SeededSetBuilder(chunks=chunks, canary=canary, seed=seed).build()

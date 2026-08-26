@@ -40,8 +40,8 @@
     },
     {
       "threshold": 0.02,
-      "intervention_rate": 0.0669,
-      "escape_rate": 0.20357142857142857,
+      "intervention_rate": 0.0673,
+      "escape_rate": 0.1988095238095238,
       "n_eval": 840,
       "p_value": 1.0,
       "rejected": false

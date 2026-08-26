@@ -37,6 +37,7 @@ NEWLINE = chr(10)
 warnings.filterwarnings("ignore")
 
 from interlock.eval.induce import TripleGenerator  # noqa: E402
+from interlock.eval.splits import split_corpus  # noqa: E402
 from interlock.observer.encoder import DEFAULT_ENCODER, ObserverEncoder  # noqa: E402
 from interlock.observer.probes import train_probes  # noqa: E402
 from interlock.retrieval import corpus_chunks, load_corpus  # noqa: E402
@@ -53,7 +54,11 @@ def main() -> int:
     args = parser.parse_args()
 
     documents = load_corpus(REPO_ROOT / "corpus" / "manifest.json", root=REPO_ROOT)
-    triples = TripleGenerator(chunks=corpus_chunks(documents), seed=args.seed).generate(args.items)
+    # The probe is a fitted model, so the same disjointness rule applies as to the
+    # calibrator: it may only see the calibration half (D4-B6).
+    split = split_corpus(corpus_chunks(documents))
+    print(f"  {split.statement()}")
+    triples = TripleGenerator(chunks=split.calibration, seed=args.seed).generate(args.items)
     labels = np.array([int(t.is_defective) for t in triples])
     print(f"{len(triples)} triples, {int(labels.sum())} defective")
 

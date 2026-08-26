@@ -52,6 +52,8 @@ from interlock.core.sse import (
 from interlock.gate.repair import SentenceRepairer
 from interlock.gate.sentence_gate import CommitGate, Emission
 from interlock.gateway.config import Settings, load_settings
+from interlock.gateway.console_ws import ConsoleHub
+from interlock.gateway.console_ws import router as console_router
 from interlock.gateway.governor import Governor
 from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.providers import Provider, build_providers
@@ -129,6 +131,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # governor's fail-closed split as it does to buffering and to the router.
             hold_above_impact_inr=policy.thresholds.buffer_above_impact_inr,
         )
+        # Mounted BEFORE the console exists, on purpose: it means the console work
+        # stream never has to edit this file, which is the only place the two work
+        # streams would otherwise collide. See coordination/ALLOTED_WORK.md.
+        app.state.console_hub = ConsoleHub()
         app.state.lane_a = LaneA(
             policy=policy,
             detectors=[
@@ -147,6 +153,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await client.aclose()
 
     app = FastAPI(title="Interlock gateway", version="0.1.0", lifespan=lifespan)
+    app.include_router(console_router)
 
     # ----------------------------------------------------------------- routes #
 

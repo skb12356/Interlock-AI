@@ -1,15 +1,16 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 3 complete - all four never-cut items built, real engine on the hot path, six metrics measured",
-  "last_completed_task": "D2-A6 (governor -- invariant 4 now implemented and asserted), after D3-B7 (seeded eval set)",
-  "next_task": "F-019 FIRST: decide the impact model (per-sentence discount / lambda_time / stakes-banded target). It blocks the Scene 1 demo. Then D4-A4 (console).",
+  "current_phase": "Day 4 backend complete - ledger economics and all of Lane C built; console (Person 2) not started",
+  "last_completed_task": "D4-B3 (deep-judge anchor + meta-monitor), after D4-B1/B2 (twins + e-values) and D4-A1/A2/A3 (pricing, regret, rework)",
+  "next_task": "F-019 is YOUR decision and blocks the demo. Then D4-A6 (evidence pack) or D2-B4/B7 (observer probe, needs torch). Console is Person 2's.",
   "system_status": "Amber -- everything builds, 653 tests pass, six metrics measured; but F-019 makes the live high-stakes path block reasonable answers, which blocks the Scene 1 demo",
   "verification": {
     "ruff": "clean across interlock/, tests/, scripts/",
     "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
-    "pytest": "653 passed",
-    "make_eval": "runs; prints six numbers; five PASS, false interventions MISS"
+    "pytest": "745 passed",
+    "make_eval": "runs; prints six numbers; five PASS, false interventions MISS",
+    "sensitivity": "make sensitivity: the F-019 experiment; disruptive target achievable below a 0.001% clean floor, annotation-inclusive target missed at every floor"
   },
   "measured_metrics": {
     "pre_action_catch_rate": "100.00% [91.8, 100.0] n=43 -- PASS",
@@ -43,12 +44,16 @@
     "the calibration set was 50% defective, so the calibrator scored clean text at P=0.135 and HELD CORRECT ANSWERS for review. Base rate corrected to 10%; ECE 0.0451 -> 0.0037.",
     "the conformal threshold was certified against the BINARY fusion but applied to the per-defect P(ungrounded) the engine gates on. Two different scales, nothing raised; guaranteed mode was a silent no-op and the only symptom was two identical eval columns.",
     "'Let me search the documents again.' scored P(ungrounded)=0.95 and at Rs.75,000 was BLOCKED. Grounding is now gated on is_claim_bearing() -- a sentence asserting nothing checkable is not scored for groundedness.",
-    "scan_egress (the canary control, invariant 6) was written, unit-tested and called by nothing until the real engine wired it"
+    "scan_egress (the canary control, invariant 6) was written, unit-tested and called by nothing until the real engine wired it",
+    "F-019 ANSWERED (not closed -- it needs your decision): my first verdict 'jointly infeasible' was WRONG. Decomposed, the disruptive false-intervention target IS achievable below a ~0.001% detector floor (zero repairs/holds/blocks on clean traffic, 100% catch). The annotation-inclusive target is missed at every floor and the entire residual is L1_annotate on high-stakes answers. So: a stateable ML goal for the observer probe, plus one definitional question about whether adding a citation counts as a false intervention.",
+    "rework confidence scaled from zero at the similarity bar, making the bar meaningless -- a match that just cleared it charged nothing. Now has an explicit floor.",
+    "fairness extractor flagged a paraphrased approval as bias; decided-vs-unreadable is now extraction_uncertain, not disparity.",
+    "judge confidence parser dropped any value with trailing punctuation ('confidence 0.85.'), silently losing every stated confidence."
   ],
   "deviations_recorded": [
     "D-009: the dense retrieval arm is a hashed lexical vector, not bge-small-en-v1.5 (no torch). BM25 carries retrieval; declares semantic=False and gets half a vote.",
     "D-010: calibration is fitted on INDUCED failures, not human labels. It calibrates; it does not audit. D2-B3's hand-labelled 300 remains outstanding and is what the meta-monitor must re-score.",
     "D-011: `make eval` holds generation FIXED across both arms (paired design). This is a methodological choice, not a shortcut -- it attributes every off-vs-on difference to Interlock rather than to sampling noise -- but it means generation latency and billing are modelled rather than observed."
   ],
-  "updated_utc": "2026-08-26T02:30:00Z"
+  "updated_utc": "2026-08-26T06:00:00Z"
 }

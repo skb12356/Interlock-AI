@@ -78,7 +78,10 @@ class MetricResult:
         else:
             body = f"{self.value:10.4f} {self.unit}"
         flag = "" if self.met is None else ("  PASS" if self.met else "  MISS")
-        return f"  {self.name:28} {body}{flag}"
+        # Sub-rows carry their note inline; top-level metrics keep theirs for the JSON,
+        # where there is room for a full sentence.
+        inline = f"   {self.note}" if self.note and self.name.startswith("  ...") else ""
+        return f"  {self.name:28} {body}{flag}{inline}"
 
 
 @dataclass

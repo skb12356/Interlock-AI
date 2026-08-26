@@ -50,6 +50,10 @@ LOOP_STRIKES = 3
 #: The shape of a RAG request on this corpus: a large retrieved prompt and a short
 #: answer. Priced separately because providers charge 3-5x more for completion, and a
 #: blended rate would over-state the cost of exactly the traffic routing makes cheap.
+#: Actions a customer actually experiences as an intervention. L1_annotate is not one:
+#: it appends a citation and ships the answer otherwise unchanged, for 5 ms.
+DISRUPTIVE_ACTIONS = frozenset({"L2_repair", "L3_reroute", "L4_hold", "L5_block"})
+
 PROMPT_TOKENS = 800
 COMPLETION_TOKENS = 100
 
@@ -385,7 +389,7 @@ def compute_metrics(
     # not uniform and is not detector noise: it is stakes. Reporting only the headline
     # invites "the detector is bad", when the measurement says something much more
     # specific -- see the DISRUPTIVE variant and the per-bucket table below.
-    disruptive = sum(1 for o in clean if o.action in {"L2_repair", "L3_reroute", "L4_hold", "L5_block"})
+    disruptive = sum(1 for o in clean if o.action in DISRUPTIVE_ACTIONS)
     disruptive_rate = disruptive / len(clean) if clean else 0.0
     metrics.add(
         MetricResult(
@@ -407,6 +411,7 @@ def compute_metrics(
         if not subset:
             continue
         fired = sum(1 for o in subset if o.intervened)
+        harsh = sum(1 for o in subset if o.action in DISRUPTIVE_ACTIONS)
         label = f"  ...Rs.{low:,}-{high:,}" if high < 10**9 else f"  ...Rs.{low:,}+"
         metrics.add(
             MetricResult(
@@ -417,6 +422,10 @@ def compute_metrics(
                 met=None,
                 numerator=fired,
                 denominator=len(subset),
+                # Both numbers per band, because they diverge sharply and the divergence
+                # is the finding: annotation is near-universal at moderate stakes while
+                # disruption is not.
+                note=f"disruptive {harsh / len(subset):.0%}",
             )
         )
 

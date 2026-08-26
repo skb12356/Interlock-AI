@@ -49,7 +49,7 @@ the most informative result in the build so far (F-019).
 | Governor / degradation order | **built** | D2-A6 — invariant 4 asserted in both directions; `/admin/governor` |
 | **Governor / Lane C / console** | not started | D2-A6, D4 |
 
-**Test count:** 653 passing.
+**Test count:** 788 passing.
 
 ### Sequencing change
 
@@ -76,48 +76,66 @@ slide.
 | **False interventions** | **≤ 2%** | **91.08%** [85.6, 94.6] n=157 | **MISS** |
 | *(beside the six)* Twin pairs treated alike | 100% | 100% (5 pairs) | PASS |
 
-### F-019 — the false-intervention miss is a target conflict, not a bug
+### F-019 — what the false-intervention miss actually is
 
-Broken out by stakes, the rate is not noise and is not uniform:
+Fully characterised as of 2026-08-26, after two experiments. The aggregate is **91.08%**
+against a ≤2% target, and that single number turns out to hide almost everything
+interesting.
 
-| Stakes bucket | False intervention rate | n |
-|---|---|---|
-| ₹0–100 | **0%** | 14 |
-| ₹100–1,000 | 100% | 42 |
-| ₹1,000–10,000 | 100% | 11 |
-| ₹10,000+ | 100% | 90 |
+Split by stakes, and by whether the customer would *experience* the intervention:
 
-The arithmetic explains it exactly. At ₹40,000 impact with a 2.5× reversibility
-multiplier the scaled impact is ₹100,000, and `L0_pass` only wins the argmin when
+| Stakes band | any intervention | **disruptive** (L2+) | n |
+|---|---|---|---|
+| < ₹100 | 0% | **0%** | 14 |
+| ₹100–1,000 | 100% | **17%** | 42 |
+| ₹1,000–10,000 | 100% | 100% | 11 |
+| ₹10,000+ | 100% | 100% | 90 |
 
-    P(defect) × 100,000  <  P(defect) × 100,000 × (1 − 0.80) + 2.00 + 0.07 + 5.48
+`L1_annotate` appends a citation and ships the answer otherwise unchanged, for 5 ms and
+₹0.50 of modelled nuisance. Whether that is a "false intervention" is a definitional
+question — and at moderate stakes it is *the entire difference* between 100% and 17%.
 
-i.e. when **P(defect) < ~0.0001**. The detector's floor on clean text is ~0.019, and no
-achievable detector reaches one false positive in ten thousand.
+**Two experiments, one of which corrected the other.**
 
-So **"false interventions ≤ 2%" and "impact_inr: 40000 with lambda_time: 0.40" cannot
-both hold.** This is a conflict between two of the plan's own targets, surfaced by
-measurement. It is deliberately **not** tuned away — CLAUDE.md §"open findings" says
-F-002 must not be, and this is F-002 with a number attached.
+`make sensitivity` stipulates a detector (clean text scores `f`, defective text scores
+0.95) and runs the real policy, objective and ladder over the real seeded set, sweeping
+`f`. The break-even floors are solved exactly rather than swept:
 
-The live question is the impact model, not the detector: `impact_inr` is a *per-request*
-stake, and the objective currently charges it in full to *every sentence* of the answer.
-For a five-sentence answer that is five times the harm the request can actually cause.
-Three defensible resolutions exist (discount the stake per sentence; raise `lambda_time`
-so waiting costs what it really costs; or accept "we verify every high-stakes answer" as
-a product stance and re-target the metric per stakes band). Choosing between them is a
-decision to take deliberately, with the numbers above in hand.
+| Stakes | detector must score clean text below |
+|---|---|
+| ₹50 | 4.78% |
+| ₹200 | 1.24% |
+| ₹3,000 | 0.033% |
+| ₹40,000 | **0.0025%** — 1 in 40,000 |
 
-**This is demo-blocking, not just a metric.** Scene 1 run live against the real engine
-on 2026-08-26 chose **L5_block** (loss ₹241.89, runner-up L4_hold) for:
+The real detector's floor is ~1.9%, so it clears exactly one row. That is the 91%,
+derived rather than observed.
 
-> "When prepaying a floating-rate home loan, the applicable charge depends on your loan
-> agreement."
+My **first conclusion from that sweep was wrong** and is worth recording. I read the
+aggregate and concluded *"not achievable at any floor — the targets are jointly
+infeasible"*. Decomposed, at a 0.001% floor the residual false interventions are 9.55%
+and **all fifteen of them are `L1_annotate`**; disruptive false interventions are
+**0.00%**, at a 100% catch rate. So:
 
-A hedged, non-committal, essentially harmless sentence. The customer received nothing.
-The flagship scene currently blocks a reasonable answer, and it is the same root cause
-as the 91% false-intervention rate rather than a separate bug — which is why F-019 is
-the next thing to resolve, ahead of any new feature.
+- The **disruptive** target is achievable below a ~0.001% clean floor. That is a hard
+  but stateable ML goal, and precisely what the observer probe (D2-B4/B7) exists to
+  deliver. F-019 is not a dead end.
+- The **annotation-inclusive** target is missed at every floor, and the whole remaining
+  gap is citations on high-stakes answers.
+
+**What this leaves as a decision rather than a bug.** The objective is behaving
+correctly: expected harm scales with impact while the cost of checking is nearly
+constant, so above some stakes, acting always wins however confident the detector is.
+"Verify every ₹40,000 answer" is a defensible product stance; it is also incompatible
+with a flat ≤2% target. Three resolutions are open — discount the per-sentence stake,
+re-price `lambda_time`, or re-target the metric per stakes band — and choosing between
+them is a deliberate call, **not** a tuning pass. CLAUDE.md is explicit that F-002 must
+not be tuned away, and `tests/unit/test_sensitivity.py` pins the arithmetic so a later
+attempt to edit `impact_inr` fails loudly next to an explanation.
+
+**Still demo-blocking.** Scene 1 run live on 2026-08-26 chose **L5_block** (loss ₹241.89)
+for *"When prepaying a floating-rate home loan, the applicable charge depends on your
+loan agreement."* — a hedged, harmless sentence. The customer received nothing.
 
 ### Calibration and conformal
 

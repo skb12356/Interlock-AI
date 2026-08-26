@@ -104,7 +104,7 @@
         "ci": null,
         "numerator": 0,
         "denominator": 14,
-        "note": ""
+        "note": "disruptive 0%"
       },
       {
         "name": "  ...Rs.100-1,000",
@@ -115,7 +115,7 @@
         "ci": null,
         "numerator": 42,
         "denominator": 42,
-        "note": ""
+        "note": "disruptive 17%"
       },
       {
         "name": "  ...Rs.1,000-10,000",
@@ -126,7 +126,7 @@
         "ci": null,
         "numerator": 11,
         "denominator": 11,
-        "note": ""
+        "note": "disruptive 100%"
       },
       {
         "name": "  ...Rs.10,000+",
@@ -137,7 +137,7 @@
         "ci": null,
         "numerator": 90,
         "denominator": 90,
-        "note": ""
+        "note": "disruptive 100%"
       },
       {
         "name": "Twin pairs treated alike",

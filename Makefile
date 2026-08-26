@@ -2,7 +2,7 @@
 # Docker was dropped (TODO.md P0.2); `up` supervises native processes instead.
 # Windows users: the .ps1 twins in scripts/ are equivalent.
 
-.PHONY: help install install-ml up down demo eval eval-guaranteed calibrate index lint fmt type test check clean
+.PHONY: help install install-ml up down demo eval eval-guaranteed sensitivity calibrate index lint fmt type test check clean
 
 help:
 	@echo "install  -- sync core+dev dependencies (no ml extra)"
@@ -14,6 +14,7 @@ help:
 	@echo "calibrate-- fit isotonic calibration + certify a conformal threshold"
 	@echo "eval     -- run the seeded eval set, Interlock off vs on, print six metrics"
 	@echo "eval-guaranteed -- the same, with the conformal filter on"
+	@echo "sensitivity -- how good must the detector be? (the F-019 experiment)"
 	@echo "check    -- lint + type + test (what CI runs)"
 
 install:
@@ -39,6 +40,11 @@ eval:
 # trade the guarantee costs, and seeing both is the point of having two targets.
 eval-guaranteed:
 	uv run python scripts/eval.py --conformal-filter --json artifacts/eval/report-guaranteed.json
+
+# The F-019 experiment: how good would the detector have to be? Answers whether the
+# false-intervention miss is an ML problem or a policy one.
+sensitivity:
+	uv run python scripts/sensitivity.py
 
 calibrate:
 	uv run python scripts/calibrate.py

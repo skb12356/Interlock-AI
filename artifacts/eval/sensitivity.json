@@ -1,0 +1,110 @@
+{
+  "question": "how good must the detector be for both targets to hold?",
+  "method": "stipulate P(clean)=floor and P(defective)=ceiling, then run the REAL policy, objective and ladder over the REAL seeded set",
+  "n_cases": 200,
+  "n_defective": 43,
+  "defect_ceiling": 0.95,
+  "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+  "break_even_by_band": [
+    {
+      "impact_inr": 50,
+      "domain": "branch_info",
+      "break_even_floor": 0.04780952380952381
+    },
+    {
+      "impact_inr": 200,
+      "domain": "general",
+      "break_even_floor": 0.01239506172839506
+    },
+    {
+      "impact_inr": 3000,
+      "domain": "fees",
+      "break_even_floor": 0.0003345551482839045
+    },
+    {
+      "impact_inr": 12000,
+      "domain": "claims",
+      "break_even_floor": 8.365969502541377e-05
+    },
+    {
+      "impact_inr": 40000,
+      "domain": "prepayment",
+      "break_even_floor": 2.509937251568648e-05
+    }
+  ],
+  "sweep": [
+    {
+      "clean_floor": 1e-05,
+      "false_intervention_rate_any": 0.09554140127388536,
+      "false_intervention_rate_disruptive": 0.0,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": true
+    },
+    {
+      "clean_floor": 3e-05,
+      "false_intervention_rate_any": 0.36942675159235666,
+      "false_intervention_rate_disruptive": 0.06369426751592357,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    },
+    {
+      "clean_floor": 0.0001,
+      "false_intervention_rate_any": 0.5732484076433121,
+      "false_intervention_rate_disruptive": 0.18471337579617833,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    },
+    {
+      "clean_floor": 0.0003,
+      "false_intervention_rate_any": 0.5859872611464968,
+      "false_intervention_rate_disruptive": 0.4140127388535032,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    },
+    {
+      "clean_floor": 0.001,
+      "false_intervention_rate_any": 0.643312101910828,
+      "false_intervention_rate_disruptive": 0.5859872611464968,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    },
+    {
+      "clean_floor": 0.003,
+      "false_intervention_rate_any": 0.643312101910828,
+      "false_intervention_rate_disruptive": 0.643312101910828,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    },
+    {
+      "clean_floor": 0.01,
+      "false_intervention_rate_any": 0.7579617834394905,
+      "false_intervention_rate_disruptive": 0.643312101910828,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    },
+    {
+      "clean_floor": 0.019,
+      "false_intervention_rate_any": 0.910828025477707,
+      "false_intervention_rate_disruptive": 0.643312101910828,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    },
+    {
+      "clean_floor": 0.05,
+      "false_intervention_rate_any": 1.0,
+      "false_intervention_rate_disruptive": 0.7579617834394905,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    }
+  ],
+  "verdict": "disruptive target achievable below a clean floor of 1e-05; annotation-inclusive target missed at every floor"
+}

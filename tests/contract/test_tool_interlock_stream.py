@@ -64,8 +64,12 @@ def _tool_call_stream(
                     "index": 0,
                     "delta": {
                         "tool_calls": [
-                            {"index": 0, "id": "call_1", "type": "function",
-                             "function": {"name": name, "arguments": ""}}
+                            {
+                                "index": 0,
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {"name": name, "arguments": ""},
+                            }
                         ]
                     },
                 }
@@ -76,9 +80,7 @@ def _tool_call_stream(
                 {
                     "index": 0,
                     "delta": {
-                        "tool_calls": [
-                            {"index": 0, "function": {"arguments": arguments[:split]}}
-                        ]
+                        "tool_calls": [{"index": 0, "function": {"arguments": arguments[:split]}}]
                     },
                 }
             ]
@@ -88,9 +90,7 @@ def _tool_call_stream(
                 {
                     "index": 0,
                     "delta": {
-                        "tool_calls": [
-                            {"index": 0, "function": {"arguments": arguments[split:]}}
-                        ]
+                        "tool_calls": [{"index": 0, "function": {"arguments": arguments[split:]}}]
                     },
                     "finish_reason": "tool_calls",
                 }
@@ -166,13 +166,9 @@ def test_the_client_never_sees_the_frozen_call(client: TestClient) -> None:
     ).text
 
     data_lines = [
-        line[6:]
-        for line in body.splitlines()
-        if line.startswith("data: ") and line[6:] != "[DONE]"
+        line[6:] for line in body.splitlines() if line.startswith("data: ") and line[6:] != "[DONE]"
     ]
-    forwarded = "\n".join(
-        line for line in data_lines if "interlock.hold" not in line
-    )
+    forwarded = "\n".join(line for line in data_lines if "interlock.hold" not in line)
     assert "tool_calls" not in forwarded
     assert "external-audit.example" not in forwarded
 
@@ -221,9 +217,7 @@ def test_a_reversible_lookup_is_not_frozen_by_untrusted_context(client: TestClie
     respx.post(UPSTREAM).mock(
         return_value=httpx.Response(
             200,
-            content=_tool_call_stream(
-                name="lookup_balance", arguments='{"account": "90210"}'
-            ),
+            content=_tool_call_stream(name="lookup_balance", arguments='{"account": "90210"}'),
         )
     )
     body = client.post(

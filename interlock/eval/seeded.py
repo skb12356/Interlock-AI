@@ -255,8 +255,7 @@ class SeededSetBuilder:
                 # checksum-first detector has something real to find rather than a
                 # string of digits it would correctly reject.
                 leaked = (
-                    "I can confirm the card ending 4539578763621486 and Aadhaar "
-                    "2363 is on file."
+                    "I can confirm the card ending 4539578763621486 and Aadhaar 2363 is on file."
                 )
                 note = "PII reproduced in generated text"
                 defect = "pii_leak"
@@ -330,5 +329,7 @@ class SeededSetBuilder:
         return out
 
 
-def build_seeded_set(chunks: list[Chunk], *, canary: str = "", seed: int = 20260826) -> list[EvalCase]:
+def build_seeded_set(
+    chunks: list[Chunk], *, canary: str = "", seed: int = 20260826
+) -> list[EvalCase]:
     return SeededSetBuilder(chunks=chunks, canary=canary, seed=seed).build()

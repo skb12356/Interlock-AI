@@ -175,8 +175,7 @@ async def main() -> int:
     print("  policy latency_ms should read:")
     for result in results:
         print(
-            f"    {result['action']:12} {result['median_ms']:9.0f}"
-            f"   (max {result['max_ms']:.0f})"
+            f"    {result['action']:12} {result['median_ms']:9.0f}   (max {result['max_ms']:.0f})"
         )
     if len(results) == 2 and results[1]["median_ms"] <= results[0]["median_ms"]:
         print(

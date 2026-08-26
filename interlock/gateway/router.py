@@ -118,10 +118,10 @@ class HeuristicDifficulty:
         signals.append(min(1.0, len(words) / 60.0))
 
         for pattern, weight in (
-            (_MULTI_PART, 0.8),      # two questions in one
-            (_COMPARATIVE, 0.9),     # requires holding two things side by side
-            (_CONDITIONAL, 0.5),     # branching on a condition
-            (_NUMERIC, 0.7),         # arithmetic, where small models fail quietly
+            (_MULTI_PART, 0.8),  # two questions in one
+            (_COMPARATIVE, 0.9),  # requires holding two things side by side
+            (_CONDITIONAL, 0.5),  # branching on a condition
+            (_NUMERIC, 0.7),  # arithmetic, where small models fail quietly
         ):
             if pattern.search(question):
                 signals.append(weight)

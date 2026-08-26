@@ -139,12 +139,10 @@ def test_concurrent_lane_b_work_is_not_counted_as_overhead() -> None:
 
 
 def test_per_lane_p95_identifies_the_expensive_lane() -> None:
-    """"The guardrail is slow" is not actionable. "The repair lane is the p95" is."""
+    """ "The guardrail is slow" is not actionable. "The repair lane is the p95" is."""
     recorder = LatencyRecorder()
     for _ in range(40):
-        recorder.record(
-            _sample(300.0, by_lane={"lane_a": 12.0, "repair": 280.0, "ledger": 8.0})
-        )
+        recorder.record(_sample(300.0, by_lane={"lane_a": 12.0, "repair": 280.0, "ledger": 8.0}))
     lanes = recorder.report()["by_lane_p95_ms"]
     assert lanes["repair"] == 280.0
     assert max(lanes, key=lambda k: lanes[k]) == "repair"

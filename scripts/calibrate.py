@@ -73,9 +73,7 @@ def _probe_features(triples: list[Any], model: str | None) -> np.ndarray | None:
     # signals/probe_signal.py: with a poisoned document in the premise the attacker's
     # own claim genuinely IS entailed, and the probe would faithfully report so.
     premises = [
-        NEWLINE.join(
-            f.text for f in t.context if not str(f.provenance).endswith("untrusted")
-        )
+        NEWLINE.join(f.text for f in t.context if not str(f.provenance).endswith("untrusted"))
         or "(no context retrieved)"
         for t in triples
     ]
@@ -93,9 +91,9 @@ def build_dataset(items: int, seed: int) -> tuple[np.ndarray, np.ndarray, list[s
     features = np.array(
         [
             list(
-                grounding_signals(
-                    triple.answer, triple.context, question=triple.question
-                ).as_features().values()
+                grounding_signals(triple.answer, triple.context, question=triple.question)
+                .as_features()
+                .values()
             )
             for triple in triples
         ]
@@ -226,7 +224,9 @@ def main() -> int:
         folds=args.folds,
     )
 
-    print(f"\n  ECE    {report.ece:.4f}   (target < 0.05: {'PASS' if report.meets_target else 'FAIL'})")
+    print(
+        f"\n  ECE    {report.ece:.4f}   (target < 0.05: {'PASS' if report.meets_target else 'FAIL'})"
+    )
     print(f"  Brier  {report.brier:.4f}")
     print(f"  AUROC  {report.auroc:.4f}")
     print("\n  per-signal AUROC:")
@@ -248,10 +248,7 @@ def main() -> int:
                 f"    {quantile:.0%} of clean text calibrates below "
                 f"{float(np.quantile(clean_scores, quantile)):.5f}"
             )
-        print(
-            "    the objective needs: Rs.3,000 -> below 0.00033, "
-            "Rs.40,000 -> below 0.000025"
-        )
+        print("    the objective needs: Rs.3,000 -> below 0.00033, Rs.40,000 -> below 0.000025")
 
     # ---- the conformal threshold ------------------------------------------ #
     #

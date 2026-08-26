@@ -61,9 +61,7 @@ class ProbeSignal:
     _failures: int = field(default=0, init=False)
 
     @classmethod
-    def load(
-        cls, probe_path: Path | str, *, model_name: str | None = None
-    ) -> ProbeSignal:
+    def load(cls, probe_path: Path | str, *, model_name: str | None = None) -> ProbeSignal:
         """Load a trained probe, or return an inert signal if there is not one.
 
         Never raises. A missing probe must degrade the risk engine, not stop the
@@ -128,7 +126,9 @@ class ProbeSignal:
             return None
         return max(0.0, min(1.0, value))
 
-    def reading(self, sentence: str, context: Sequence[Fragment], *, latency_ms: float = 0.0) -> SignalReading | None:
+    def reading(
+        self, sentence: str, context: Sequence[Fragment], *, latency_ms: float = 0.0
+    ) -> SignalReading | None:
         value = self.score(sentence, context)
         if value is None:
             return None

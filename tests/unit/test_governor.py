@@ -98,13 +98,16 @@ def test_bypass_gives_up_everything() -> None:
     assert CAPABILITIES[GovernorState.BYPASS] == frozenset()
 
 
-@pytest.mark.parametrize(("overhead", "expected"), [
-    (10.0, GovernorState.NORMAL),
-    (70.0, GovernorState.THIN),
-    (100.0, GovernorState.SHALLOW),
-    (150.0, GovernorState.PROBE_ONLY),
-    (300.0, GovernorState.BYPASS),
-])
+@pytest.mark.parametrize(
+    ("overhead", "expected"),
+    [
+        (10.0, GovernorState.NORMAL),
+        (70.0, GovernorState.THIN),
+        (100.0, GovernorState.SHALLOW),
+        (150.0, GovernorState.PROBE_ONLY),
+        (300.0, GovernorState.BYPASS),
+    ],
+)
 def test_each_rung_engages_at_its_threshold(overhead: float, expected: GovernorState) -> None:
     governor = Governor()
     _load(governor, overhead)

@@ -43,7 +43,9 @@ async def main() -> int:
         action="store_true",
         help="guaranteed mode: strike L0_pass above the certified threshold",
     )
-    parser.add_argument("--json", type=Path, default=REPO_ROOT / "artifacts" / "eval" / "report.json")
+    parser.add_argument(
+        "--json", type=Path, default=REPO_ROOT / "artifacts" / "eval" / "report.json"
+    )
     parser.add_argument("--show-failures", type=int, default=8)
     args = parser.parse_args()
 
@@ -63,8 +65,10 @@ async def main() -> int:
 
     calibrator_path = CALIBRATION_DIR / "calibrator_per_defect.json"
     if not calibrator_path.exists():
-        print("  ! no calibrator -- run scripts/calibrate.py first; every decision "
-              "would be degraded and the numbers meaningless")
+        print(
+            "  ! no calibrator -- run scripts/calibrate.py first; every decision "
+            "would be degraded and the numbers meaningless"
+        )
         return 1
     calibrator = MultiDefectCalibrator.load(calibrator_path)
     conformal = load_conformal(CALIBRATION_DIR / "lambda.json")
@@ -109,11 +113,7 @@ async def main() -> int:
         flag = "" if caught == len(outcomes) else "   <-- misses here"
         print(f"    {category:22} {caught:3}/{len(outcomes):<3}{flag}")
 
-    misses = [
-        o
-        for o in on.outcomes
-        if by_id[o.case_id].is_defective and not o.caught_pre_action
-    ]
+    misses = [o for o in on.outcomes if by_id[o.case_id].is_defective and not o.caught_pre_action]
     if misses and args.show_failures:
         print(f"\n  what got through ({len(misses)} total, showing {args.show_failures}):")
         for outcome in misses[: args.show_failures]:

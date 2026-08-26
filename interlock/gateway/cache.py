@@ -64,9 +64,7 @@ def context_hash(retrieved: Sequence[Fragment]) -> str:
     different order is still a hit.
     """
     digest = hashlib.sha256()
-    for item in sorted(
-        f"{fragment.doc_id or ''}|{fragment.text}" for fragment in retrieved
-    ):
+    for item in sorted(f"{fragment.doc_id or ''}|{fragment.text}" for fragment in retrieved):
         digest.update(item.encode("utf-8"))
         digest.update(b"\x00")
     return digest.hexdigest()[:32]

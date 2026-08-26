@@ -35,12 +35,12 @@ __all__ = ["LANES", "LatencyRecorder", "LatencySample", "percentile"]
 #: ``lane_b``: Lane B's concurrent work is free, and only the part where the gate was
 #: actually waiting on it is latency the customer experienced.
 LANES: tuple[str, ...] = (
-    "lane_a",      # pre-flight: retrieval, detectors, stakes, routing
-    "gate_hold",   # the commit gate waiting on a verdict before releasing a sentence
-    "repair",      # L2: re-prompting the model
-    "reroute",     # L3: regenerating on a stronger tier
-    "interlock",   # the tool-call interlock, including the durable hold write
-    "ledger",      # anything the request path had to await before responding
+    "lane_a",  # pre-flight: retrieval, detectors, stakes, routing
+    "gate_hold",  # the commit gate waiting on a verdict before releasing a sentence
+    "repair",  # L2: re-prompting the model
+    "reroute",  # L3: regenerating on a stronger tier
+    "interlock",  # the tool-call interlock, including the durable hold write
+    "ledger",  # anything the request path had to await before responding
 )
 
 #: Below this, a percentile is a description of the sample rather than an estimate of
@@ -161,7 +161,9 @@ class LatencyRecorder:
             "overhead_p95_ms": round(p95, 2),
             "overhead_max_ms": round(max(overheads), 2) if overheads else 0.0,
             "within_budget": p95 <= budget_ms if n >= MIN_SAMPLES_FOR_PERCENTILE else None,
-            "ttft_p50_ms": round(percentile([s.ttft_ms for s in self.samples if s.ttft_ms > 0], 0.5), 2),
+            "ttft_p50_ms": round(
+                percentile([s.ttft_ms for s in self.samples if s.ttft_ms > 0], 0.5), 2
+            ),
             "ttft_p95_ms": round(self.ttft_p95(), 2),
             "buffered": {
                 "n": len(buffered),
@@ -172,9 +174,7 @@ class LatencyRecorder:
                 "p95_ms": round(percentile(unbuffered, 0.95), 2),
             },
             "by_lane_p95_ms": {
-                lane: round(self.lane_p95(lane), 2)
-                for lane in LANES
-                if self._by_lane.get(lane)
+                lane: round(self.lane_p95(lane), 2) for lane in LANES if self._by_lane.get(lane)
             },
             "unattributed_mean_ms": round(mean_unattributed, 2),
             "notes": notes,

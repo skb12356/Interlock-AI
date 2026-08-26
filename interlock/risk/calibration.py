@@ -356,8 +356,7 @@ class MultiDefectCalibrator:
     def predict(self, features: dict[str, float]) -> dict[str, float]:
         """``{defect: probability}`` for every class that was fitted."""
         return {
-            defect: calibrator.predict(features)
-            for defect, calibrator in self.per_defect.items()
+            defect: calibrator.predict(features) for defect, calibrator in self.per_defect.items()
         }
 
     def evaluate(

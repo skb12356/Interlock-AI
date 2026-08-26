@@ -79,8 +79,15 @@ def test_the_pack_contains_everything_needed_to_defend_a_decision(tmp_path: Path
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
     assert {
-        "manifest.json", "request.json", "decisions.json", "signals.json",
-        "spend.json", "tool_calls.json", "holds.json", "policy.yaml", "calibration.json",
+        "manifest.json",
+        "request.json",
+        "decisions.json",
+        "signals.json",
+        "spend.json",
+        "tool_calls.json",
+        "holds.json",
+        "policy.yaml",
+        "calibration.json",
     } <= names
 
 
@@ -183,7 +190,7 @@ def test_a_missing_calibration_is_reported() -> None:
 
 
 def test_a_decision_with_no_version_stamp_is_reported() -> None:
-    """"Which version priced this?" is the question the pack exists to answer."""
+    """ "Which version priced this?" is the question the pack exists to answer."""
     rows = _rows()
     rows["decisions"][0]["policy_version"] = ""
     pack = _pack(rows=rows)

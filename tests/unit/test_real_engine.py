@@ -40,7 +40,9 @@ GROUNDED = Fragment(
 )
 
 
-def _ctx(sentence: str, *, retrieved: list[Fragment] | None = None, **kwargs: object) -> RiskContext:
+def _ctx(
+    sentence: str, *, retrieved: list[Fragment] | None = None, **kwargs: object
+) -> RiskContext:
     defaults: dict = {
         "request_id": "req_1",
         "sentence_idx": 0,
@@ -118,7 +120,7 @@ def _low_stakes() -> Stakes:
 
 
 async def test_a_grounded_sentence_scores_at_the_base_rate(engine: RealRiskEngine) -> None:
-    """"Nothing looks wrong" is not "this is certainly right".
+    """ "Nothing looks wrong" is not "this is certainly right".
 
     With no positive evidence of a defect the honest answer is the base rate the
     calibration set was built at (10%, and these signals push a clean sentence below

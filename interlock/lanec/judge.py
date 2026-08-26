@@ -180,9 +180,7 @@ class DeepJudge:
                 confidence = value
                 break
 
-        reasoning = next(
-            (line.strip() for line in text.splitlines() if len(line.strip()) > 20), ""
-        )
+        reasoning = next((line.strip() for line in text.splitlines() if len(line.strip()) > 20), "")
         return JudgeVerdict(
             verdict=verdict, confidence=confidence, reasoning=reasoning[:400], model=model
         )
@@ -202,12 +200,8 @@ def agreement_summary(samples: Sequence[JudgeSample]) -> dict[str, Any]:
     # Split by direction, because the two disagreements mean opposite things: the fast
     # lane missing something the judge caught is an escape, and the fast lane flagging
     # something the judge thought fine is a false alarm.
-    fast_missed = sum(
-        1 for s in judged if not s.fast_lane_flagged and s.verdict.says_defective
-    )
-    fast_over = sum(
-        1 for s in judged if s.fast_lane_flagged and not s.verdict.says_defective
-    )
+    fast_missed = sum(1 for s in judged if not s.fast_lane_flagged and s.verdict.says_defective)
+    fast_over = sum(1 for s in judged if s.fast_lane_flagged and not s.verdict.says_defective)
 
     notes: list[str] = []
     if samples and unclear / len(samples) > 0.25:

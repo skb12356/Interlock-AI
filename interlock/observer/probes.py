@@ -36,7 +36,13 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-__all__ = ["LayerResult", "ProbeBundle", "ProbeTrainer", "train_probes"]
+__all__ = [
+    "LayerResult",
+    "ProbeBundle",
+    "ProbeTrainer",
+    "auroc_standard_error",
+    "train_probes",
+]
 
 #: Held-out share for layer selection. Generous because selection is the thing most
 #: likely to fool us here, and a thin held-out split makes the choice noisy.
@@ -45,6 +51,25 @@ HELD_OUT = 0.3
 #: L2 strength. Deliberately strong: hidden states are high-dimensional and correlated,
 #: and an unregularised probe on 768 features will happily memorise a few thousand rows.
 DEFAULT_C = 0.05
+
+
+def auroc_standard_error(auroc: float, n_positive: int, n_negative: int) -> float:
+    """Hanley-McNeil standard error of an AUROC estimate.
+
+    Needed because "layer 6 scored 0.9455 and layer 3 scored 0.9348" reads like a
+    result and is not one: on a few hundred held-out items that gap is well inside one
+    standard error, and treating it as a ranking picks a layer by coin flip.
+    """
+    if n_positive <= 0 or n_negative <= 0:
+        return 1.0
+    q1 = auroc / (2.0 - auroc)
+    q2 = 2.0 * auroc**2 / (1.0 + auroc)
+    variance = (
+        auroc * (1.0 - auroc)
+        + (n_positive - 1) * (q1 - auroc**2)
+        + (n_negative - 1) * (q2 - auroc**2)
+    ) / (n_positive * n_negative)
+    return max(0.0, variance) ** 0.5
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,9 +106,9 @@ class ProbeBundle:
 
     def score(self, hidden: np.ndarray) -> np.ndarray:
         """Raw probe scores in [0, 1]. **Not calibrated** -- see the module docstring."""
-        standardised = (np.asarray(hidden, dtype=float) - np.asarray(self.scaler_mean)) / np.asarray(
-            self.scaler_scale
-        )
+        standardised = (
+            np.asarray(hidden, dtype=float) - np.asarray(self.scaler_mean)
+        ) / np.asarray(self.scaler_scale)
         logits = standardised @ np.asarray(self.coefficients) + self.intercept
         return 1.0 / (1.0 + np.exp(-logits))
 
@@ -150,7 +175,21 @@ class ProbeTrainer:
             )
             fitted[index] = (scaler, probe)
 
-        best = max(curve, key=lambda item: item.auroc)
+        # THE ONE-STANDARD-ERROR RULE, and it is not a stylistic choice here.
+        #
+        # A first run selected the LAST layer at 0.9455 with layer 3 at 0.9348 -- a gap
+        # of 0.011 on ~450 held-out items, where one standard error is around 0.015. So
+        # the "winner" was chosen by noise, and it happened to be the layer whose signal
+        # is most likely to be the encoder's own task head rather than anything about
+        # grounding. The module's own warning fired, correctly.
+        #
+        # Take the EARLIEST layer within one standard error of the best instead. Earlier
+        # layers are cheaper to reach if the encoder is ever truncated, and preferring
+        # them breaks the tie away from the task-head confound rather than toward it.
+        top = max(curve, key=lambda item: item.auroc)
+        n_positive = int(labels[test_idx].sum())
+        tolerance = auroc_standard_error(top.auroc, n_positive, len(test_idx) - n_positive)
+        best = next(item for item in curve if item.auroc >= top.auroc - tolerance)
         scaler, probe = fitted[best.layer]
 
         notes: list[str] = []
@@ -160,11 +199,19 @@ class ProbeTrainer:
                 f"{best.overfit_gap:.3f} -- the probe is partly memorising, and more "
                 f"regularisation or more data would help"
             )
+        if best.layer != top.layer:
+            notes.append(
+                f"layer {top.layer} scored highest ({top.auroc:.4f}) but layer "
+                f"{best.layer} ({best.auroc:.4f}) is within one standard error "
+                f"({tolerance:.4f}); the earlier layer was taken, because a gap inside "
+                f"noise is not a ranking"
+            )
         if best.layer == len(layers) - 1:
             notes.append(
-                "the best layer is the LAST one, which often means the probe has learned "
-                "the encoder's own task head rather than anything about grounding; "
-                "signal concentrated mid-stack is the expected shape"
+                "the selected layer is the LAST one, and by more than one standard "
+                "error. That often means the probe has learned the encoder's own task "
+                "head rather than anything about grounding; signal concentrated "
+                "mid-stack is the expected shape"
             )
         if best.auroc < 0.65:
             notes.append(

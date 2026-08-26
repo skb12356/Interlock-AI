@@ -44,9 +44,7 @@ def wilson_interval(successes: int, trials: int, *, z: float = 1.96) -> tuple[fl
     denominator = 1 + z**2 / trials
     centre = (proportion + z**2 / (2 * trials)) / denominator
     spread = (
-        z
-        * math.sqrt(proportion * (1 - proportion) / trials + z**2 / (4 * trials**2))
-        / denominator
+        z * math.sqrt(proportion * (1 - proportion) / trials + z**2 / (4 * trials**2)) / denominator
     )
     return (max(0.0, centre - spread), min(1.0, centre + spread))
 

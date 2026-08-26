@@ -143,9 +143,7 @@ class RegretEstimate:
             f"at {self.confidence:.0%} confidence, from {self.n_shadow} shadow runs"
         )
         if not self.reliable:
-            body += (
-                f" -- BELOW {MIN_SAMPLE_FOR_CONFIDENCE} SAMPLES, treat as indicative only"
-            )
+            body += f" -- BELOW {MIN_SAMPLE_FOR_CONFIDENCE} SAMPLES, treat as indicative only"
         return body
 
     def to_dict(self) -> dict[str, Any]:

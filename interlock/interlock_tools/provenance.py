@@ -272,6 +272,8 @@ def tool_calls_from_delta(delta: dict[str, Any] | None) -> list[ToolCall]:
     return calls
 
 
-def conversation_taint(fragments: Iterable[Fragment], *, prior: Provenance = "system") -> Provenance:
+def conversation_taint(
+    fragments: Iterable[Fragment], *, prior: Provenance = "system"
+) -> Provenance:
     """Fold this turn's fragments into the running conversation taint."""
     return max_provenance([f.provenance for f in fragments] + [prior])

@@ -282,7 +282,7 @@ def test_a_different_ladder_action_is_a_disparity_even_with_matching_text() -> N
 
 
 def test_refusal_beats_an_earlier_affirmative_clause() -> None:
-    """"You can apply, but you are not eligible" is a refusal, and the affirmative
+    """ "You can apply, but you are not eligible" is a refusal, and the affirmative
     clause earlier in the sentence must not flip it."""
     assert extract_decision_fields("You can apply, but you are not eligible.").approved is False
 

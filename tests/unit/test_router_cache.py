@@ -56,7 +56,9 @@ def test_high_stakes_forces_the_strong_tier_however_easy_the_question() -> None:
     """A router able to talk itself out of the strong model on a high-stakes question
     has broken the guarantee the stakes estimate exists to provide."""
     router = Router(policy=POLICY)
-    decision = router.route(stakes=_stakes(40_000, "prepayment"), question="Fee?", retrieved=[CLEAN])
+    decision = router.route(
+        stakes=_stakes(40_000, "prepayment"), question="Fee?", retrieved=[CLEAN]
+    )
     assert decision.tier == "strong"
     assert decision.forced_by_stakes
     assert decision.reason == "stakes_high"
@@ -167,7 +169,7 @@ def test_an_identical_question_with_identical_context_hits() -> None:
 
 
 def test_a_merely_similar_question_misses() -> None:
-    """"What is the fee" and "what is the fee for premium accounts" must not collide.
+    """ "What is the fee" and "what is the fee for premium accounts" must not collide.
     A threshold that admitted that would answer the second with the first, confidently."""
     cache = _cache()
     assert _stored(cache, [1.0, 0.0, 0.0])
@@ -234,7 +236,9 @@ def test_high_stakes_never_hits() -> None:
     assert "cache ceiling" in result.reason
 
 
-@pytest.mark.parametrize("action", ["L1_annotate", "L2_repair", "L3_reroute", "L4_hold", "L5_block"])
+@pytest.mark.parametrize(
+    "action", ["L1_annotate", "L2_repair", "L3_reroute", "L4_hold", "L5_block"]
+)
 def test_only_a_clean_pass_is_ever_stored(action: str) -> None:
     """Caching a repaired or held answer replays the defect on every subsequent hit --
     turning one bad answer into a permanent one, at machine speed."""
@@ -284,7 +288,7 @@ def test_the_conditions_are_conjunctive() -> None:
 
 
 def test_a_miss_reports_why() -> None:
-    """"Cache miss" tells an operator nothing. "Missed because the context hash changed"
+    """ "Cache miss" tells an operator nothing. "Missed because the context hash changed"
     tells them a document was re-uploaded."""
     cache = _cache()
     cache.lookup(question="q", embedding=[1.0], retrieved=[CLEAN], stakes_inr=40_000.0)
@@ -329,7 +333,7 @@ def test_cosine_handles_degenerate_vectors() -> None:
 
 
 def test_retrieval_that_never_ran_is_not_evidence_of_difficulty() -> None:
-    """"Found nothing" and "never looked" are opposite facts.
+    """ "Found nothing" and "never looked" are opposite facts.
 
     A deployment where the caller does its own RAG attaches no context, and scoring
     that as maximally hard would route EVERY request to the strong tier in exactly the

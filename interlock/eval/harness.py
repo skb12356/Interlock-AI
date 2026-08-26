@@ -101,7 +101,9 @@ class EvalRun:
 
     @property
     def defective(self) -> list[CaseOutcome]:
-        return [o for o in self.outcomes if o.category != "clean" and o.category != "demographic_twin"]
+        return [
+            o for o in self.outcomes if o.category != "clean" and o.category != "demographic_twin"
+        ]
 
 
 class _Baseline:
@@ -150,9 +152,7 @@ def _loop_breaker(case: EvalCase) -> tuple[bool, int]:
         seen[digest] = seen.get(digest, 0) + 1
         if seen[digest] >= LOOP_STRIKES:
             remaining = len(case.loop_calls) - index - 1
-            per_call = (
-                case.wasted_tokens_if_unbroken // max(len(case.loop_calls), 1)
-            )
+            per_call = case.wasted_tokens_if_unbroken // max(len(case.loop_calls), 1)
             return True, remaining * per_call
     return False, 0
 
@@ -209,7 +209,7 @@ async def _run_arm(
             caught = tool_frozen
 
         # -- the loop breaker -------------------------------------------- #
-        cut, saved = (_loop_breaker(case) if tool_interlock is not None else (False, 0))
+        cut, saved = _loop_breaker(case) if tool_interlock is not None else (False, 0)
         if case.loop_calls:
             caught = cut
 
@@ -345,9 +345,7 @@ def compute_metrics(
 
     # -- 5. Ungrounded escapes ------------------------------------------ #
     grounding_cases = [
-        o
-        for o in on.outcomes
-        if by_id[o.case_id].expected_defect in {"ungrounded", "contradicted"}
+        o for o in on.outcomes if by_id[o.case_id].expected_defect in {"ungrounded", "contradicted"}
     ]
     escapes = sum(1 for o in grounding_cases if o.escaped)
     escape_rate = escapes / len(grounding_cases) if grounding_cases else 0.0

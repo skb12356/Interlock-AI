@@ -140,8 +140,16 @@ class RetrievalIndex:
                 "INSERT INTO chunks(chunk_id, doc_id, title, body, text, domain, "
                 "provenance, ordinal) VALUES (?,?,?,?,?,?,?,?)",
                 [
-                    (c.chunk_id, c.doc_id, c.title, c.body, c.text, c.domain,
-                     c.provenance, c.ordinal)
+                    (
+                        c.chunk_id,
+                        c.doc_id,
+                        c.title,
+                        c.body,
+                        c.text,
+                        c.domain,
+                        c.provenance,
+                        c.ordinal,
+                    )
                     for c in rows
                 ],
             )

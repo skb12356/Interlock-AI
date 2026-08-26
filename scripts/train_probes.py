@@ -73,9 +73,7 @@ def main() -> int:
     # attacker's own claim genuinely entailed, so the probe would faithfully report
     # "supported". Training matches serving.
     premises = [
-        NEWLINE.join(
-            f.text for f in t.context if not str(f.provenance).endswith("untrusted")
-        )
+        NEWLINE.join(f.text for f in t.context if not str(f.provenance).endswith("untrusted"))
         or "(no context retrieved)"
         for t in triples
     ]
@@ -84,8 +82,10 @@ def main() -> int:
     encoder = ObserverEncoder(model_name=args.model)
     started = time.time()
     encoder.load()
-    print(f"  loaded {encoder.model_name}: {encoder.n_layers} layers, {encoder.hidden_size} dim "
-          f"({time.time() - started:.1f}s)")
+    print(
+        f"  loaded {encoder.model_name}: {encoder.n_layers} layers, {encoder.hidden_size} dim "
+        f"({time.time() - started:.1f}s)"
+    )
 
     started = time.time()
     batch = encoder.encode(premises, hypotheses, batch_size=args.batch_size)
@@ -98,14 +98,14 @@ def main() -> int:
     for row in bundle.curve:
         bar = "#" * int(max(0.0, row.auroc - 0.5) * 100)
         marker = "  <- selected" if row.layer == bundle.best_layer else ""
-        print(f"  layer {row.layer:2}  {row.auroc:.4f}  (train {row.train_auroc:.4f})  {bar}{marker}")
+        print(
+            f"  layer {row.layer:2}  {row.auroc:.4f}  (train {row.train_auroc:.4f})  {bar}{marker}"
+        )
 
     # The comparison that decides whether this earns its 94 ms.
     features = np.array(
         [
-            list(
-                grounding_signals(t.answer, t.context, question=t.question).as_features().values()
-            )
+            list(grounding_signals(t.answer, t.context, question=t.question).as_features().values())
             for t in triples
         ]
     )
@@ -115,10 +115,14 @@ def main() -> int:
         (float(roc_auc_score(labels, features[:, i])), name)
         for i, name in enumerate(GROUNDING_SIGNALS)
     )
-    print(f"\n  best deterministic signal: {best_deterministic[1]} at AUROC "
-          f"{best_deterministic[0]:.4f} (free)")
-    print(f"  probe:                     layer {bundle.best_layer} at AUROC "
-          f"{bundle.best_auroc:.4f} ({elapsed / len(triples) * 1000:.0f} ms/pair)")
+    print(
+        f"\n  best deterministic signal: {best_deterministic[1]} at AUROC "
+        f"{best_deterministic[0]:.4f} (free)"
+    )
+    print(
+        f"  probe:                     layer {bundle.best_layer} at AUROC "
+        f"{bundle.best_auroc:.4f} ({elapsed / len(triples) * 1000:.0f} ms/pair)"
+    )
 
     verdict: str
     if bundle.best_auroc > best_deterministic[0] + 0.03:
@@ -126,10 +130,12 @@ def main() -> int:
         print(f"\n  {verdict.upper()}: +{bundle.best_auroc - best_deterministic[0]:.3f} AUROC.")
     else:
         verdict = "the probe does NOT earn its forward pass"
-        print(f"\n  {verdict.upper()}. It costs "
-              f"{elapsed / len(triples) * 1000:.0f} ms per sentence and adds "
-              f"{bundle.best_auroc - best_deterministic[0]:+.3f} AUROC over a free lexical "
-              f"check. Ship it only as one signal among several, never as a replacement.")
+        print(
+            f"\n  {verdict.upper()}. It costs "
+            f"{elapsed / len(triples) * 1000:.0f} ms per sentence and adds "
+            f"{bundle.best_auroc - best_deterministic[0]:+.3f} AUROC over a free lexical "
+            f"check. Ship it only as one signal among several, never as a replacement."
+        )
 
     for note in bundle.notes:
         print(f"  ! {note}")

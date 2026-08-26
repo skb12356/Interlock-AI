@@ -250,7 +250,8 @@ class RealRiskEngine:
         claims: list[str] = []
         if scores.unsupported_citations:
             claims.append(
-                "cites " + ", ".join(f"Clause {c}" for c in scores.unsupported_citations)
+                "cites "
+                + ", ".join(f"Clause {c}" for c in scores.unsupported_citations)
                 + ", which is not in the retrieved context"
             )
         if scores.unsupported_numbers:
@@ -293,9 +294,7 @@ class RealRiskEngine:
 
     # -- the rest of the Protocol ---------------------------------------- #
 
-    async def prefetch(
-        self, request_id: str, question: str, retrieved: list[Fragment]
-    ) -> None:
+    async def prefetch(self, request_id: str, question: str, retrieved: list[Fragment]) -> None:
         """No observer weights yet, so nothing to warm. The call path stays exercised."""
         self._prefetched.add(request_id)
 

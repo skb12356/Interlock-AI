@@ -323,9 +323,7 @@ class TripleGenerator:
             note = f"clause reference {match.group(1)} rewritten as {other}"
         return (self._question_for(chunk), broken, [chunk.to_fragment()], note, broken)
 
-    def _make_unanswerable(
-        self, chunk: Chunk
-    ) -> tuple[str, str, list[Fragment], str, str] | None:
+    def _make_unanswerable(self, chunk: Chunk) -> tuple[str, str, list[Fragment], str, str] | None:
         """A confident answer to a question the context does not settle."""
         sentence = self._pick_sentence(chunk)
         if not sentence:
@@ -342,9 +340,7 @@ class TripleGenerator:
             sentence,
         )
 
-    def _make_contradiction(
-        self, chunk: Chunk
-    ) -> tuple[str, str, list[Fragment], str, str] | None:
+    def _make_contradiction(self, chunk: Chunk) -> tuple[str, str, list[Fragment], str, str] | None:
         """The superseded passage is in context beside the current one.
 
         Uses the corpus's real contradictory pairs where the chunk is half of one, so

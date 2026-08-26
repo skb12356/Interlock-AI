@@ -73,7 +73,9 @@ class Retriever:
     ) -> Retriever:
         return cls(index=RetrievalIndex(db_path, embedder=embedder or HashingEmbedder()), k=k)
 
-    def search(self, question: str, *, k: int | None = None, domain: str | None = None) -> list[Hit]:
+    def search(
+        self, question: str, *, k: int | None = None, domain: str | None = None
+    ) -> list[Hit]:
         return self.index.search(question, k=k or self.k, domain=domain)
 
     async def retrieve(

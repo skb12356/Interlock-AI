@@ -72,7 +72,44 @@ _WORD = re.compile(r"[a-z0-9]+")
 #: Function words shared by every question. Left in, a bag-of-words cosine between two
 #: unrelated banking questions sits around 0.5 purely on "what is the my for".
 _STOPWORDS = frozenset(
-    ["a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "does", "for", "from", "how", "i", "in", "is", "it", "me", "my", "of", "on", "or", "please", "that", "the", "to", "was", "what", "when", "where", "which", "will", "with", "you", "your"]
+    [
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "can",
+        "do",
+        "does",
+        "for",
+        "from",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "me",
+        "my",
+        "of",
+        "on",
+        "or",
+        "please",
+        "that",
+        "the",
+        "to",
+        "was",
+        "what",
+        "when",
+        "where",
+        "which",
+        "will",
+        "with",
+        "you",
+        "your",
+    ]
 )
 
 
@@ -148,9 +185,7 @@ class ReworkLedger:
         ordered = sorted(turns, key=lambda turn: turn.ts)
         found: list[ReworkEdge] = []
 
-        by_hold = {
-            turn.raised_hold_id: turn for turn in ordered if turn.raised_hold_id
-        }
+        by_hold = {turn.raised_hold_id: turn for turn in ordered if turn.raised_hold_id}
 
         for index, turn in enumerate(ordered):
             previous = ordered[index - 1] if index else None
@@ -207,9 +242,9 @@ class ReworkLedger:
             # in the money it moves.
             span = max(1e-9, 1.0 - self.retry_similarity)
             reach = min(1.0, (score - self.retry_similarity) / span)
-            confidence = RETRY_CONFIDENCE_FLOOR + (
-                CONFIDENCE["retry"] - RETRY_CONFIDENCE_FLOOR
-            ) * reach
+            confidence = (
+                RETRY_CONFIDENCE_FLOOR + (CONFIDENCE["retry"] - RETRY_CONFIDENCE_FLOOR) * reach
+            )
             found.append(
                 ReworkEdge(
                     child_request_id=turn.request_id,

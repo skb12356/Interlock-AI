@@ -50,9 +50,7 @@ def dataset() -> tuple[np.ndarray, np.ndarray, list[str]]:
     triples = TripleGenerator(chunks=corpus_chunks(documents)).generate(2000)
     features = np.array(
         [
-            list(
-                grounding_signals(t.answer, t.context, question=t.question).as_features().values()
-            )
+            list(grounding_signals(t.answer, t.context, question=t.question).as_features().values())
             for t in triples
         ]
     )
@@ -258,9 +256,7 @@ def test_a_bound_is_unreachable_below_a_sample_size_whatever_the_detector() -> N
 def test_a_perfect_detector_certifies_a_useful_threshold() -> None:
     rng = np.random.default_rng(3)
     labels = np.array([0] * 700 + [1] * 700)
-    probabilities = np.concatenate(
-        [rng.uniform(0.0, 0.2, 700), rng.uniform(0.8, 1.0, 700)]
-    )
+    probabilities = np.concatenate([rng.uniform(0.0, 0.2, 700), rng.uniform(0.8, 1.0, 700)])
     result = select_threshold(probabilities, labels, alpha=0.01, delta=0.10)
     assert result.certified
     assert 0.2 <= (result.threshold or 0) <= 0.8, result.threshold
@@ -436,13 +432,17 @@ def test_context_conflict_sees_what_the_answer_side_checks_cannot() -> None:
 
     agreeing = [
         Fragment(text="A charge of 2% applies.", provenance="retrieved_verified", domain="fees"),
-        Fragment(text="A charge of 2% applies here too.", provenance="retrieved_verified",
-                 domain="fees"),
+        Fragment(
+            text="A charge of 2% applies here too.", provenance="retrieved_verified", domain="fees"
+        ),
     ]
     conflicting = [
         Fragment(text="A charge of 2% applies.", provenance="retrieved_verified", domain="fees"),
-        Fragment(text="No charge applies; the rate is 0%.", provenance="retrieved_verified",
-                 domain="fees"),
+        Fragment(
+            text="No charge applies; the rate is 0%.",
+            provenance="retrieved_verified",
+            domain="fees",
+        ),
     ]
     assert context_conflict(agreeing) == 0.0
     assert context_conflict(conflicting) > 0.0
@@ -468,8 +468,10 @@ def test_every_signal_is_bounded_on_real_data() -> None:
     """The calibrator clips, but a signal outside [0,1] means a bug upstream of it."""
     documents = load_corpus(REPO_ROOT / "corpus" / "manifest.json", root=REPO_ROOT)
     for triple in TripleGenerator(chunks=corpus_chunks(documents)).generate(300):
-        for name, value in grounding_signals(
-            triple.answer, triple.context, question=triple.question
-        ).as_features().items():
+        for name, value in (
+            grounding_signals(triple.answer, triple.context, question=triple.question)
+            .as_features()
+            .items()
+        ):
             assert 0.0 <= value <= 1.0, f"{name}={value}"
             assert not math.isnan(value), name

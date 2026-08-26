@@ -97,8 +97,7 @@ def test_the_fallback_is_expensive_on_purpose() -> None:
     book = PriceBook.default()
     unknown = book.cost_inr("who-knows", prompt_tokens=1000, completion_tokens=1000)
     cheapest = min(
-        book.cost_inr(p.model, prompt_tokens=1000, completion_tokens=1000)
-        for p in DEFAULT_PRICES
+        book.cost_inr(p.model, prompt_tokens=1000, completion_tokens=1000) for p in DEFAULT_PRICES
     )
     assert unknown > cheapest
 
@@ -115,8 +114,16 @@ def test_prices_load_from_config(tmp_path: Path) -> None:
     path = tmp_path / "prices.json"
     path.write_text(
         json.dumps(
-            {"models": [{"model": "custom", "prompt_inr_per_1k": 1.0,
-                         "completion_inr_per_1k": 2.0, "basis": "negotiated"}]}
+            {
+                "models": [
+                    {
+                        "model": "custom",
+                        "prompt_inr_per_1k": 1.0,
+                        "completion_inr_per_1k": 2.0,
+                        "basis": "negotiated",
+                    }
+                ]
+            }
         ),
         encoding="utf-8",
     )
@@ -200,9 +207,7 @@ def test_the_point_and_the_interval_are_scaled_together() -> None:
     for index in range(50):
         ledger.record(_shadow(4.0 if index % 2 else 0.0, rid=f"r{index}"))
     estimate = ledger.estimate()
-    assert estimate.estimated_total_regret_inr == pytest.approx(
-        estimate.mean_regret_inr * 1000
-    )
+    assert estimate.estimated_total_regret_inr == pytest.approx(estimate.mean_regret_inr * 1000)
     assert estimate.estimated_total_ci[0] == pytest.approx(estimate.ci_low_inr * 1000)
 
 
@@ -256,10 +261,12 @@ def _turn(rid: str, question: str, ts: float, cost: float = 10.0, **kwargs: obje
 
 
 def test_a_re_asked_question_is_attributed_to_the_answer_that_failed() -> None:
-    edges = ReworkLedger().attribute([
-        _turn("r1", "What is the prepayment charge on my home loan?", 0.0),
-        _turn("r2", "What is the prepayment charge on my home loan", 30.0),
-    ])
+    edges = ReworkLedger().attribute(
+        [
+            _turn("r1", "What is the prepayment charge on my home loan?", 0.0),
+            _turn("r2", "What is the prepayment charge on my home loan", 30.0),
+        ]
+    )
     assert len(edges) == 1
     assert edges[0].kind == "retry"
     assert edges[0].parent_request_id == "r1"
@@ -268,28 +275,34 @@ def test_a_re_asked_question_is_attributed_to_the_answer_that_failed() -> None:
 def test_an_unrelated_follow_up_is_not_rework() -> None:
     """Rework is the number that argues hardest for the product, so it is the one that
     most needs to resist flattering itself."""
-    edges = ReworkLedger().attribute([
-        _turn("r1", "What is the prepayment charge on my home loan?", 0.0),
-        _turn("r2", "What are the branch timings in Mumbai?", 30.0),
-    ])
+    edges = ReworkLedger().attribute(
+        [
+            _turn("r1", "What is the prepayment charge on my home loan?", 0.0),
+            _turn("r2", "What are the branch timings in Mumbai?", 30.0),
+        ]
+    )
     assert edges == []
 
 
 def test_a_question_re_asked_tomorrow_is_a_new_conversation() -> None:
-    edges = ReworkLedger().attribute([
-        _turn("r1", "What is the prepayment charge on my home loan?", 0.0),
-        _turn("r2", "What is the prepayment charge on my home loan?", 90_000.0),
-    ])
+    edges = ReworkLedger().attribute(
+        [
+            _turn("r1", "What is the prepayment charge on my home loan?", 0.0),
+            _turn("r2", "What is the prepayment charge on my home loan?", 90_000.0),
+        ]
+    )
     assert edges == []
 
 
 def test_an_inferred_retry_is_charged_at_its_confidence_not_in_full() -> None:
     """Charging the full amount on a maybe lets a coincidental follow-up inflate the
     rework figure."""
-    edges = ReworkLedger().attribute([
-        _turn("r1", f"{_LONG} nine", 0.0),
-        _turn("r2", f"{_LONG} seven", 20.0, cost=10.0),
-    ])
+    edges = ReworkLedger().attribute(
+        [
+            _turn("r1", f"{_LONG} nine", 0.0),
+            _turn("r2", f"{_LONG} seven", 20.0, cost=10.0),
+        ]
+    )
     assert len(edges) == 1
     edge = edges[0]
     assert edge.confidence < 1.0
@@ -301,32 +314,40 @@ def test_a_retry_at_the_threshold_still_charges_something() -> None:
     """The floor exists because scaling confidence from zero at the bar would make the
     bar meaningless -- everything between 0.90 and 0.91 similarity would be detected
     and then costed at approximately nothing."""
-    edges = ReworkLedger().attribute([
-        _turn("r1", f"{_LONG} nine", 0.0),
-        _turn("r2", f"{_LONG} seven", 20.0, cost=10.0),
-    ])
+    edges = ReworkLedger().attribute(
+        [
+            _turn("r1", f"{_LONG} nine", 0.0),
+            _turn("r2", f"{_LONG} seven", 20.0, cost=10.0),
+        ]
+    )
     assert edges[0].confidence >= RETRY_CONFIDENCE_FLOOR
     assert edges[0].inr_charged > 0.0
 
 
 def test_a_verbatim_repeat_is_charged_more_than_a_near_miss() -> None:
-    verbatim = ReworkLedger().attribute([
-        _turn("r1", f"{_LONG} nine", 0.0),
-        _turn("r2", f"{_LONG} nine", 20.0),
-    ])
-    near = ReworkLedger().attribute([
-        _turn("r1", f"{_LONG} nine", 0.0),
-        _turn("r2", f"{_LONG} seven", 20.0),
-    ])
+    verbatim = ReworkLedger().attribute(
+        [
+            _turn("r1", f"{_LONG} nine", 0.0),
+            _turn("r2", f"{_LONG} nine", 20.0),
+        ]
+    )
+    near = ReworkLedger().attribute(
+        [
+            _turn("r1", f"{_LONG} nine", 0.0),
+            _turn("r2", f"{_LONG} seven", 20.0),
+        ]
+    )
     assert verbatim and near
     assert verbatim[0].confidence > near[0].confidence
 
 
 def test_an_explicit_regenerate_beats_inference() -> None:
-    edges = ReworkLedger().attribute([
-        _turn("r1", "What is the fee?", 0.0),
-        _turn("r2", "Something else entirely", 10.0, explicit_regenerate=True),
-    ])
+    edges = ReworkLedger().attribute(
+        [
+            _turn("r1", "What is the fee?", 0.0),
+            _turn("r2", "Something else entirely", 10.0, explicit_regenerate=True),
+        ]
+    )
     assert len(edges) == 1
     assert edges[0].kind == "regenerate"
     assert edges[0].confidence > 0.9
@@ -336,10 +357,12 @@ def test_a_human_escalation_charges_the_reviewer_s_time_too() -> None:
     """The reviewer is paid whether they approve or reject, and that cost was caused by
     the answer that got held."""
     ledger = ReworkLedger(human_review_inr=220.0)
-    edges = ledger.attribute([
-        _turn("r1", "Can you email my claim summary?", 0.0, raised_hold_id="hold_1"),
-        _turn("r2", "resolved", 300.0, cost=5.0, resolves_hold_id="hold_1"),
-    ])
+    edges = ledger.attribute(
+        [
+            _turn("r1", "Can you email my claim summary?", 0.0, raised_hold_id="hold_1"),
+            _turn("r2", "resolved", 300.0, cost=5.0, resolves_hold_id="hold_1"),
+        ]
+    )
     assert len(edges) == 1
     assert edges[0].kind == "human_escalation"
     assert edges[0].confidence == 1.0
@@ -349,36 +372,44 @@ def test_a_human_escalation_charges_the_reviewer_s_time_too() -> None:
 def test_escalation_is_not_bounded_by_the_retry_window() -> None:
     """A human takes 15 minutes by policy. A time window built for retries would miss
     every escalation, which is the most expensive edge there is."""
-    edges = ReworkLedger().attribute([
-        _turn("r1", "q", 0.0, raised_hold_id="hold_1"),
-        _turn("r2", "resolved", 3_600.0, resolves_hold_id="hold_1"),
-    ])
+    edges = ReworkLedger().attribute(
+        [
+            _turn("r1", "q", 0.0, raised_hold_id="hold_1"),
+            _turn("r2", "resolved", 3_600.0, resolves_hold_id="hold_1"),
+        ]
+    )
     assert len(edges) == 1
     assert edges[0].kind == "human_escalation"
 
 
 def test_the_report_says_which_edges_were_inferred() -> None:
     ledger = ReworkLedger()
-    ledger.attribute([
-        _turn("r1", "prepayment charge home loan floating rate", 0.0),
-        _turn("r2", "prepayment charge home loan floating rate", 20.0),
-    ])
+    ledger.attribute(
+        [
+            _turn("r1", "prepayment charge home loan floating rate", 0.0),
+            _turn("r2", "prepayment charge home loan floating rate", 20.0),
+        ]
+    )
     report = ledger.report()
     assert report["by_kind"]["retry"]["count"] == 1
     assert any("INFERRED" in note for note in report["notes"])
 
 
 def test_the_worst_parents_are_ranked() -> None:
-    """"Which answer cost us the most afterwards" is the question an operator asks."""
+    """ "Which answer cost us the most afterwards" is the question an operator asks."""
     ledger = ReworkLedger()
-    ledger.attribute([
-        _turn("r1", "q", 0.0, raised_hold_id="h1"),
-        _turn("r2", "x", 10.0, cost=5.0, resolves_hold_id="h1"),
-    ])
-    ledger.attribute([
-        _turn("r3", "prepayment charge home loan floating", 0.0),
-        _turn("r4", "prepayment charge home loan floating", 20.0, cost=1.0),
-    ])
+    ledger.attribute(
+        [
+            _turn("r1", "q", 0.0, raised_hold_id="h1"),
+            _turn("r2", "x", 10.0, cost=5.0, resolves_hold_id="h1"),
+        ]
+    )
+    ledger.attribute(
+        [
+            _turn("r3", "prepayment charge home loan floating", 0.0),
+            _turn("r4", "prepayment charge home loan floating", 20.0, cost=1.0),
+        ]
+    )
     worst = ledger.report()["worst_parents"]
     assert worst[0]["request_id"] == "r1"
 

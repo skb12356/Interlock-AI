@@ -178,7 +178,12 @@ def test_the_encoder_produces_one_vector_per_layer_per_item() -> None:
     encoder = ObserverEncoder()
     batch = encoder.encode(
         ["Clause 9.1: no prepayment charge applies."] * 4,
-        ["No charge applies.", "A 2% charge applies.", "No charge applies.", "A 2% charge applies."],
+        [
+            "No charge applies.",
+            "A 2% charge applies.",
+            "No charge applies.",
+            "A 2% charge applies.",
+        ],
         batch_size=4,
     )
     assert len(batch.layers) == encoder.n_layers + 1
@@ -222,3 +227,52 @@ def test_mismatched_input_lengths_are_refused() -> None:
 
     with pytest.raises(ValueError, match="same length"):
         ObserverEncoder().encode(["a", "b"], ["only one"])
+
+
+# --------------------------------------------------------------------------- #
+# The one-standard-error rule
+# --------------------------------------------------------------------------- #
+
+
+def test_a_gap_inside_noise_is_not_treated_as_a_ranking() -> None:
+    """The rule exists because of a real run: layer 6 scored 0.9455 and layer 3 scored
+    0.9348 on ~450 held-out items, where one standard error is around 0.015. The winner
+    was chosen by noise -- and it happened to be the layer most likely to be the
+    encoder's own task head rather than anything about grounding.
+    """
+    rng = np.random.default_rng(21)
+    n, dim = 600, 24
+    labels = rng.integers(0, 2, n)
+    early = rng.normal(size=(n, dim))
+    early[:, 0] += labels * 2.0
+    # The same signal, jittered. Two layers carrying the same information will land
+    # within noise of each other, which is exactly the situation the rule is for --
+    # constructing a deliberate 0.05 gap would test the opposite behaviour.
+    late = early + rng.normal(scale=0.02, size=(n, dim))
+
+    bundle = train_probes([early, late], labels)
+    assert bundle.best_layer == 0, [row.auroc for row in bundle.curve]
+    assert any("within one standard error" in note for note in bundle.notes)
+
+
+def test_a_genuinely_better_later_layer_is_still_chosen() -> None:
+    """The rule must not become "always take layer 0". A real margin still wins."""
+    rng = np.random.default_rng(22)
+    n, dim = 600, 24
+    labels = rng.integers(0, 2, n)
+    weak = rng.normal(size=(n, dim))
+    weak[:, 0] += labels * 0.4
+    strong = rng.normal(size=(n, dim))
+    strong[:, 0] += labels * 3.0
+
+    bundle = train_probes([weak, strong], labels)
+    assert bundle.best_layer == 1
+
+
+def test_the_standard_error_shrinks_with_more_data() -> None:
+    from interlock.observer.probes import auroc_standard_error
+
+    small = auroc_standard_error(0.94, 50, 450)
+    large = auroc_standard_error(0.94, 500, 4500)
+    assert large < small
+    assert auroc_standard_error(0.94, 0, 10) == 1.0, "a degenerate split has no usable SE"

@@ -74,9 +74,7 @@ def test_most_of_the_set_is_clean(cases: list) -> None:
 def test_the_plan_s_sixty_induced_failures_are_present(cases: list) -> None:
     """The plan specifies 60. Twin pairs are not failures -- they are a fairness probe
     where BOTH members are legitimate -- so they are counted separately."""
-    induced = sum(
-        1 for case in cases if case.category not in {"clean", "demographic_twin"}
-    )
+    induced = sum(1 for case in cases if case.category not in {"clean", "demographic_twin"})
     assert induced == 50
     twins = sum(1 for case in cases if case.category == "demographic_twin")
     assert induced + twins == 60
@@ -242,9 +240,7 @@ async def test_the_deterministic_defects_are_caught_at_one_hundred_percent(
     assert all(o.caught_pre_action for o in canary_cases)
 
 
-async def test_every_poisoned_tool_call_is_frozen(
-    cases: list, interlock: ToolInterlock
-) -> None:
+async def test_every_poisoned_tool_call_is_frozen(cases: list, interlock: ToolInterlock) -> None:
     if not CALIB.exists():
         pytest.skip("run scripts/calibrate.py first")
     registry = CanaryRegistry()
@@ -262,9 +258,7 @@ async def test_every_poisoned_tool_call_is_frozen(
     assert all(o.tool_frozen for o in poisoned)
 
 
-async def test_the_off_arm_intervenes_on_nothing(
-    cases: list, interlock: ToolInterlock
-) -> None:
+async def test_the_off_arm_intervenes_on_nothing(cases: list, interlock: ToolInterlock) -> None:
     """The control arm has to be a real control: nothing checked, everything shipped."""
     if not CALIB.exists():
         pytest.skip("run scripts/calibrate.py first")

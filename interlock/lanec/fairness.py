@@ -216,9 +216,7 @@ class FairnessPair:
 class TwinGenerator:
     """Mutates a real query into a twin pair, on one axis at a time."""
 
-    axes: dict[str, tuple[tuple[str, str], ...]] = field(
-        default_factory=lambda: dict(MARKER_AXES)
-    )
+    axes: dict[str, tuple[tuple[str, str], ...]] = field(default_factory=lambda: dict(MARKER_AXES))
 
     def applicable(self, question: str) -> list[tuple[str, str, str]]:
         """Every ``(axis, marker_a, marker_b)`` this question can host.

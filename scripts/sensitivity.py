@@ -50,7 +50,15 @@ from interlock.risk.objective import choose_action  # noqa: E402
 #: Floors to sweep, from "impossibly good" to "what we actually have". Log-spaced,
 #: because the interesting behaviour is all in the bottom two decades.
 DEFAULT_FLOORS: tuple[float, ...] = (
-    0.000_01, 0.000_03, 0.000_1, 0.000_3, 0.001, 0.003, 0.01, 0.019, 0.05,
+    0.000_01,
+    0.000_03,
+    0.000_1,
+    0.000_3,
+    0.001,
+    0.003,
+    0.01,
+    0.019,
+    0.05,
 )
 
 #: What a stipulated detector scores on genuinely defective text. 0.95 rather than 1.0
@@ -135,7 +143,9 @@ BANDS: tuple[tuple[float, str, str], ...] = (
 
 async def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--json", type=Path, default=REPO_ROOT / "artifacts" / "eval" / "sensitivity.json")
+    parser.add_argument(
+        "--json", type=Path, default=REPO_ROOT / "artifacts" / "eval" / "sensitivity.json"
+    )
     parser.add_argument("--floors", type=float, nargs="*", default=list(DEFAULT_FLOORS))
     parser.add_argument("--ceiling", type=float, default=DEFECT_CEILING)
     args = parser.parse_args()
@@ -156,26 +166,29 @@ async def main() -> int:
             impact_inr=impact, reversibility=reversibility, domain=domain, confidence=0.9
         )
         floor = break_even_floor(policy, stakes)
-        thresholds.append(
-            {"impact_inr": impact, "domain": domain, "break_even_floor": floor}
-        )
+        thresholds.append({"impact_inr": impact, "domain": domain, "break_even_floor": floor})
         print(f"  Rs.{impact:>8,}  {domain:<13} {floor * 100:>18.4f}%")
 
     print("\n  For reference, the real detector's floor on clean text is ~1.9%.")
     print("  It clears only the first row.\n")
 
     # -- part 2: sweep a stipulated detector over the real seeded set -------- #
-    print(f"Sweeping a stipulated detector over the seeded set "
-          f"({len(cases)} cases, {len(defective_ids)} defective).")
-    print(f"Defective text is scored at {args.ceiling:.2f} throughout; only the clean "
-          f"floor moves.\n")
+    print(
+        f"Sweeping a stipulated detector over the seeded set "
+        f"({len(cases)} cases, {len(defective_ids)} defective)."
+    )
+    print(
+        f"Defective text is scored at {args.ceiling:.2f} throughout; only the clean floor moves.\n"
+    )
     # Two false-intervention columns, because they are different claims and the
     # difference turns out to be the whole answer. ANY counts L1_annotate, which ships
     # the answer unchanged with a citation appended and costs 5 ms. DISRUPTIVE counts
     # only what a customer actually experiences as an intervention: a 14 s repair, a
     # 30 s reroute, a 15-minute hold, a refusal.
-    print(f"  {'clean floor':>12}  {'FI (any)':>10}  {'FI (disrupt)':>13}  "
-          f"{'catch':>8}  {'verdict':>16}")
+    print(
+        f"  {'clean floor':>12}  {'FI (any)':>10}  {'FI (disrupt)':>13}  "
+        f"{'catch':>8}  {'verdict':>16}"
+    )
     print("  " + "-" * 68)
 
     ledger = Ledger(db_path=REPO_ROOT / "artifacts" / "eval" / "sensitivity.db")

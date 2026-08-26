@@ -44,22 +44,105 @@ _CLAUSE = re.compile(r"\b(?:clause|section|article)\s+(\d+(?:\.\d+)?)", re.IGNOR
 #: Function words carry no grounding information -- an answer and a passage will always
 #: share "the of a to", and counting that as support inflates every score toward
 #: "grounded" and flattens the signal's discrimination to nothing.
-_STOPWORDS = frozenset((
-    "a", "an", "and", "any", "are", "as", "at", "be", "been", "but", "by", "can", "could",
-    "do", "does", "for", "from", "had", "has", "have", "how", "i", "if", "in", "into", "is",
-    "it", "its", "may", "me", "my", "no", "not", "of", "on", "or", "our", "shall", "should",
-    "so", "than", "that", "the", "their", "them", "then", "there", "these", "they", "this",
-    "to", "was", "we", "were", "what", "when", "where", "which", "who", "will", "with",
-    "would", "you", "your",
-))
+_STOPWORDS = frozenset(
+    (
+        "a",
+        "an",
+        "and",
+        "any",
+        "are",
+        "as",
+        "at",
+        "be",
+        "been",
+        "but",
+        "by",
+        "can",
+        "could",
+        "do",
+        "does",
+        "for",
+        "from",
+        "had",
+        "has",
+        "have",
+        "how",
+        "i",
+        "if",
+        "in",
+        "into",
+        "is",
+        "it",
+        "its",
+        "may",
+        "me",
+        "my",
+        "no",
+        "not",
+        "of",
+        "on",
+        "or",
+        "our",
+        "shall",
+        "should",
+        "so",
+        "than",
+        "that",
+        "the",
+        "their",
+        "them",
+        "then",
+        "there",
+        "these",
+        "they",
+        "this",
+        "to",
+        "was",
+        "we",
+        "were",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "will",
+        "with",
+        "would",
+        "you",
+        "your",
+    )
+)
 
 #: Words that mark an answer as appropriately uncertain. Their *absence* is what makes a
 #: wrong answer dangerous: "confidence is the instruction humans follow".
-_HEDGES = frozenset((
-    "about", "appears", "approximately", "around", "cannot", "confirm", "could", "depending",
-    "estimated", "generally", "likely", "may", "might", "often", "please", "possibly",
-    "roughly", "seems", "subject", "typically", "unable", "unclear", "unlikely", "usually",
-))
+_HEDGES = frozenset(
+    (
+        "about",
+        "appears",
+        "approximately",
+        "around",
+        "cannot",
+        "confirm",
+        "could",
+        "depending",
+        "estimated",
+        "generally",
+        "likely",
+        "may",
+        "might",
+        "often",
+        "please",
+        "possibly",
+        "roughly",
+        "seems",
+        "subject",
+        "typically",
+        "unable",
+        "unclear",
+        "unlikely",
+        "usually",
+    )
+)
 
 #: The names these emit, in the order the fusion layer expects them.
 GROUNDING_SIGNALS: tuple[str, ...] = (
@@ -75,10 +158,27 @@ GROUNDING_SIGNALS: tuple[str, ...] = (
 #: Openers that mark a sentence as *procedural* rather than factual: the assistant
 #: narrating what it is doing, not asserting anything about the documents.
 _PROCEDURAL = (
-    "let me", "i will", "i'll", "i am going to", "i'm going to", "i have reviewed",
-    "i've reviewed", "i can help", "i'd be happy", "i would be happy", "let us",
-    "checking", "searching", "one moment", "please hold", "thank you", "sure,",
-    "certainly", "of course", "happy to help", "i understand",
+    "let me",
+    "i will",
+    "i'll",
+    "i am going to",
+    "i'm going to",
+    "i have reviewed",
+    "i've reviewed",
+    "i can help",
+    "i'd be happy",
+    "i would be happy",
+    "let us",
+    "checking",
+    "searching",
+    "one moment",
+    "please hold",
+    "thank you",
+    "sure,",
+    "certainly",
+    "of course",
+    "happy to help",
+    "i understand",
 )
 
 #: Sentences shorter than this, with no figure and no clause reference, are almost
@@ -204,8 +304,9 @@ def numeric_unsupported(answer: str, context: Sequence[Fragment]) -> tuple[float
     haystack = _context_text(context)
     present = set(_NUMBER.findall(haystack))
     missing = tuple(
-        figure for figure in figures if figure not in present and _normalise(figure) not in
-        {_normalise(p) for p in present}
+        figure
+        for figure in figures
+        if figure not in present and _normalise(figure) not in {_normalise(p) for p in present}
     )
     return len(missing) / len(figures), missing
 

@@ -65,7 +65,7 @@ def test_a_missing_evidence_set_is_shown_as_none_not_omitted() -> None:
 
 
 def test_unsupported_is_not_misread_as_supported() -> None:
-    """"unsupported" contains "supported" as a substring. Testing for the affirmative
+    """ "unsupported" contains "supported" as a substring. Testing for the affirmative
     first would misread every negative verdict in the anchor set."""
     assert DeepJudge.parse("Verdict: UNSUPPORTED. The clause is not in evidence.").verdict == (
         "unsupported"
@@ -185,9 +185,7 @@ def test_calibration_drift_makes_the_probabilities_unquotable() -> None:
     """The whole point of invariant 8: the system must be able to say NO about itself."""
     monitor = MetaMonitor(ece_at_fit=0.004)
     # The calibrator now says 0.9 on items that are almost never defective.
-    report = monitor.assess(
-        anchor_probabilities=[0.9] * 100, anchor_labels=[0] * 95 + [1] * 5
-    )
+    report = monitor.assess(anchor_probabilities=[0.9] * 100, anchor_labels=[0] * 95 + [1] * 5)
     assert report.ece_now is not None and report.ece_now >= ECE_ALARM
     assert report.trust == TrustState.UNTRUSTED
     assert not report.safe_to_quote_probabilities

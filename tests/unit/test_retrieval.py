@@ -190,8 +190,9 @@ def test_the_same_query_returns_the_same_order(retriever: Retriever) -> None:
 
 
 def test_domain_filter_restricts_results(retriever: Retriever) -> None:
-    hits = retriever.search("where is the nearest branch and when does it open", k=8,
-                            domain="branch_info")
+    hits = retriever.search(
+        "where is the nearest branch and when does it open", k=8, domain="branch_info"
+    )
     assert hits
     assert {h.chunk.domain for h in hits} == {"branch_info"}
 

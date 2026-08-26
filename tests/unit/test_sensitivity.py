@@ -36,7 +36,10 @@ def break_even_floor(stakes: Stakes) -> float:
     low, high = 0.0, 1.0
     for _ in range(60):
         mid = (low + high) / 2
-        if choose_action(probs={"ungrounded": mid}, stakes=stakes, policy=POLICY).action == "L0_pass":
+        if (
+            choose_action(probs={"ungrounded": mid}, stakes=stakes, policy=POLICY).action
+            == "L0_pass"
+        ):
             low = mid
         else:
             high = mid

@@ -1,47 +1,52 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 2/3 - retrieval, tool interlock and calibration are live; three of the four never-cut items are built",
-  "last_completed_task": "D2-B1 + D2-B2 (isotonic calibration and conformal threshold selection), with D1-B5's induced-failure labelling underneath them",
-  "next_task": "D3-B7 (seeded eval set, never-cut) then D3-B3/B4 (the real RiskEngine, a one-line DI swap from StubRiskEngine)",
-  "system_status": "Green",
+  "current_phase": "Day 3 complete - all four never-cut items built, real engine on the hot path, six metrics measured",
+  "last_completed_task": "D3-B7 (seeded eval set + `make eval`), after D3-B1/B2/B3/B4 (the real RiskEngine)",
+  "next_task": "D2-A6 (governor -- invariant 4 is currently unimplemented), then D4-A4 (console: the counterfactual is what makes the demo land)",
+  "system_status": "Green, with one measured target miss (F-019) that is a design question, not a bug",
   "verification": {
     "ruff": "clean across interlock/, tests/, scripts/",
     "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
-    "pytest": "583 passed",
-    "calibration": "out-of-fold n=2000: ECE 0.0451 (target <0.05 PASS), Brier 0.0863, AUROC 0.9205",
-    "conformal": "certified: <=1% ungrounded escapes at 90% confidence, threshold 0.145, n=1000 -- at a 100% intervention rate",
-    "tool_interlock": "Scene 2 runs through the proxy: poisoned doc -> email frozen -> durable review card; the client never receives the frozen call",
-    "holds": "kill-and-restart survival test passes",
-    "action_latency": "MEASURED on this hardware: L2_repair 13,704 ms median, L3_reroute 30,719 ms median"
+    "pytest": "627 passed",
+    "make_eval": "runs; prints six numbers; five PASS, false interventions MISS"
+  },
+  "measured_metrics": {
+    "pre_action_catch_rate": "100.00% [91.8, 100.0] n=43 -- PASS",
+    "added_p95_latency_ms": "15 -- PASS",
+    "verification_cost": "3.53% of model spend -- PASS",
+    "net_spend_change": "-20.15% -- PASS (routing + loop-breaking only; NO cache saving claimed)",
+    "ungrounded_escapes": "0.00% [0.0, 13.3] n=25 -- PASS empirically; the CERTIFIED bound is separate",
+    "false_interventions": "91.08% [85.6, 94.6] n=157 -- MISS against a 2% target. See F-019.",
+    "twin_pairs_treated_alike": "100% (5 pairs)",
+    "calibration": "ECE 0.0037, Brier 0.0206, AUROC 0.8944, out-of-fold at n=10,000",
+    "conformal": "threshold 0.0150 at alpha=0.01 delta=0.10, certified on n=840 ungrounded items, at a 100% intervention rate"
   },
   "never_cut_status": {
-    "calibration_step": "BUILT (D2-B1/B2) -- isotonic + conformal, artefacts in artifacts/calibration/",
-    "commit_gate": "BUILT (D2-A4/A5) -- text streams one sentence behind; tool calls now stream one call behind",
-    "tool_interlock": "BUILT (D3-A1/A2) -- taint x reversibility, durable holds, approve/reject endpoints",
-    "seeded_eval_set": "NOT BUILT (D3-B7) -- this is the remaining never-cut item and the next task"
+    "calibration_step": "BUILT (D2-B1/B2)",
+    "commit_gate": "BUILT (D2-A4/A5) -- text one sentence behind, tool calls one call behind",
+    "tool_interlock": "BUILT (D3-A1/A2) -- kill-and-restart survival test passes",
+    "seeded_eval_set": "BUILT (D3-B7) -- 200 cases, exact counts asserted, `make eval` prints six numbers"
   },
   "open_findings": [
-    "F-002 open: high-stakes intervention rate; disciplined by the false-intervention metric, must NOT be tuned away",
+    "F-002 / F-019 OPEN, MEASURED, MUST NOT BE TUNED AWAY: false interventions are 91.08% against a 2% target. Broken out by stakes: 0% below Rs.100, 100% above. NOT detector noise -- at Rs.40,000 impact with a 2.5x reversibility multiplier, L0_pass only wins if P(defect) < ~0.0001, and the detector's floor on clean text is ~0.019. 'false interventions <= 2%' and 'impact_inr: 40000 with lambda_time 0.40' cannot both hold. The live question is the IMPACT MODEL: impact_inr is a per-request stake charged in full to every sentence, so a five-sentence answer is charged five times the harm the request can cause. Three defensible resolutions (discount per sentence / raise lambda_time / re-target the metric per stakes band); choosing is a deliberate decision, not a tuning pass.",
     "F-003 recorded: impact_inr is a base that multipliers scale",
-    "F-014 RESOLVED by measurement: the 46 s repair was mostly Ollama cold-loading. keep_alive removes it; the residual 13.7 s is real and is now what the policy charges.",
-    "F-015 open: on an L4_hold at sentence 0 the held sentence is suppressed but later sentences still stream. Whether a hold terminates the response or holds only the flagged span is a decision-layer question, not yet settled.",
-    "F-016 OPEN, MEASURED: the conformal bound is certified only at a 100% intervention rate, because 'unanswerable' is invisible to the deterministic grounding signals (0.203 vs a clean baseline of 0.191). The guarantee is real and operationally useless until the observer probe (D2-B4/B7) lands. Do NOT present the bound without the intervention rate beside it.",
-    "F-017 OPEN: calibrated probabilities are bimodal -- nothing between 0.25 and 0.85 -- so the ECE of 0.0451 rests on four populated bins. Visible in the reliability histogram. A richer signal set should spread this out; until it does, the ECE means less than a single number suggests.",
-    "F-018 OPEN: the semantic-entropy labelling job (D1-B5's second half) is not run. 10 samples x N questions at 3-14 s each is unaffordable on this hardware; the pipeline that consumes those scores is built and will take them."
+    "F-015 open: on an L4_hold at sentence 0 the held sentence is suppressed but later sentences still stream. Whether a hold terminates the response or holds only the flagged span is unsettled.",
+    "F-016 OPEN, MEASURED: the conformal bound is certified only at a 100% intervention rate, because 'unanswerable' is invisible to the deterministic signals (0.025 vs a clean baseline of 0.025). Guaranteed mode measured: false interventions 91.08% -> 100.00%. Never present the bound without the intervention rate beside it.",
+    "F-017 OPEN: calibrated probabilities are bimodal, so the ECE rests on few populated bins. Visible in the reliability histogram.",
+    "F-018 OPEN: the semantic-entropy labelling job (D1-B5's second half) is not run -- unaffordable on this hardware. The pipeline that consumes those scores is built.",
+    "F-020 OPEN: `make eval` models generation latency and billing rather than observing them, and models no cache saving at all. The -20.15% net spend figure is routing + loop-breaking only. Stated in the harness output, not just in docs."
   ],
   "fixed_this_session": [
-    "F-010 closed: repair corrects against real retrieved evidence and cites the clause",
-    "F-011: repair fallback evidence included UNTRUSTED passages -- the guardrail would have rewritten a correct answer into agreement with the poisoned document and cited it",
-    "F-012: qwen3 spent its whole repair budget thinking; '/no_think' fixes it (chat_template_kwargs is ignored by Ollama's OpenAI shim -- measured both ways)",
-    "F-013: RepairResult reported 'failed verification' when the model had produced no text at all",
-    "conformal fixed-sequence grid was ordered backwards, so EVERY input reported 'not certified'; it neither raised nor looked wrong",
-    "tool-call argument matching used raw substring, so {'currency': 'en'} matched 'prepaym-en-t' and traced every call to every document",
-    "induced-failure taxonomy silently rebalanced when a chunk could not host a mode"
+    "the calibration set was 50% defective, so the calibrator scored clean text at P=0.135 and HELD CORRECT ANSWERS for review. Base rate corrected to 10%; ECE 0.0451 -> 0.0037.",
+    "the conformal threshold was certified against the BINARY fusion but applied to the per-defect P(ungrounded) the engine gates on. Two different scales, nothing raised; guaranteed mode was a silent no-op and the only symptom was two identical eval columns.",
+    "'Let me search the documents again.' scored P(ungrounded)=0.95 and at Rs.75,000 was BLOCKED. Grounding is now gated on is_claim_bearing() -- a sentence asserting nothing checkable is not scored for groundedness.",
+    "scan_egress (the canary control, invariant 6) was written, unit-tested and called by nothing until the real engine wired it"
   ],
   "deviations_recorded": [
-    "D-009: the dense retrieval arm is a deterministic hashed lexical vector, not bge-small-en-v1.5 (no torch). BM25 carries retrieval; the dense arm declares semantic=False and gets half a vote. One config string swaps in the real model.",
-    "D-010: calibration is fitted on INDUCED failures, not human labels. It calibrates; it does not audit. D2-B3's hand-labelled 300 remains outstanding and is what the meta-monitor must re-score."
+    "D-009: the dense retrieval arm is a hashed lexical vector, not bge-small-en-v1.5 (no torch). BM25 carries retrieval; declares semantic=False and gets half a vote.",
+    "D-010: calibration is fitted on INDUCED failures, not human labels. It calibrates; it does not audit. D2-B3's hand-labelled 300 remains outstanding and is what the meta-monitor must re-score.",
+    "D-011: `make eval` holds generation FIXED across both arms (paired design). This is a methodological choice, not a shortcut -- it attributes every off-vs-on difference to Interlock rather than to sampling noise -- but it means generation latency and billing are modelled rather than observed."
   ],
-  "updated_utc": "2026-08-25T22:00:00Z"
+  "updated_utc": "2026-08-26T02:30:00Z"
 }

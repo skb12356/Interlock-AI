@@ -5,9 +5,10 @@ Live record of what is **built**, what is **measured**, what is **stubbed**, and
 
 Task-level state lives in `TODO.md`; machine-readable resume state in `STATE_CHECKPOINT.json`.
 
-**Last updated:** 2026-08-25 · **Phase:** Day 2/3 — retrieval, the tool interlock and the
-calibration layer are built. Three of the four never-cut items are done; the seeded eval
-set is the outstanding one.
+**Last updated:** 2026-08-26 · **Phase:** Day 3 complete — all four never-cut items are
+built, the real risk engine is on the hot path, and `make eval` produces six measured
+numbers. Five meet their target; one misses by a factor of forty-five, and that miss is
+the most informative result in the build so far (F-019).
 
 ---
 
@@ -38,14 +39,17 @@ set is the outstanding one.
 | Induced-failure labelling | **built** | six modes, exact proportions, zero fallbacks, deterministic |
 | **Calibration + conformal** | **built** | D2-B1/B2 — **never-cut item done**; artefacts in `artifacts/calibration/` |
 | **Tool interlock + durable holds** | **built** | D3-A1/A2 — **never-cut item done**; kill-and-restart test passes |
+| **Seeded eval set + `make eval`** | **built** | D3-B7 — **never-cut item done**; 200 cases, six metrics |
+| Real `RiskEngine` on the hot path | **built** | D3-B3/B4 — `INTERLOCK_RISK_ENGINE=real` is the default |
+| Conformal feasibility filter | **built** | D3-B1 — off by default (F-016); `make eval-guaranteed` runs it on |
+| Loop breaker | **partial** | scored in the harness; not yet wired into the live agent path |
 | **Observer (real weights)** | not started | D2-B4 — needs torch |
-| **Seeded eval set** | not started | D3-B7 — **the remaining never-cut item** |
 | Hand-labelled anchor set (300) | not started | D2-B3 — calibration currently runs on induced data (D-010) |
-| Real `RiskEngine` (swap from stub) | not started | D3-B3/B4 — a one-line DI change if the contracts held |
 | Demo app UI | not started | D1-A5 remainder |
+| Governor / degradation order | not started | D2-A6 — **invariant 4 is currently unimplemented** |
 | **Governor / Lane C / console** | not started | D2-A6, D4 |
 
-**Test count:** 583 passing.
+**Test count:** 627 passing.
 
 ### Sequencing change
 
@@ -58,38 +62,89 @@ conformal feasibility filter — remain at D3-B1.
 
 ## 2. What is measured
 
-The six headline metrics still need `make eval` (D3-B7), which does not exist yet — so
-five of the six remain blank. **Never reported as achieved without a run that produced
-the number** (CLAUDE.md §8).
+All six now come from a run. `make eval` (200 seeded conversations, Interlock off vs on,
+paired generations) produces them, and it is re-run on demand rather than quoted from a
+slide.
 
-| Metric | Target | Measured |
+| Metric | Target | Measured | |
+|---|---|---|---|
+| Pre-Action Catch Rate | ≥ 90% | **100.00%** [91.8, 100.0] n=43 | PASS |
+| Added p95 latency | ≤ 120 ms | **15 ms** | PASS |
+| Verification cost | ≤ 5% of model spend | **3.53%** | PASS |
+| Net spend change | ≈ −30% | **−20.15%** | PASS |
+| Ungrounded escapes | ≤ 1% @ 90% confidence | **0.00%** [0.0, 13.3] n=25 | PASS |
+| **False interventions** | **≤ 2%** | **91.08%** [85.6, 94.6] n=157 | **MISS** |
+| *(beside the six)* Twin pairs treated alike | 100% | 100% (5 pairs) | PASS |
+
+### F-019 — the false-intervention miss is a target conflict, not a bug
+
+Broken out by stakes, the rate is not noise and is not uniform:
+
+| Stakes bucket | False intervention rate | n |
 |---|---|---|
-| Pre-Action Catch Rate | ≥ 90% | — |
-| Added p95 latency | ≤ 120 ms | — |
-| Verification cost | ≤ 5% of model spend | — |
-| Net spend change | ≈ −30% | — |
-| Ungrounded escapes | ≤ 1% @ 90% confidence | **certified — but at a 100% intervention rate** (see below) |
-| False interventions | ≤ 2% | — |
+| ₹0–100 | **0%** | 14 |
+| ₹100–1,000 | 100% | 42 |
+| ₹1,000–10,000 | 100% | 11 |
+| ₹10,000+ | 100% | 90 |
 
-### Measured this phase
+The arithmetic explains it exactly. At ₹40,000 impact with a 2.5× reversibility
+multiplier the scaled impact is ₹100,000, and `L0_pass` only wins the argmin when
 
-Numbers that exist because a run produced them, with the caveat each one carries.
+    P(defect) × 100,000  <  P(defect) × 100,000 × (1 − 0.80) + 2.00 + 0.07 + 5.48
+
+i.e. when **P(defect) < ~0.0001**. The detector's floor on clean text is ~0.019, and no
+achievable detector reaches one false positive in ten thousand.
+
+So **"false interventions ≤ 2%" and "impact_inr: 40000 with lambda_time: 0.40" cannot
+both hold.** This is a conflict between two of the plan's own targets, surfaced by
+measurement. It is deliberately **not** tuned away — CLAUDE.md §"open findings" says
+F-002 must not be, and this is F-002 with a number attached.
+
+The live question is the impact model, not the detector: `impact_inr` is a *per-request*
+stake, and the objective currently charges it in full to *every sentence* of the answer.
+For a five-sentence answer that is five times the harm the request can actually cause.
+Three defensible resolutions exist (discount the stake per sentence; raise `lambda_time`
+so waiting costs what it really costs; or accept "we verify every high-stakes answer" as
+a product stance and re-target the metric per stakes band). Choosing between them is a
+decision to take deliberately, with the numbers above in hand.
+
+### Calibration and conformal
 
 | Quantity | Value | Caveat |
 |---|---|---|
-| Calibration ECE (out-of-fold, n=2000) | **0.0451** | target < 0.05 → PASS. Rests on four populated bins (F-017) |
-| Brier / AUROC | 0.0863 / 0.9205 | 5-fold cross-fitted; induced data, not human labels (D-010) |
-| Conformal threshold | **0.145 @ α=0.01, δ=0.10** | certified on n=1000 defective items |
+| Calibration ECE (out-of-fold, n=10,000) | **0.0037** | target < 0.05 → PASS |
+| Brier / AUROC | 0.0206 / 0.8944 | 5-fold cross-fitted; induced data, not human labels (D-010) |
+| Conformal threshold | **0.0150 @ α=0.01, δ=0.10** | certified on n=840 ungrounded items |
 | Intervention rate at that threshold | **100%** | the bound holds and is useless (F-016) |
+| Defect base rate assumed | 10% | a stated assumption, not a measurement |
+
+ECE improved by an order of magnitude (0.0451 → 0.0037) when the calibration set's base
+rate was corrected from 50% to 10%. At 50/50 the calibrator had learned that half of
+everything is broken and scored clean text at P=0.135, which at ₹40,000 was enough to
+**hold a correct answer for human review** — correctly, given what it had been told a
+clean sentence looks like.
+
+### Measured action costs
+
+| Quantity | Value | Caveat |
+|---|---|---|
 | L2 repair latency | **13,704 ms median** | qwen3:8b on the build laptop; `artifacts/action_latency.json` |
 | L3 reroute latency | **30,719 ms median** | same; both re-priced into the policy |
 | Ollama cold start | 12 s (4b) / 21 s (8b) | eliminated by `keep_alive`, not by making anything faster |
 
-**The one that must not be quoted alone** is the conformal bound. "At most 1% ungrounded
-escapes at 90% confidence" is true and certified. It is achieved by intervening on every
-request, because `unanswerable` failures are invisible to the deterministic grounding
-signals. Presenting the bound without the intervention rate beside it would be the exact
-kind of technically-true claim this project exists to avoid.
+**Two things must never be quoted alone.** The conformal bound — "at most 1% ungrounded
+escapes at 90% confidence" is true, certified, and achieved by intervening on every
+request. And the catch rate — 100% is real, and it sits beside a 91% false-intervention
+rate; a system that intervenes on almost everything catches almost everything.
+
+### What `make eval` does not measure
+
+Stated in its own output, not only here. Generation latency and generation billing are
+**modelled** from the policy's token prices and the measured per-action latencies, not
+observed: a live-generation run over 200 conversations at ~14 s per repair is hours and
+would measure Ollama's mood as much as anything else. No cache saving is modelled or
+claimed, because nothing in this build has measured one — so the −20% net spend figure
+is routing and loop-breaking only, and the plan's 20–45% cache range is absent by choice.
 
 ## 3. What is stubbed
 
@@ -234,6 +289,20 @@ calibrates; human data audits.** D2-B3 stays on the never-cut list, and the meta
 (D4-B3) must re-score the *human* anchor set, never this one. The published ECE is honest
 about what it was measured on — `artifacts/calibration/dataset.json` carries the warning
 alongside the numbers.
+
+### D-011 — `make eval` holds generation fixed across both arms
+**Plan:** 200 conversations run off vs on, with the metric delta as the headline.
+**Reality:** each case carries its model output rather than sampling one at run time.
+**Why this is a methodological choice rather than a shortcut:** a paired design
+attributes every off-vs-on difference to Interlock rather than to the model having a
+different day, which is what the delta is supposed to isolate. It also runs in seconds,
+which is the difference between a number re-measured on every commit and one measured
+once, the night before.
+**Cost of the choice, stated plainly:** generation latency and generation billing are
+**modelled** from the policy's token prices and the measured per-action latencies, not
+observed. No cache saving is modelled at all, so the −20.15% net spend figure is routing
+and loop-breaking only, and the plan's conservative 20–45% cache range is absent by
+choice rather than by oversight. The harness prints both limits in its own output.
 
 ## 4b. Open findings
 

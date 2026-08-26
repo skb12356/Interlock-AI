@@ -10,6 +10,7 @@ import type {
 
 export interface RequestTrace {
   requestId: string;
+  prompt: string;
   assistantText: string;
   status: "streaming" | "complete" | "failed";
   error: string | null;
@@ -28,10 +29,11 @@ export interface ConsoleState {
 }
 
 export type ConsoleAction =
-  | { type: "request.started"; requestId: string }
+  | { type: "request.started"; requestId: string; prompt: string }
   | { type: "stream.frame"; requestId: string; frame: ParsedFrame }
   | { type: "request.failed"; requestId: string; message: string }
   | { type: "projection.received"; envelope: ConsoleEnvelope }
+  | { type: "diagnostic.received"; code: string; message: string }
   | { type: "decision.loaded"; detail: DecisionDetail };
 
 export const initialConsoleState: ConsoleState = {
@@ -41,9 +43,10 @@ export const initialConsoleState: ConsoleState = {
   diagnostics: [],
 };
 
-function emptyTrace(requestId: string): RequestTrace {
+function emptyTrace(requestId: string, prompt = ""): RequestTrace {
   return {
     requestId,
+    prompt,
     assistantText: "",
     status: "streaming",
     error: null,
@@ -70,11 +73,20 @@ function applyFrame(state: ConsoleState, requestId: string, frame: ParsedFrame):
   } else if (frame.event === "interlock.stakes") {
     nextTrace = { ...trace, stakes: frame.data };
   } else if (frame.event === "interlock.signal") {
-    nextTrace = { ...trace, signals: [...trace.signals, frame.data] };
+    const duplicate = trace.signals.some((signal) =>
+      signal.sentence_idx === frame.data.sentence_idx &&
+      signal.name === frame.data.name &&
+      signal.prob === frame.data.prob
+    );
+    if (!duplicate) nextTrace = { ...trace, signals: [...trace.signals, frame.data] };
   } else if (frame.event === "interlock.decision") {
-    nextTrace = { ...trace, decisions: [...trace.decisions, frame.data] };
+    if (!trace.decisions.some((decision) => decision.decision_id === frame.data.decision_id)) {
+      nextTrace = { ...trace, decisions: [...trace.decisions, frame.data] };
+    }
   } else if (frame.event === "interlock.hold") {
-    nextTrace = { ...trace, holds: [...trace.holds, frame.data] };
+    if (!trace.holds.some((hold) => hold.hold_id === frame.data.hold_id)) {
+      nextTrace = { ...trace, holds: [...trace.holds, frame.data] };
+    }
   }
 
   return {
@@ -106,7 +118,14 @@ export function consoleReducer(state: ConsoleState, action: ConsoleAction): Cons
     return {
       ...state,
       activeRequestId: action.requestId,
-      requests: { ...state.requests, [action.requestId]: emptyTrace(action.requestId) },
+      requests: { ...state.requests, [action.requestId]: emptyTrace(action.requestId, action.prompt) },
+    };
+  }
+
+  if (action.type === "diagnostic.received") {
+    return {
+      ...state,
+      diagnostics: [...state.diagnostics, { code: action.code, message: action.message }],
     };
   }
 

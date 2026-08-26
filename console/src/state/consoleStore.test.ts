@@ -5,7 +5,7 @@ import { consoleReducer, initialConsoleState } from "./consoleStore";
 
 describe("consoleReducer", () => {
   it("keeps partial assistant text when the transport fails", () => {
-    let state = consoleReducer(initialConsoleState, { type: "request.started", requestId: "req_1" });
+    let state = consoleReducer(initialConsoleState, { type: "request.started", requestId: "req_1", prompt: "Question" });
     state = consoleReducer(state, {
       type: "stream.frame",
       requestId: "req_1",
@@ -26,7 +26,7 @@ describe("consoleReducer", () => {
   });
 
   it("applies known Interlock events to the matching request", () => {
-    let state = consoleReducer(initialConsoleState, { type: "request.started", requestId: "req_2" });
+    let state = consoleReducer(initialConsoleState, { type: "request.started", requestId: "req_2", prompt: "Question" });
     state = consoleReducer(state, {
       type: "stream.frame",
       requestId: "req_2",
@@ -40,6 +40,30 @@ describe("consoleReducer", () => {
     expect(state.requests.req_2.signals).toEqual([
       { sentence_idx: 1, name: "grounding.support", prob: 0.82 },
     ]);
+  });
+
+  it("suppresses the same named event arriving over direct SSE and projections", () => {
+    let state = consoleReducer(initialConsoleState, { type: "request.started", requestId: "req_2", prompt: "Question" });
+    const frame = {
+      kind: "interlock" as const,
+      event: "interlock.signal" as const,
+      data: { sentence_idx: 1, name: "grounding.support", prob: 0.82 },
+    };
+    state = consoleReducer(state, { type: "stream.frame", requestId: "req_2", frame });
+    state = consoleReducer(state, {
+      type: "projection.received",
+      envelope: {
+        stream_id: "epoch-a",
+        seq: 1,
+        event: frame.event,
+        data: frame.data,
+        ts: 10,
+        request_id: "req_2",
+        replayed: false,
+      },
+    });
+
+    expect(state.requests.req_2.signals).toHaveLength(1);
   });
 
   it("deduplicates projection envelopes and resets the cursor for a new stream", () => {

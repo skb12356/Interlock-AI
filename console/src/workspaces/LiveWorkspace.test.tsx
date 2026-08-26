@@ -16,6 +16,7 @@ const actions = [
 function trace(): RequestTrace {
   return {
     requestId: "req_1",
+    prompt: "What are the prepayment charges?",
     assistantText: "You may prepay without a foreclosure charge.",
     status: "complete",
     error: null,
@@ -122,5 +123,24 @@ describe("LiveWorkspace", () => {
 
     expect(screen.getByText("Blocked before release")).toBeInTheDocument();
     expect(screen.getByText("Hard rule: canary_leak")).toBeInTheDocument();
+  });
+
+  it("keeps the submitted customer message stable while the next draft changes", () => {
+    render(
+      <LiveWorkspace
+        trace={trace()}
+        prompt="A different draft for the next request"
+        scenario="scene1"
+        busy={false}
+        onPromptChange={vi.fn()}
+        onScenarioChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("What are the prepayment charges?")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Customer message" })).toHaveValue(
+      "A different draft for the next request",
+    );
   });
 });

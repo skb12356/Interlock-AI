@@ -62,6 +62,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .wordmark small { display: block; opacity: 0.7; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; }
 .system-state { font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
 .system-state span { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--evidence); box-shadow: 0 0 0 4px rgba(123, 165, 150, 0.18); }
+.system-state.reconnecting span, .system-state.connecting span { background: var(--signal); box-shadow: 0 0 0 4px rgba(196, 122, 40, 0.18); }
+.system-state.unavailable span { background: var(--stop); box-shadow: 0 0 0 4px rgba(164, 63, 66, 0.18); }
 
 .workspace-rail {
   padding: 22px 12px;
@@ -90,6 +92,9 @@ h2 { margin: 0; font: 600 24px/1.05 Charter, Georgia, serif; letter-spacing: -0.
 .workspace-intro { max-width: 620px; margin-top: 24px; color: var(--ledger-soft); font-size: 17px; line-height: 1.6; }
 
 .workspace-titlebar { display: flex; align-items: end; justify-content: space-between; margin-bottom: 20px; }
+.transport-notice { display: flex; gap: 10px 18px; margin: -4px 0 16px; padding: 10px 13px; color: var(--stop); border-left: 3px solid var(--stop); background: rgba(164, 63, 66, 0.07); font-size: 11px; }
+.transport-notice strong { font-family: "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
+.transport-notice span { color: var(--ledger-soft); }
 .workspace-titlebar .eyebrow { margin-bottom: 7px; }
 .live-grid { display: grid; grid-template-columns: minmax(340px, 0.82fr) minmax(500px, 1.18fr); gap: 18px; align-items: start; }
 .conversation-panel, .decision-panel { min-width: 0; border: 1px solid var(--rule); background: rgba(245, 247, 242, 0.94); box-shadow: 0 18px 50px rgba(23, 54, 56, 0.09); }

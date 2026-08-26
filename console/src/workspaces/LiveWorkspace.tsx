@@ -78,7 +78,7 @@ export function LiveWorkspace({
             <>
               <article className="message customer-message">
                 <span>Customer</span>
-                <p>{prompt}</p>
+                <p>{trace.prompt || prompt}</p>
               </article>
               <article className="message assistant-message">
                 <span>Bank assistant · Interlock guarded</span>

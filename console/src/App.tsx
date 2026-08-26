@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { streamChat } from "./api/chatClient";
+import { ProjectionConnection } from "./api/projectionClient";
 import {
   ConsoleApiError,
   getEvidenceBundle,
@@ -55,13 +56,41 @@ export function App() {
   const [evidence, setEvidence] = useState<EvidenceBundle>(emptyEvidence);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [projectionStatus, setProjectionStatus] = useState<"connecting" | "connected" | "reconnecting" | "unavailable">("connecting");
   const vault = useRef(new ResumeTokenVault());
   const activeController = useRef<AbortController | null>(null);
+  const workspaceMain = useRef<HTMLElement | null>(null);
+  const mountedWorkspace = useRef(false);
 
   useEffect(() => () => {
     activeController.current?.abort();
     vault.current.clear();
   }, []);
+
+  useEffect(() => {
+    if (typeof WebSocket === "undefined") {
+      setProjectionStatus("unavailable");
+      return;
+    }
+    const connection = new ProjectionConnection({
+      onEnvelope: (envelope) => dispatch({ type: "projection.received", envelope }),
+      onStatus: (status) => {
+        if (status !== "stopped") setProjectionStatus(status);
+      },
+      onDiagnostic: (message) => dispatch({ type: "diagnostic.received", code: "projection", message }),
+    });
+    connection.start();
+    return () => connection.stop();
+  }, []);
+
+  useEffect(() => {
+    if (!mountedWorkspace.current) {
+      mountedWorkspace.current = true;
+      return;
+    }
+    workspaceMain.current?.focus();
+  }, [workspace]);
 
   const loadReviews = useCallback(async () => {
     setReviewsLoading(true);
@@ -118,6 +147,7 @@ export function App() {
     activeController.current?.abort();
     activeController.current = controller;
     vault.current.clear();
+    setChatError(null);
     setBusy(true);
     let requestId: string | null = null;
     try {
@@ -126,7 +156,7 @@ export function App() {
         {
           onRequestId: (id) => {
             requestId = id;
-            dispatch({ type: "request.started", requestId: id });
+            dispatch({ type: "request.started", requestId: id, prompt });
           },
           onFrame: (frame) => {
             if (requestId) dispatch({ type: "stream.frame", requestId, frame });
@@ -138,6 +168,7 @@ export function App() {
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       const message = error instanceof Error ? error.message : "The stream ended unexpectedly";
+      setChatError(message);
       if (requestId) dispatch({ type: "request.failed", requestId, message });
     } finally {
       if (activeController.current === controller) activeController.current = null;
@@ -176,7 +207,7 @@ export function App() {
             <small>Decision console</small>
           </span>
         </div>
-        <div className="system-state"><span aria-hidden="true" /> Replay desk</div>
+        <div className={`system-state ${projectionStatus}`}><span aria-hidden="true" /> {projectionStatus} projection</div>
       </header>
 
       <nav className="workspace-rail" aria-label="Console workspaces">
@@ -194,11 +225,17 @@ export function App() {
         ))}
       </nav>
 
-      <main className="workspace" id="workspace" tabIndex={-1}>
+      <main className="workspace" id="workspace" tabIndex={-1} ref={workspaceMain}>
         <header className="workspace-titlebar">
           <p className="eyebrow">Operator workspace / {workspace}</p>
           <h1>{headings[workspace]}</h1>
         </header>
+        {(chatError || state.diagnostics.at(-1)) && (
+          <div className="transport-notice" role="alert">
+            <strong>Transport notice</strong>
+            <span>{chatError ?? state.diagnostics.at(-1)?.message}</span>
+          </div>
+        )}
         {workspace === "live" ? (
           <LiveWorkspace
             trace={trace}

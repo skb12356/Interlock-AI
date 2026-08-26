@@ -1,9 +1,12 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { streamChat } from "./api/chatClient";
+import { ConsoleApiError, getHolds, resolveHold } from "./api/consoleClient";
+import type { HoldProjection } from "./domain/contracts";
 import { ResumeTokenVault } from "./security/resumeTokens";
 import { consoleReducer, initialConsoleState } from "./state/consoleStore";
 import { LiveWorkspace } from "./workspaces/LiveWorkspace";
+import { ReviewsWorkspace } from "./workspaces/ReviewsWorkspace";
 
 import "./styles.css";
 
@@ -27,6 +30,10 @@ export function App() {
   const [scenario, setScenario] = useState<"clean" | "scene1" | "held" | "blocked">("scene1");
   const [prompt, setPrompt] = useState("What are the prepayment charges on my floating-rate home loan?");
   const [busy, setBusy] = useState(false);
+  const [holds, setHolds] = useState<HoldProjection[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [resolvingHoldId, setResolvingHoldId] = useState<string | null>(null);
   const vault = useRef(new ResumeTokenVault());
   const activeController = useRef<AbortController | null>(null);
 
@@ -34,6 +41,22 @@ export function App() {
     activeController.current?.abort();
     vault.current.clear();
   }, []);
+
+  const loadReviews = useCallback(async () => {
+    setReviewsLoading(true);
+    setReviewError(null);
+    try {
+      setHolds(await getHolds());
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : "The review queue could not be loaded");
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (workspace === "reviews") void loadReviews();
+  }, [loadReviews, workspace]);
 
   const chooseScenario = (next: typeof scenario) => {
     const prompts: Record<typeof scenario, string> = {
@@ -75,6 +98,25 @@ export function App() {
     } finally {
       if (activeController.current === controller) activeController.current = null;
       setBusy(false);
+    }
+  };
+
+  const handleHold = async (holdId: string, resolution: "approved" | "rejected") => {
+    setResolvingHoldId(holdId);
+    setReviewError(null);
+    try {
+      await resolveHold(holdId, resolution, vault.current.get(holdId));
+      vault.current.delete(holdId);
+      await loadReviews();
+    } catch (error) {
+      if (error instanceof ConsoleApiError && (error.status === 404 || error.status === 409)) {
+        await loadReviews();
+        setReviewError("This hold changed before the action completed. The queue has been refreshed.");
+      } else {
+        setReviewError(error instanceof Error ? error.message : "The hold could not be resolved");
+      }
+    } finally {
+      setResolvingHoldId(null);
     }
   };
 
@@ -123,9 +165,19 @@ export function App() {
             onScenarioChange={chooseScenario}
             onSubmit={() => void submitChat()}
           />
+        ) : workspace === "reviews" ? (
+          <ReviewsWorkspace
+            holds={holds}
+            loading={reviewsLoading}
+            error={reviewError}
+            resolvingHoldId={resolvingHoldId}
+            hasToken={(holdId) => vault.current.get(holdId) !== undefined}
+            onApprove={(holdId) => void handleHold(holdId, "approved")}
+            onReject={(holdId) => void handleHold(holdId, "rejected")}
+            onRefresh={() => void loadReviews()}
+          />
         ) : (
           <p className="workspace-intro">
-            {workspace === "reviews" && "Resolve durable holds without exposing approval secrets."}
             {workspace === "evidence" && "Read measured performance with its limits kept attached."}
           </p>
         )}

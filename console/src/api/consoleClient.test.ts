@@ -89,7 +89,9 @@ describe("console client evidence projections", () => {
       },
       "/console/artifacts/calibration%2Freport.json": { ece: 0.01, reliability: [] },
       "/console/artifacts/calibration%2Flambda.json": { escape_rate: 0, intervention_rate: 1 },
-      "/console/artifacts/eval%2Freport-guaranteed.json": { metrics: [], notes: [] },
+      "/console/artifacts/eval%2Freport-guaranteed.json": {
+        metrics: { metrics: [], notes: ["Generation is held fixed."] },
+      },
       "/console/artifacts/action_latency.json": [],
     };
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
@@ -105,7 +107,7 @@ describe("console client evidence projections", () => {
     await expect(getEvidenceBundle(fetcher)).resolves.toMatchObject({
       calibration: { ece: 0.01 },
       conformal: { escape_rate: 0 },
-      evaluation: { metrics: [] },
+      evaluation: { metrics: [], notes: ["Generation is held fixed."] },
       latency: [],
     });
   });

@@ -59,12 +59,15 @@ async function getArtifact<T>(name: string, fetcher: typeof fetch): Promise<T | 
 }
 
 export async function getEvidenceBundle(fetcher: typeof fetch = fetch): Promise<EvidenceBundle> {
-  const [calibration, conformal, evaluation, latency] = await Promise.all([
+  const [calibration, conformal, evaluationArtifact, latency] = await Promise.all([
     getArtifact<CalibrationReport>("calibration/report.json", fetcher),
     getArtifact<ConformalReport>("calibration/lambda.json", fetcher),
-    getArtifact<EvaluationReport>("eval/report-guaranteed.json", fetcher),
+    getArtifact<EvaluationReport | { metrics: EvaluationReport }>("eval/report-guaranteed.json", fetcher),
     getArtifact<ActionLatency[]>("action_latency.json", fetcher),
   ]);
+  const evaluation = evaluationArtifact && !("notes" in evaluationArtifact)
+    ? evaluationArtifact.metrics
+    : evaluationArtifact;
   return { calibration, conformal, evaluation, latency };
 }
 

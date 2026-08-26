@@ -98,6 +98,7 @@ export class ProjectionConnection {
     };
     socket.onmessage = (event) => this.handleMessage(event.data);
     socket.onerror = () => {
+      if (this.stopped || this.socket !== socket) return;
       this.options.onDiagnostic?.("Projection connection encountered a transport error");
       socket.close();
     };
@@ -136,7 +137,8 @@ export class ProjectionConnection {
     const query = new URLSearchParams({ after: String(this.currentCursor.lastSeq) });
     if (this.currentCursor.streamId) query.set("stream_id", this.currentCursor.streamId);
     try {
-      const response = await this.options.fetcher(`/console/recent?${query.toString()}`);
+      const fetcher = this.options.fetcher;
+      const response = await fetcher(`/console/recent?${query.toString()}`);
       if (!response.ok) throw new Error(`Recent projection request failed with ${response.status}`);
       const payload = (await response.json()) as RecentProjection;
       if (!payload || typeof payload.stream_id !== "string" || !Array.isArray(payload.events)) {

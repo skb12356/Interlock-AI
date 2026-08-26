@@ -45,6 +45,30 @@ describe("ProjectionConnection", () => {
     expect(socket.close).toHaveBeenCalledOnce();
   });
 
+  it("invokes the browser fetch function without rebinding its receiver", async () => {
+    const socket = new FakeSocket();
+    const fetcher = vi.fn(function (this: unknown) {
+      if (this !== undefined) throw new TypeError("Illegal invocation");
+      return Promise.resolve(
+        new Response(JSON.stringify({ stream_id: "epoch-a", latest_seq: 0, events: [] }), { status: 200 }),
+      );
+    }) as unknown as typeof fetch;
+    const onDiagnostic = vi.fn();
+    const connection = new ProjectionConnection({
+      onEnvelope: vi.fn(),
+      onDiagnostic,
+      fetcher,
+      createSocket: () => socket,
+    });
+
+    connection.start();
+    socket.onopen?.();
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    connection.stop();
+  });
+
   it("resets its cursor when the server stream changes", async () => {
     const sockets = [new FakeSocket(), new FakeSocket()];
     const fetcher = vi.fn<typeof fetch>()
@@ -85,6 +109,23 @@ describe("ProjectionConnection", () => {
 
     expect(onDiagnostic).toHaveBeenCalledWith("Projection received malformed JSON");
     connection.stop();
+  });
+
+  it("ignores errors from a socket that was deliberately stopped", () => {
+    const socket = new FakeSocket();
+    const onDiagnostic = vi.fn();
+    const connection = new ProjectionConnection({
+      onEnvelope: vi.fn(),
+      onDiagnostic,
+      fetcher: vi.fn<typeof fetch>(),
+      createSocket: () => socket,
+    });
+
+    connection.start();
+    connection.stop();
+    socket.onerror?.();
+
+    expect(onDiagnostic).not.toHaveBeenCalled();
   });
 });
 

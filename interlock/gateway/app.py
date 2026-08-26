@@ -56,6 +56,7 @@ from interlock.gateway.console_ws import ConsoleHub
 from interlock.gateway.console_ws import router as console_router
 from interlock.gateway.governor import Governor
 from interlock.gateway.lane_a import LaneA, PreflightResult
+from interlock.gateway.latency import LaneTimer, LatencyRecorder, LatencySample
 from interlock.gateway.providers import Provider, build_providers
 from interlock.interlock_tools.holds import ToolInterlock
 from interlock.interlock_tools.streaming import ToolCallAccumulator
@@ -135,6 +136,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # stream never has to edit this file, which is the only place the two work
         # streams would otherwise collide. See coordination/ALLOTED_WORK.md.
         app.state.console_hub = ConsoleHub()
+        app.state.latency = LatencyRecorder()
         app.state.lane_a = LaneA(
             policy=policy,
             detectors=[
@@ -174,6 +176,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 for name, tier in app.state.settings.tiers.items()
             },
         }
+
+    @app.get("/admin/latency")
+    async def latency_report() -> dict[str, Any]:
+        """Where the added latency went, by lane.
+
+        The Day-5 p95 claim is made from this, and it is a measurement rather than a
+        target -- including when it is over budget.
+        """
+        return app.state.latency.report(budget_ms=app.state.settings.lane_a_deadline_ms)
 
     @app.get("/admin/governor")
     async def governor_state() -> dict[str, Any]:
@@ -373,6 +384,7 @@ async def _stream_response(
     # Tool calls stream one *call* behind, for the same reason text streams one
     # sentence behind: there is no moment during the stream when a half-assembled
     # call could be judged. `{"to":` is not an argument.
+    timer = LaneTimer()
     tool_calls = ToolCallAccumulator()
     interlock: ToolInterlock = app.state.tool_interlock
     interlock.observe(request_id, lane.fragments)
@@ -490,6 +502,12 @@ async def _stream_response(
 
         # Any sentence the gate withheld for human review becomes a durable hold, so it
         # survives a restart (F6/F7). Awaited, not queued -- see ledger/writer.py.
+        # The repairer records what each attempt cost; attribute it to the lane that
+        # spent it rather than leaving it in the unattributed remainder.
+        last_repair = getattr(gate.repair, "last_result", None)
+        if last_repair is not None:
+            timer.add("repair", last_repair.latency_ms)
+
         for decision in gate.decisions:
             if decision.action in {"L3_reroute", "L4_hold"}:
                 hold_id = new_hold_id()
@@ -549,7 +567,19 @@ async def _stream_response(
         # The governor learns from Interlock's OWN overhead, not from total latency:
         # a slow upstream is not a reason to stop checking, and treating it as one
         # would degrade the guardrail exactly when the model is struggling.
-        app.state.governor.observe((monotonic_ms() - started_ms) - upstream_ms)
+        overhead_ms = (monotonic_ms() - started_ms) - upstream_ms
+        app.state.governor.observe(overhead_ms)
+        timer.add("lane_a", lane.elapsed_ms)
+        app.state.latency.record(
+            LatencySample(
+                request_id=request_id,
+                overhead_ms=overhead_ms,
+                ttft_ms=ttft_ms,
+                by_lane=timer.snapshot(),
+                buffered=lane.buffered,
+                tier=lane.tier,
+            )
+        )
         # Taint is per-request state on a long-lived process; leaving it would grow
         # without bound and, worse, leak one customer's poisoned upload into the next
         # request that happened to reuse the id.

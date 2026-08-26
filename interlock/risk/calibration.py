@@ -360,6 +360,19 @@ class MultiDefectCalibrator:
             for defect, calibrator in self.per_defect.items()
         }
 
+    def evaluate(
+        self, defect: str, features: np.ndarray, labels: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Out-of-fold probabilities for ONE defect class.
+
+        Exists so the conformal threshold can be certified against the same score it
+        will later gate. Certifying on one calibrator's output and applying the result
+        to another's is a mismatch that does not raise and does not look wrong -- the
+        threshold is simply meaningless, and the guarantee with it.
+        """
+        calibrator = SignalCalibrator(signals=list(self.signals), folds=self.folds)
+        return calibrator.evaluate(features, labels)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "version": 1,

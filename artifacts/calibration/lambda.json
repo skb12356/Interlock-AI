@@ -1,8 +1,8 @@
 {
-  "threshold": 0.02,
+  "threshold": 0.015,
   "alpha": 0.01,
   "delta": 0.1,
-  "n_eval": 1000,
+  "n_eval": 840,
   "escape_rate": 0.0,
   "intervention_rate": 1.0,
   "candidates": [
@@ -10,47 +10,39 @@
       "threshold": 0.0,
       "intervention_rate": 1.0,
       "escape_rate": 0.0,
-      "n_eval": 1000,
-      "p_value": 0.00011735161734830087,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
       "rejected": true
     },
     {
       "threshold": 0.005,
       "intervention_rate": 1.0,
       "escape_rate": 0.0,
-      "n_eval": 1000,
-      "p_value": 0.00011735161734830087,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
       "rejected": true
     },
     {
       "threshold": 0.01,
       "intervention_rate": 1.0,
       "escape_rate": 0.0,
-      "n_eval": 1000,
-      "p_value": 0.00011735161734830087,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
       "rejected": true
     },
     {
       "threshold": 0.015,
       "intervention_rate": 1.0,
       "escape_rate": 0.0,
-      "n_eval": 1000,
-      "p_value": 0.00011735161734830087,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
       "rejected": true
     },
     {
       "threshold": 0.02,
-      "intervention_rate": 1.0,
-      "escape_rate": 0.0,
-      "n_eval": 1000,
-      "p_value": 0.00011735161734830087,
-      "rejected": true
-    },
-    {
-      "threshold": 0.025,
-      "intervention_rate": 0.4413,
-      "escape_rate": 0.135,
-      "n_eval": 1000,
+      "intervention_rate": 0.0669,
+      "escape_rate": 0.20357142857142857,
+      "n_eval": 840,
       "p_value": 1.0,
       "rejected": false
     }

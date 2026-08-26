@@ -31,6 +31,7 @@ __all__ = [
     "context_conflict",
     "grounding_signals",
     "hedge_density",
+    "is_claim_bearing",
     "numeric_unsupported",
     "question_drift",
     "unsupported_content",
@@ -71,6 +72,47 @@ GROUNDING_SIGNALS: tuple[str, ...] = (
 )
 
 
+#: Openers that mark a sentence as *procedural* rather than factual: the assistant
+#: narrating what it is doing, not asserting anything about the documents.
+_PROCEDURAL = (
+    "let me", "i will", "i'll", "i am going to", "i'm going to", "i have reviewed",
+    "i've reviewed", "i can help", "i'd be happy", "i would be happy", "let us",
+    "checking", "searching", "one moment", "please hold", "thank you", "sure,",
+    "certainly", "of course", "happy to help", "i understand",
+)
+
+#: Sentences shorter than this, with no figure and no clause reference, are almost
+#: always acknowledgements ("Understood.", "Here you go.").
+_MIN_CLAIM_WORDS = 4
+
+
+def is_claim_bearing(sentence: str) -> bool:
+    """Does this sentence assert something the documents could contradict?
+
+    A grounding check on a sentence that makes no claim is a category error, and it was
+    producing real false positives: "Let me search the documents again." scored
+    P(ungrounded)=0.95, because none of its content words appear in the retrieved
+    passage -- which is true, and means nothing. At Rs.75,000 stakes that was enough to
+    BLOCK an agent's own progress narration.
+
+    Deterministic and deliberately conservative: anything carrying a figure or a clause
+    reference is claim-bearing regardless of how it opens, because "Let me confirm: the
+    charge is 2%" is an assertion wearing a procedural hat.
+    """
+    stripped = sentence.strip()
+    if not stripped:
+        return False
+    if _NUMBER.search(stripped) or _CLAUSE.search(stripped):
+        return True
+    if stripped.endswith("?"):
+        # A question asserts nothing. The answer to it might.
+        return False
+    lowered = stripped.lower()
+    if any(lowered.startswith(opener) for opener in _PROCEDURAL):
+        return False
+    return len(_WORD.findall(stripped)) >= _MIN_CLAIM_WORDS
+
+
 def _words(text: str) -> list[str]:
     return [w for w in _WORD.findall(text.lower()) if w not in _STOPWORDS]
 
@@ -89,6 +131,9 @@ class GroundingScores:
     overconfidence: float
     context_conflict: float = 0.0
     question_drift: float = 0.0
+    #: False when the sentence asserts nothing checkable. Not a signal -- a gate on the
+    #: others, recorded so a trace can show WHY everything came back at zero.
+    claim_bearing: bool = True
     #: Figures and references that appear in the answer and nowhere in the context.
     unsupported_numbers: tuple[str, ...] = ()
     unsupported_citations: tuple[str, ...] = ()
@@ -260,6 +305,21 @@ def grounding_signals(
     answer: str, context: Sequence[Fragment], *, question: str = ""
 ) -> GroundingScores:
     """All six, over one sentence and the context it was supposed to come from."""
+    if not is_claim_bearing(answer):
+        # Nothing to be ungrounded about. Returning zeros is not the detector being
+        # lenient; it is the detector declining to answer a question that was not asked.
+        # The other lanes still see the sentence -- the canary rule, PII and the tool
+        # interlock all run regardless, and none of them care whether a claim was made.
+        return GroundingScores(
+            unsupported_content=0.0,
+            numeric_unsupported=0.0,
+            citation_unsupported=0.0,
+            overconfidence=1.0 - hedge_density(answer),
+            context_conflict=context_conflict(context),
+            question_drift=0.0,
+            claim_bearing=False,
+        )
+
     numeric, bad_numbers = numeric_unsupported(answer, context)
     citation, bad_citations = citation_unsupported(answer, context)
     return GroundingScores(

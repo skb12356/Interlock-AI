@@ -187,8 +187,27 @@ def main() -> int:
     for name, value in sorted(report.mode_mean_probability.items(), key=lambda kv: -kv[1]):
         print(f"    {name:38} {value:.3f}")
 
+    # ---- the conformal threshold ------------------------------------------ #
+    #
+    # Certified against the UNGROUNDED per-defect calibrator's out-of-fold scores, not
+    # against the binary "is anything wrong" fusion above. The guarantee in the policy is
+    # specifically about ungrounded escapes, and the engine gates on P(ungrounded) -- so
+    # that is the score the threshold has to be computed on.
+    #
+    # It was originally computed on the binary fusion, which is a different number on a
+    # different scale. Nothing raised. The threshold landed at 0.020 against a binary
+    # clean baseline of 0.025 (intervene on everything) and was then applied to a
+    # per-defect clean baseline of 0.019 (intervene on nothing), so guaranteed mode was a
+    # silent no-op. It was only caught because `make eval --conformal-filter` printed
+    # numbers identical to operating mode.
     print(f"\nconformal threshold search (alpha={alpha}, delta={delta})")
-    result = select_threshold(probabilities, labels, alpha=alpha, delta=delta)
+    print("  certified against P(ungrounded) -- the score the engine actually gates on")
+    ungrounded_labels = labels_by_defect.get("ungrounded")
+    if ungrounded_labels is None:
+        print("  ! no 'ungrounded' class in the data; the policy's guarantee cannot be certified")
+        return 1
+    ungrounded_probs, _ = per_defect.evaluate("ungrounded", features, ungrounded_labels)
+    result = select_threshold(ungrounded_probs, ungrounded_labels, alpha=alpha, delta=delta)
     print(f"  {result.statement()}")
     if result.certified:
         print(f"  intervention rate at that threshold: {result.intervention_rate:.1%}")

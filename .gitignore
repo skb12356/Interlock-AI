@@ -43,3 +43,5 @@ artifacts/calib/
 # --- os -------------------------------------------------------------------
 .DS_Store
 Thumbs.db
+artifacts/eval/*.db
+artifacts/eval/*.db-*

@@ -162,8 +162,14 @@ def test_repeated_held_requests_keep_secrets_and_projection_records_isolated() -
         assert first_decision["decision_id"] != second_decision["decision_id"]
         assert first_hold["hold_id"] != second_hold["hold_id"]
         assert first_hold["resume_token"] != second_hold["resume_token"]
-        assert client.get(f"/console/decisions/{first_decision['decision_id']}").json()["request_id"] == "req_replay_0001"
-        assert client.get(f"/console/decisions/{second_decision['decision_id']}").json()["request_id"] == "req_replay_0002"
+        assert (
+            client.get(f"/console/decisions/{first_decision['decision_id']}").json()["request_id"]
+            == "req_replay_0001"
+        )
+        assert (
+            client.get(f"/console/decisions/{second_decision['decision_id']}").json()["request_id"]
+            == "req_replay_0002"
+        )
         assert len(client.get("/console/holds").json()["holds"]) == 2
 
         approved = client.post(
@@ -171,4 +177,6 @@ def test_repeated_held_requests_keep_secrets_and_projection_records_isolated() -
             json={"resume_token": first_hold["resume_token"]},
         )
         assert approved.status_code == 200
-        assert [hold["hold_id"] for hold in client.get("/console/holds").json()["holds"]] == [second_hold["hold_id"]]
+        assert [hold["hold_id"] for hold in client.get("/console/holds").json()["holds"]] == [
+            second_hold["hold_id"]
+        ]

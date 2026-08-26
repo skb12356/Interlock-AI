@@ -38,11 +38,7 @@ ALLOWED_ARTIFACTS = frozenset(
 def _without_secrets(value: Any) -> Any:
     """Copy JSON-like data while removing resume tokens at every nesting level."""
     if isinstance(value, dict):
-        return {
-            key: _without_secrets(item)
-            for key, item in value.items()
-            if key != "resume_token"
-        }
+        return {key: _without_secrets(item) for key, item in value.items() if key != "resume_token"}
     if isinstance(value, list):
         return [_without_secrets(item) for item in value]
     return value
@@ -195,13 +191,17 @@ class LiveConsoleSource:
         }
 
     def decision(self, decision_id: str) -> dict[str, Any]:
-        row = self._connection().execute(
-            "SELECT decision_id, request_id, sentence_idx, action, loss_table_json,"
-            " chosen_loss, runner_up, margin, probs_json, why_json, hard_rule,"
-            " policy_version, calib_version, probe_version, inputs_digest, latency_ms"
-            " FROM decisions WHERE decision_id=?",
-            (decision_id,),
-        ).fetchone()
+        row = (
+            self._connection()
+            .execute(
+                "SELECT decision_id, request_id, sentence_idx, action, loss_table_json,"
+                " chosen_loss, runner_up, margin, probs_json, why_json, hard_rule,"
+                " policy_version, calib_version, probe_version, inputs_digest, latency_ms"
+                " FROM decisions WHERE decision_id=?",
+                (decision_id,),
+            )
+            .fetchone()
+        )
         if row is None:
             raise HTTPException(status_code=404, detail="decision is not available yet")
         record = dict(row)
@@ -252,9 +252,7 @@ class LiveConsoleSource:
     def ledger_summary(self) -> dict[str, Any]:
         connection = self._connection()
         request_count = int(connection.execute("SELECT COUNT(*) FROM requests").fetchone()[0])
-        spend = float(
-            connection.execute("SELECT COALESCE(SUM(inr), 0) FROM spend").fetchone()[0]
-        )
+        spend = float(connection.execute("SELECT COALESCE(SUM(inr), 0) FROM spend").fetchone()[0])
         action_counts = {
             str(row[0]): int(row[1])
             for row in connection.execute(
@@ -301,7 +299,11 @@ router = APIRouter(prefix="/console", tags=["console"])
 
 def _source(request: Request) -> ConsoleSource:
     configured = getattr(request.app.state, "console_source", None)
-    return cast(ConsoleSource, configured) if configured is not None else LiveConsoleSource(request.app)
+    return (
+        cast(ConsoleSource, configured)
+        if configured is not None
+        else LiveConsoleSource(request.app)
+    )
 
 
 @router.websocket("/ws")

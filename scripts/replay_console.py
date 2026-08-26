@@ -93,9 +93,13 @@ SCENARIOS: dict[str, dict[str, Any]] = {
     "scene1": {
         "fixture": "prepayment_penalty",
         "stakes": {
-            "impact_inr": 40000.0, "reversibility": "costly", "domain": "prepayment",
-            "mode": "buffered", "stakes_id": "stk_01REPLAY0000000000000SCENE1",
-            "route_reason": "stakes_high", "model_served": "qwen3:8b",
+            "impact_inr": 40000.0,
+            "reversibility": "costly",
+            "domain": "prepayment",
+            "mode": "buffered",
+            "stakes_id": "stk_01REPLAY0000000000000SCENE1",
+            "route_reason": "stakes_high",
+            "model_served": "qwen3:8b",
         },
         "signals": [
             ("grounding.citation_unsupported", 0.94),
@@ -105,40 +109,56 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         ],
         "decision": {
             "decision_id": "dec_01REPLAY000000000000SCENE1",
-            "sentence_idx": 0, "action": "L2_repair", "chosen_loss": 494.36,
-            "runner_up": "L4_hold", "margin": 88.46,
+            "sentence_idx": 0,
+            "action": "L2_repair",
+            "chosen_loss": 494.36,
+            "runner_up": "L4_hold",
+            "margin": 88.46,
             "counterfactual": (
                 "Prepayment of a floating-rate home loan attracts a foreclosure charge "
                 "of 2% of the outstanding principal under Clause 7.4."
             ),
-            "hard_rule": None, "degraded": False,
+            "hard_rule": None,
+            "degraded": False,
         },
         "holds": [],
     },
     "blocked": {
         "fixture": "clause_reference",
         "stakes": {
-            "impact_inr": 25000.0, "reversibility": "irreversible", "domain": "payments",
-            "mode": "buffered", "stakes_id": "stk_01REPLAY000000000000BLOCK",
-            "route_reason": "stakes_high", "model_served": "qwen3:8b",
+            "impact_inr": 25000.0,
+            "reversibility": "irreversible",
+            "domain": "payments",
+            "mode": "buffered",
+            "stakes_id": "stk_01REPLAY000000000000BLOCK",
+            "route_reason": "stakes_high",
+            "model_served": "qwen3:8b",
         },
         "signals": [("canary_leak", 1.0)],
         "decision": {
             "decision_id": "dec_01REPLAY0000000000BLOCKED",
-            "sentence_idx": 0, "action": "L5_block", "chosen_loss": 1720.0,
-            "runner_up": "L4_hold", "margin": 0.0,
+            "sentence_idx": 0,
+            "action": "L5_block",
+            "chosen_loss": 1720.0,
+            "runner_up": "L4_hold",
+            "margin": 0.0,
             "counterfactual": "Your internal reference is INTERLOCK-CANARY-<redacted>.",
             # A hard rule, so the arithmetic was computed but never consulted.
-            "hard_rule": "canary_leak", "degraded": False,
+            "hard_rule": "canary_leak",
+            "degraded": False,
         },
         "holds": [],
     },
     "held": {
         "fixture": "multi_sentence",
         "stakes": {
-            "impact_inr": 12000.0, "reversibility": "costly", "domain": "claims",
-            "mode": "buffered", "stakes_id": "stk_01REPLAY00000000000HELD",
-            "route_reason": "stakes_high", "model_served": "qwen3:8b",
+            "impact_inr": 12000.0,
+            "reversibility": "costly",
+            "domain": "claims",
+            "mode": "buffered",
+            "stakes_id": "stk_01REPLAY00000000000HELD",
+            "route_reason": "stakes_high",
+            "model_served": "qwen3:8b",
         },
         "signals": [
             ("grounding.unsupported_content", 0.88),
@@ -146,10 +166,14 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         ],
         "decision": {
             "decision_id": "dec_01REPLAY00000000000HELD",
-            "sentence_idx": 1, "action": "L4_hold", "chosen_loss": 582.82,
-            "runner_up": "L2_repair", "margin": 41.9,
+            "sentence_idx": 1,
+            "action": "L4_hold",
+            "chosen_loss": 582.82,
+            "runner_up": "L2_repair",
+            "margin": 41.9,
             "counterfactual": "Your claim was approved on 14 March and paid in full.",
-            "hard_rule": None, "degraded": False,
+            "hard_rule": None,
+            "degraded": False,
         },
         "holds": [
             {
@@ -166,25 +190,32 @@ SCENARIOS: dict[str, dict[str, Any]] = {
     "clean": {
         "fixture": "branch_hours",
         "stakes": {
-            "impact_inr": 50.0, "reversibility": "reversible", "domain": "branch_info",
-            "mode": "unbuffered", "stakes_id": "stk_01REPLAY0000000000CLEAN",
-            "route_reason": "stakes_low", "model_served": "qwen3:4b",
+            "impact_inr": 50.0,
+            "reversibility": "reversible",
+            "domain": "branch_info",
+            "mode": "unbuffered",
+            "stakes_id": "stk_01REPLAY0000000000CLEAN",
+            "route_reason": "stakes_low",
+            "model_served": "qwen3:4b",
         },
         "signals": [("grounding.unsupported_content", 0.02)],
         "decision": {
             "decision_id": "dec_01REPLAY000000000CLEAN",
-            "sentence_idx": 0, "action": "L0_pass", "chosen_loss": 1.30,
-            "runner_up": "L1_annotate", "margin": 3.91,
-            "counterfactual": None, "hard_rule": None, "degraded": False,
+            "sentence_idx": 0,
+            "action": "L0_pass",
+            "chosen_loss": 1.30,
+            "runner_up": "L1_annotate",
+            "margin": 3.91,
+            "counterfactual": None,
+            "hard_rule": None,
+            "degraded": False,
         },
         "holds": [],
     },
 }
 
 
-def loss_table(
-    action: str, chosen: float, runner_up: str, margin: float
-) -> list[dict[str, Any]]:
+def loss_table(action: str, chosen: float, runner_up: str, margin: float) -> list[dict[str, Any]]:
     """A full six-row table. The console must render all six, including what was
     unavailable and why -- the table IS the explanation, so showing only the winner
     hides the argument."""
@@ -283,9 +314,7 @@ def pick_scenario(body: dict[str, Any]) -> str:
     explicit = str(body.get("scenario") or "").strip()
     if explicit in SCENARIOS:
         return explicit
-    text = " ".join(
-        str(m.get("content") or "") for m in body.get("messages", [])
-    ).lower()
+    text = " ".join(str(m.get("content") or "") for m in body.get("messages", [])).lower()
     if any(word in text for word in ("prepay", "foreclos", "clause")):
         return "scene1"
     if any(word in text for word in ("email", "forward", "claim")):
@@ -327,7 +356,10 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
             "replay": True,
             "note": "scripts/replay_console.py -- no model, no calibrator, no retrieval",
             "policy_version": "banking-v3@sha256:replayreplayrepl",
-            "risk_engine": {"engine": "replay", "calibrated_defects": ["contradicted", "ungrounded"]},
+            "risk_engine": {
+                "engine": "replay",
+                "calibrated_defects": ["contradicted", "ungrounded"],
+            },
             "retrieval": {"available": True, "chunks": 47, "embedder": "hashing-v1"},
             "governor": "normal",
             "scenarios": sorted(SCENARIOS),
@@ -366,9 +398,7 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
         except Exception:
             payload = {}
         if payload.get("resume_token") != hold["resume_token"]:
-            return JSONResponse(
-                {"error": {"message": "approval requires the resume token"}}, 409
-            )
+            return JSONResponse({"error": {"message": "approval requires the resume token"}}, 409)
         app.state.holds.pop(hold_id, None)
         return {"hold_id": hold_id, "state": "approved"}
 
@@ -392,8 +422,7 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
             "decision_id": f"{scenario['decision']['decision_id']}_{request_id}",
         }
         request_holds = [
-            {**hold, "hold_id": f"{hold['hold_id']}_{request_id}"}
-            for hold in scenario["holds"]
+            {**hold, "hold_id": f"{hold['hold_id']}_{request_id}"} for hold in scenario["holds"]
         ]
         request_scenario = {
             **scenario,
@@ -456,9 +485,7 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
         )
 
     async def _stream(scenario: dict[str, Any], request_id: str) -> AsyncIterator[str]:
-        app.state.console_hub.publish(
-            "interlock.stakes", scenario["stakes"], request_id=request_id
-        )
+        app.state.console_hub.publish("interlock.stakes", scenario["stakes"], request_id=request_id)
         yield sse("interlock.stakes", scenario["stakes"])
         await asyncio.sleep(min(0.05, token_delay_s))
 
@@ -508,7 +535,7 @@ def main() -> int:
     print(f"  scenarios: {', '.join(sorted(SCENARIOS))}")
     print(f"  try: curl -N -X POST http://127.0.0.1:{args.port}/v1/chat/completions \\")
     print("         -H 'content-type: application/json' \\")
-    print("         -d '{\"scenario\":\"scene1\",\"messages\":[],\"stream\":true}'")
+    print('         -d \'{"scenario":"scene1","messages":[],"stream":true}\'')
     uvicorn.run(build_app(), host=args.host, port=args.port, log_level="warning")
     return 0
 

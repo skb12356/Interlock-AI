@@ -2,21 +2,21 @@
   "schema_version": 1,
   "project": "Interlock V2",
   "current_phase": "Day 4 backend complete - ledger economics and all of Lane C built; console (Person 2) not started",
-  "last_completed_task": "D4-B3 (deep-judge anchor + meta-monitor), after D4-B1/B2 (twins + e-values) and D4-A1/A2/A3 (pricing, regret, rework)",
-  "next_task": "F-019 is YOUR decision and blocks the demo. Then D4-A6 (evidence pack) or D2-B4/B7 (observer probe, needs torch). Console is Person 2's.",
+  "last_completed_task": "D4-A6 (evidence pack) + D3-A4 (router/cache) + real per-model pricing wired into the eval",
+  "next_task": "F-019 is YOUR decision and blocks the demo. Otherwise: D3-A6 (latency split by lane), or wire the cache onto the request path. Console is Person 2's.",
   "system_status": "Amber -- everything builds, 653 tests pass, six metrics measured; but F-019 makes the live high-stakes path block reasonable answers, which blocks the Scene 1 demo",
   "verification": {
     "ruff": "clean across interlock/, tests/, scripts/",
     "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
-    "pytest": "745 passed",
+    "pytest": "788 passed",
     "make_eval": "runs; prints six numbers; five PASS, false interventions MISS",
     "sensitivity": "make sensitivity: the F-019 experiment; disruptive target achievable below a 0.001% clean floor, annotation-inclusive target missed at every floor"
   },
   "measured_metrics": {
     "pre_action_catch_rate": "100.00% [91.8, 100.0] n=43 -- PASS",
     "added_p95_latency_ms": "15 -- PASS",
-    "verification_cost": "3.53% of model spend -- PASS",
-    "net_spend_change": "-20.15% -- PASS (routing + loop-breaking only; NO cache saving claimed)",
+    "verification_cost": "4.64% of model spend -- PASS",
+    "net_spend_change": "-19.97% -- MISS against ~-30%. Now uses REAL per-model pricing (prompt/completion split), not a blended rate. Gap explained in the report: only 71/200 requests route cheap because 57% of the seeded set is Rs.10,000+ traffic, and NO cache saving is modelled.",
     "ungrounded_escapes": "0.00% [0.0, 13.3] n=25 -- PASS empirically; the CERTIFIED bound is separate",
     "false_interventions": "91.08% [85.6, 94.6] n=157 -- MISS against a 2% target. See F-019.",
     "twin_pairs_treated_alike": "100% (5 pairs)",
@@ -55,5 +55,5 @@
     "D-010: calibration is fitted on INDUCED failures, not human labels. It calibrates; it does not audit. D2-B3's hand-labelled 300 remains outstanding and is what the meta-monitor must re-score.",
     "D-011: `make eval` holds generation FIXED across both arms (paired design). This is a methodological choice, not a shortcut -- it attributes every off-vs-on difference to Interlock rather than to sampling noise -- but it means generation latency and billing are modelled rather than observed."
   ],
-  "updated_utc": "2026-08-26T06:00:00Z"
+  "updated_utc": "2026-08-26T09:00:00Z"
 }

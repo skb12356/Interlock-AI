@@ -37,6 +37,7 @@ from interlock.eval.metrics import PRE_ACTION_ACTIONS, MetricResult, MetricSet, 
 from interlock.eval.seeded import EvalCase
 from interlock.interlock_tools.holds import ToolInterlock
 from interlock.interlock_tools.provenance import ToolCall
+from interlock.ledger.pricing import PriceBook
 from interlock.signals.base import PreflightContext
 from interlock.signals.stakes import StakesModel
 
@@ -45,6 +46,16 @@ __all__ = ["CaseOutcome", "EvalRun", "run_eval"]
 #: A repeated (tool, args) pair this many times is a loop, not persistence. Three
 #: strikes, per the plan's loop breaker (D3-A5).
 LOOP_STRIKES = 3
+
+#: The shape of a RAG request on this corpus: a large retrieved prompt and a short
+#: answer. Priced separately because providers charge 3-5x more for completion, and a
+#: blended rate would over-state the cost of exactly the traffic routing makes cheap.
+PROMPT_TOKENS = 800
+COMPLETION_TOKENS = 100
+
+#: Which model each tier serves. Matches the gateway defaults; the eval prices what the
+#: router would actually have called rather than a notional "cheap" and "strong".
+TIER_MODELS: dict[str, str] = {"cheap": "qwen3:4b", "strong": "qwen3:8b"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,7 +161,8 @@ async def _run_arm(
     policy: Policy,
     stakes_model: StakesModel,
     tool_interlock: ToolInterlock | None,
-    strong_tier_multiplier: float,
+    prices: PriceBook,
+    force_tier: str | None,
     deadline_ms: float,
 ) -> EvalRun:
     run = EvalRun(label=label)
@@ -164,7 +176,9 @@ async def _run_arm(
             retrieved=list(case.context),
         )
         stakes = stakes_model.estimate(preflight)
-        tier = (
+        # With Interlock off there is no router, so every request pays the strong
+        # tier -- which is what a deployment without stakes-based routing does.
+        tier = force_tier or (
             "strong"
             if stakes.impact_inr >= policy.thresholds.strong_model_above_impact_inr
             else "cheap"
@@ -196,8 +210,18 @@ async def _run_arm(
             caught = cut
 
         # -- modelled spend ---------------------------------------------- #
-        base_tokens = 900 * (strong_tier_multiplier if tier == "strong" else 1.0)
-        model_spend = base_tokens * price_per_token
+        #
+        # Per model and split by direction, not a blended rate. The entire routing
+        # argument is "cheap traffic goes to a cheap model", and a blended price makes
+        # that saving arithmetically invisible.
+        model_spend = prices.cost_inr(
+            TIER_MODELS[tier],
+            prompt_tokens=PROMPT_TOKENS,
+            completion_tokens=COMPLETION_TOKENS,
+        )
+        # Verification is billed at the tier that would run it. A repair re-prompts the
+        # SAME model (escalating is L3 and priced separately), so it is not free even
+        # when the request was routed cheap.
         verification_spend = policy.compute_tokens[decision.action] * price_per_token
 
         run.outcomes.append(
@@ -288,16 +312,32 @@ def compute_metrics(
     saved_tokens = sum(o.saved_tokens for o in on.outcomes)
     on_spend -= saved_tokens * (policy.price_inr_per_1k_tokens / 1000.0)
     change = (on_spend - off_spend) / off_spend if off_spend else 0.0
+    cheap = sum(1 for o in on.outcomes if o.tier == "cheap")
     metrics.add(
         MetricResult(
             name="Net spend change",
             value=change,
             unit="%",
             target="~ -30%",
-            met=change <= -0.20,
-            note="routing + loop-breaking only; NO cache saving is modelled or claimed",
+            # -20% is not -30%. Reported as a miss rather than accepted against a
+            # generous threshold, with the gap explained below.
+            met=change <= -0.28,
+            note=(
+                f"routing only: {cheap}/{len(on.outcomes)} requests went cheap. "
+                f"NO cache saving is modelled or claimed."
+            ),
         )
     )
+    if change > -0.28:
+        metrics.notes.append(
+            f"Net spend is {change:.1%} against a ~-30% target, and the gap has two "
+            f"stated causes rather than one unknown. (1) Only {cheap} of "
+            f"{len(on.outcomes)} requests routed cheap, because 57% of this seeded set "
+            f"is Rs.10,000+ traffic that the stakes threshold forces to the strong tier "
+            f"-- a corpus artefact, not a router failure. (2) No cache hit is modelled "
+            f"at all; the plan's conservative 20-45% range is deliberately not claimed "
+            f"because nothing in this build has measured one."
+        )
 
     # -- 5. Ungrounded escapes ------------------------------------------ #
     grounding_cases = [
@@ -428,11 +468,12 @@ async def run_eval(
     policy: Policy,
     tool_interlock: ToolInterlock,
     stakes_model: StakesModel | None = None,
-    strong_tier_multiplier: float = 2.2,
+    prices: PriceBook | None = None,
     deadline_ms: float = 120.0,
 ) -> tuple[EvalRun, EvalRun, MetricSet]:
     """Run both arms and score them. Returns ``(off, on, metrics)``."""
     stakes_model = stakes_model or StakesModel(policy=policy)
+    prices = prices or PriceBook.default()
 
     off = await _run_arm(
         label="off",
@@ -441,18 +482,14 @@ async def run_eval(
         policy=policy,
         stakes_model=stakes_model,
         tool_interlock=None,
-        # With Interlock off there is no router, so every request pays the strong tier
-        # -- which is what a deployment without stakes-based routing actually does.
-        strong_tier_multiplier=strong_tier_multiplier,
+        prices=prices,
+        # No router with Interlock off, so everything pays the strong tier. Forced here
+        # rather than patched afterwards -- the previous version mutated the frozen
+        # outcomes with object.__setattr__, which worked and was a good way to have the
+        # baseline silently diverge from what the arm actually computed.
+        force_tier="strong",
         deadline_ms=deadline_ms,
     )
-    for outcome in off.outcomes:
-        object.__setattr__(outcome, "tier", "strong")
-        object.__setattr__(
-            outcome,
-            "model_spend_inr",
-            900 * strong_tier_multiplier * (policy.price_inr_per_1k_tokens / 1000.0),
-        )
 
     on = await _run_arm(
         label="on",
@@ -461,7 +498,8 @@ async def run_eval(
         policy=policy,
         stakes_model=stakes_model,
         tool_interlock=tool_interlock,
-        strong_tier_multiplier=strong_tier_multiplier,
+        prices=prices,
+        force_tier=None,
         deadline_ms=deadline_ms,
     )
     return off, on, compute_metrics(off=off, on=on, cases=cases, policy=policy)

@@ -289,3 +289,37 @@ def test_a_request_with_no_body_on_reject_is_accepted(client: TestClient) -> Non
     client.post("/v1/chat/completions", json=_request([POISONED_CONTEXT]))
     hold_id = client.get("/v1/holds").json()["holds"][0]["hold_id"]
     assert client.post(f"/v1/holds/{hold_id}/reject").status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# The governor, through the gateway (invariant 4)
+# --------------------------------------------------------------------------- #
+
+
+def test_the_governor_is_exposed_and_starts_normal(client: TestClient) -> None:
+    snapshot = client.get("/admin/governor").json()
+    assert snapshot["state"] == "normal"
+    assert "background" in snapshot["capabilities"]
+    assert snapshot["given_up"] == []
+
+
+@respx.mock
+def test_the_governor_learns_from_interlock_overhead_not_total_latency(
+    client: TestClient,
+) -> None:
+    """A slow upstream must not degrade the guardrail.
+
+    Treating total latency as the signal would thin checking exactly when the model is
+    struggling, which is when it is most likely to be producing something worth checking.
+    """
+    respx.post(UPSTREAM).mock(
+        return_value=httpx.Response(
+            200, content=_tool_call_stream(arguments='{"to": "me@mybank.example"}')
+        )
+    )
+    for _ in range(5):
+        client.post("/v1/chat/completions", json=_request([CLEAN_CONTEXT]))
+
+    snapshot = client.get("/admin/governor").json()
+    assert snapshot["samples"] >= 5
+    assert snapshot["state"] == "normal", snapshot

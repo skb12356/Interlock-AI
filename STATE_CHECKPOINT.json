@@ -2,13 +2,13 @@
   "schema_version": 1,
   "project": "Interlock V2",
   "current_phase": "Day 3 complete - all four never-cut items built, real engine on the hot path, six metrics measured",
-  "last_completed_task": "D3-B7 (seeded eval set + `make eval`), after D3-B1/B2/B3/B4 (the real RiskEngine)",
-  "next_task": "D2-A6 (governor -- invariant 4 is currently unimplemented), then D4-A4 (console: the counterfactual is what makes the demo land)",
+  "last_completed_task": "D2-A6 (governor -- invariant 4 now implemented and asserted), after D3-B7 (seeded eval set)",
+  "next_task": "D4-A4 (console: split-screen risk trail -- the counterfactual is what makes the demo land), or D3-A4 (router + semantic cache)",
   "system_status": "Green, with one measured target miss (F-019) that is a design question, not a bug",
   "verification": {
     "ruff": "clean across interlock/, tests/, scripts/",
     "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
-    "pytest": "627 passed",
+    "pytest": "653 passed",
     "make_eval": "runs; prints six numbers; five PASS, false interventions MISS"
   },
   "measured_metrics": {
@@ -26,7 +26,8 @@
     "calibration_step": "BUILT (D2-B1/B2)",
     "commit_gate": "BUILT (D2-A4/A5) -- text one sentence behind, tool calls one call behind",
     "tool_interlock": "BUILT (D3-A1/A2) -- kill-and-restart survival test passes",
-    "seeded_eval_set": "BUILT (D3-B7) -- 200 cases, exact counts asserted, `make eval` prints six numbers"
+    "seeded_eval_set": "BUILT (D3-B7) -- 200 cases, exact counts asserted, `make eval` prints six numbers",
+    "governor_invariant_4": "BUILT (D2-A6) -- five nested states, circuit breaker, fail-open low / fail-closed high"
   },
   "open_findings": [
     "F-002 / F-019 OPEN, MEASURED, MUST NOT BE TUNED AWAY: false interventions are 91.08% against a 2% target. Broken out by stakes: 0% below Rs.100, 100% above. NOT detector noise -- at Rs.40,000 impact with a 2.5x reversibility multiplier, L0_pass only wins if P(defect) < ~0.0001, and the detector's floor on clean text is ~0.019. 'false interventions <= 2%' and 'impact_inr: 40000 with lambda_time 0.40' cannot both hold. The live question is the IMPACT MODEL: impact_inr is a per-request stake charged in full to every sentence, so a five-sentence answer is charged five times the harm the request can cause. Three defensible resolutions (discount per sentence / raise lambda_time / re-target the metric per stakes band); choosing is a deliberate decision, not a tuning pass.",

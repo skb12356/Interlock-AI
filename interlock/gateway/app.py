@@ -52,6 +52,7 @@ from interlock.core.sse import (
 from interlock.gate.repair import SentenceRepairer
 from interlock.gate.sentence_gate import CommitGate, Emission
 from interlock.gateway.config import Settings, load_settings
+from interlock.gateway.governor import Governor
 from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.providers import Provider, build_providers
 from interlock.interlock_tools.holds import ToolInterlock
@@ -123,6 +124,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.risk_engine = _build_risk_engine(settings, policy, canaries)
         app.state.retriever = _open_retriever(settings)
         app.state.tool_interlock = ToolInterlock(policy=policy, ledger=ledger)
+        app.state.governor = Governor(
+            # One estimate, one threshold: 'high stakes' means the same thing to the
+            # governor's fail-closed split as it does to buffering and to the router.
+            hold_above_impact_inr=policy.thresholds.buffer_above_impact_inr,
+        )
         app.state.lane_a = LaneA(
             policy=policy,
             detectors=[
@@ -155,11 +161,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "ledger": app.state.ledger.stats(),
             "lane_a_deadline_ms": app.state.settings.lane_a_deadline_ms,
             "retrieval": _retrieval_health(app.state.retriever),
+            "governor": app.state.governor.snapshot()["state"],
             "tiers": {
                 name: f"{tier.provider}:{tier.model}"
                 for name, tier in app.state.settings.tiers.items()
             },
         }
+
+    @app.get("/admin/governor")
+    async def governor_state() -> dict[str, Any]:
+        """What Interlock has given up, and why. Explains; never asks."""
+        return app.state.governor.snapshot()
 
     @app.get("/v1/models")
     async def models() -> dict[str, Any]:
@@ -527,6 +539,10 @@ async def _stream_response(
             )
         )
         engine.disarm(request_id)
+        # The governor learns from Interlock's OWN overhead, not from total latency:
+        # a slow upstream is not a reason to stop checking, and treating it as one
+        # would degrade the guardrail exactly when the model is struggling.
+        app.state.governor.observe((monotonic_ms() - started_ms) - upstream_ms)
         # Taint is per-request state on a long-lived process; leaving it would grow
         # without bound and, worse, leak one customer's poisoned upload into the next
         # request that happened to reuse the id.

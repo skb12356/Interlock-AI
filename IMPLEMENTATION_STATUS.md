@@ -46,10 +46,10 @@ the most informative result in the build so far (F-019).
 | **Observer (real weights)** | not started | D2-B4 — needs torch |
 | Hand-labelled anchor set (300) | not started | D2-B3 — calibration currently runs on induced data (D-010) |
 | Demo app UI | not started | D1-A5 remainder |
-| Governor / degradation order | not started | D2-A6 — **invariant 4 is currently unimplemented** |
+| Governor / degradation order | **built** | D2-A6 — invariant 4 asserted in both directions; `/admin/governor` |
 | **Governor / Lane C / console** | not started | D2-A6, D4 |
 
-**Test count:** 627 passing.
+**Test count:** 653 passing.
 
 ### Sequencing change
 

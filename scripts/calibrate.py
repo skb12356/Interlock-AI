@@ -36,6 +36,10 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+#: A named constant because this file is edited by scripts, and a bare escape in a
+#: patched string literal has been mangled into a real newline more than once.
+NEWLINE = "\n"
+
 from interlock.core.policy import load_policy  # noqa: E402
 from interlock.eval.induce import TripleGenerator  # noqa: E402
 from interlock.retrieval import corpus_chunks, load_corpus  # noqa: E402
@@ -46,6 +50,37 @@ from interlock.risk.calibration import (  # noqa: E402
 )
 from interlock.risk.conformal import select_threshold  # noqa: E402
 from interlock.signals.grounding import GROUNDING_SIGNALS, grounding_signals  # noqa: E402
+
+
+def _probe_features(triples: list[Any], model: str | None) -> np.ndarray | None:
+    """Encode every triple through the observer probe, or return None if unavailable.
+
+    Slow -- ~123 ms per item on CPU -- so it is opt-in. Worth the wait once: the whole
+    question is whether a learned probe moves the CLEAN-TEXT FLOOR, which is what F-019
+    turns on, and AUROC does not answer that.
+    """
+    from interlock.observer.encoder import ObserverEncoder
+    from interlock.observer.probes import ProbeBundle
+
+    path = REPO_ROOT / "artifacts" / "probes" / "probe.json"
+    if not path.exists():
+        print("  ! no trained probe at artifacts/probes/probe.json -- run scripts/train_probes.py")
+        return None
+
+    bundle = ProbeBundle.load(path)
+    encoder = ObserverEncoder(model_name=model or bundle.model_name)
+    # Untrusted passages are excluded from the premise, for the same reason as in
+    # signals/probe_signal.py: with a poisoned document in the premise the attacker's
+    # own claim genuinely IS entailed, and the probe would faithfully report so.
+    premises = [
+        NEWLINE.join(
+            f.text for f in t.context if not str(f.provenance).endswith("untrusted")
+        )
+        or "(no context retrieved)"
+        for t in triples
+    ]
+    batch = encoder.encode(premises, [t.answer for t in triples], batch_size=24)
+    return bundle.score(batch.layers[bundle.best_layer]).reshape(-1, 1)
 
 
 def build_dataset(items: int, seed: int) -> tuple[np.ndarray, np.ndarray, list[str], list[Any]]:
@@ -134,6 +169,12 @@ def main() -> int:
     parser.add_argument("--alpha", type=float, default=None, help="defaults to the policy's")
     parser.add_argument("--delta", type=float, default=None, help="defaults to the policy's")
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "artifacts" / "calibration")
+    parser.add_argument(
+        "--with-probe",
+        action="store_true",
+        help="add the trained observer probe as a feature (slow: ~123 ms/item on CPU)",
+    )
+    parser.add_argument("--probe-model", default=None)
     args = parser.parse_args()
 
     policy = load_policy(REPO_ROOT / "policies" / "banking.yaml")
@@ -147,6 +188,14 @@ def main() -> int:
     print(f"  {len(labels)} items, {int(labels.sum())} defective\n")
 
     signals = list(GROUNDING_SIGNALS)
+    if args.with_probe:
+        print("  encoding through the observer probe (this takes a while)...")
+        probe_column = _probe_features(triples, args.probe_model)
+        if probe_column is not None:
+            features = np.hstack([features, probe_column])
+            signals = [*signals, "observer.probe"]
+            print(f"  added observer.probe; {features.shape[1]} features total\n")
+
     calibrator = SignalCalibrator(signals=signals, folds=args.folds)
 
     print(f"cross-fitting {args.folds} folds for the reported metrics")
@@ -186,6 +235,23 @@ def main() -> int:
     print("\n  mean predicted probability by failure mode:")
     for name, value in sorted(report.mode_mean_probability.items(), key=lambda kv: -kv[1]):
         print(f"    {name:38} {value:.3f}")
+
+    # The number F-019 actually turns on. AUROC says how well a detector RANKS; this
+    # says how low it can push a genuinely clean sentence, and that is what decides
+    # whether the objective will ever let high-stakes traffic pass.
+    clean_mask = np.array([m == "clean" for m in modes])
+    if clean_mask.any():
+        clean_scores = probabilities[clean_mask]
+        print(f"{NEWLINE}  CLEAN-TEXT FLOOR (what F-019 turns on, not AUROC):")
+        for quantile in (0.25, 0.50, 0.75):
+            print(
+                f"    {quantile:.0%} of clean text calibrates below "
+                f"{float(np.quantile(clean_scores, quantile)):.5f}"
+            )
+        print(
+            "    the objective needs: Rs.3,000 -> below 0.00033, "
+            "Rs.40,000 -> below 0.000025"
+        )
 
     # ---- the conformal threshold ------------------------------------------ #
     #

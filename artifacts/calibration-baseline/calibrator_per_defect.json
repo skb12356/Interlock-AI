@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "kind": "multi_defect",
+  "signals": [
+    "grounding.unsupported_content",
+    "grounding.numeric_unsupported",
+    "grounding.citation_unsupported",
+    "grounding.overconfidence",
+    "grounding.context_conflict",
+    "grounding.question_drift"
+  ],
+  "per_defect": {
+    "contradicted": {
+      "version": 1,
+      "signals": [
+        "grounding.unsupported_content",
+        "grounding.numeric_unsupported",
+        "grounding.citation_unsupported",
+        "grounding.overconfidence",
+        "grounding.context_conflict",
+        "grounding.question_drift"
+      ],
+      "isotonic": {
+        "grounding.unsupported_content": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.016,
+            0.016
+          ]
+        },
+        "grounding.numeric_unsupported": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.015999999999999997,
+            0.015999999999999997
+          ]
+        },
+        "grounding.citation_unsupported": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.016,
+            0.016
+          ]
+        },
+        "grounding.overconfidence": {
+          "x": [
+            0.6666666666666667,
+            1.0
+          ],
+          "y": [
+            0.010948905109489052,
+            0.016801853997682505
+          ]
+        },
+        "grounding.context_conflict": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.0040650406504065045,
+            0.75
+          ]
+        },
+        "grounding.question_drift": {
+          "x": [
+            0.5,
+            0.7272727272727273,
+            0.8,
+            0.9090909090909091,
+            1.0
+          ],
+          "y": [
+            0.0,
+            0.0,
+            0.0016722408026755853,
+            0.0016722408026755853,
+            0.02712160979877515
+          ]
+        }
+      },
+      "fusion": {
+        "coefficients": [
+          -0.02310583300312275,
+          -0.023105833003122748,
+          -0.02310583300312275,
+          -0.01950898272088199,
+          6.314249261607594,
+          0.13566034667879787
+        ],
+        "intercept": -4.7950612390908995
+      }
+    },
+    "ungrounded": {
+      "version": 1,
+      "signals": [
+        "grounding.unsupported_content",
+        "grounding.numeric_unsupported",
+        "grounding.citation_unsupported",
+        "grounding.overconfidence",
+        "grounding.context_conflict",
+        "grounding.question_drift"
+      ],
+      "isotonic": {
+        "grounding.unsupported_content": {
+          "x": [
+            0.0,
+            0.04,
+            1.0
+          ],
+          "y": [
+            0.018746652383502947,
+            1.0,
+            1.0
+          ]
+        },
+        "grounding.numeric_unsupported": {
+          "x": [
+            0.0,
+            0.1111111111111111,
+            1.0
+          ],
+          "y": [
+            0.026567481402763018,
+            1.0,
+            1.0
+          ]
+        },
+        "grounding.citation_unsupported": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.0653061224489796,
+            1.0
+          ]
+        },
+        "grounding.overconfidence": {
+          "x": [
+            0.6666666666666667,
+            1.0
+          ],
+          "y": [
+            0.058394160583941604,
+            0.0880648899188876
+          ]
+        },
+        "grounding.context_conflict": {
+          "x": [
+            0.0,
+            1.0
+          ],
+          "y": [
+            0.08130081300813008,
+            0.25
+          ]
+        },
+        "grounding.question_drift": {
+          "x": [
+            0.5,
+            0.8333333333333334,
+            0.9,
+            1.0
+          ],
+          "y": [
+            0.06872037914691943,
+            0.06872037914691943,
+            0.09515570934256055,
+            0.09515570934256055
+          ]
+        }
+      },
+      "fusion": {
+        "coefficients": [
+          5.3252172331817205,
+          2.342827537152442,
+          0.5376302117422765,
+          0.009780430204484694,
+          0.02257987829394033,
+          0.27483168209010134
+        ],
+        "intercept": -4.034731717445855
+      }
+    }
+  },
+  "skipped": {}
+}

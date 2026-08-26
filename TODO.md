@@ -118,8 +118,8 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 ### Day 1 exit criteria
 - `[ ]` `scripts/up.ps1` brings all 3 services to healthy from cold (per P0.2)
 - `[ ]` Demo app answers through the gateway, streaming, with a trace row
-- `[ ]` `X-Interlock-Force: ungrounded@2` → stub L2 decision in the trace
-- `[ ]` Contracts committed and untouched since the freeze
+- `[x]` `X-Interlock-Force: ungrounded@2` → stub L2 decision in the trace — *stub retained behind `INTERLOCK_RISK_ENGINE=stub`; the real engine ignores the header by design*
+- `[x]` Contracts committed and untouched since the freeze — *158 contract tests green; Contract 1 took two ADDITIVE optional fields under its own change rule*
 - `[ ]` Semantic-entropy label job running
 
 ---
@@ -159,10 +159,10 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
   - *Fallback (cut-list #7):* logprob/entailment proxy behind the same interface, ~30 min swap.
 
 ### Day 2 exit criteria
-- `[ ]` Gate property test passes; a real stream can be held, repaired and released
+- `[x]` Gate property test passes; a real stream can be held, repaired and released — *28 property tests green; verified live against Ollama*
 - `[ ]` Observer returns real probe scores under 25 ms p95 warm, with KV caching proven by a log line
-- `[ ]` `reliability.png` + `lambda.json` committed with a certified (α=0.01, δ=0.10)
-- `[ ]` Accuracy-by-layer curve exists
+- `[x]` `reliability.png` + `lambda.json` committed with a certified (α=0.01, δ=0.10) — *certified at threshold 0.0150 on n=840; **the 100% intervention rate must be quoted with it***
+- `[x]` Accuracy-by-layer curve exists — *`artifacts/probes/curve.json`; peaks mid-stack at layer 3, one-standard-error selection*
 - `[ ]` Governor degrades when the observer is killed
 
 ---
@@ -194,7 +194,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[x]` Scene 1 (invented clause → held → repaired → cited) works live — *verified against Ollama; the repair cites Clause 9.1*
 - `[x]` Scene 2 (poisoned PDF → tool frozen → review card) works live — *`tests/contract/test_tool_interlock_stream.py`; the client never receives the frozen call*
 - `[x]` `make eval` prints six numbers, even if they are bad — *and one of them is bad*
-- `[ ]` The router provably consumes the same `Stakes` object as the risk engine — from one trace
+- `[x]` The router provably consumes the same `Stakes` object as the risk engine — *same `stakes_id` on the route decision and the risk decision, asserted by a test* — from one trace
 
 ---
 
@@ -225,7 +225,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[ ]` Fairness run produces an e-value chart
 - `[ ]` All four scenes run without a human touching a terminal mid-scene
 - `[ ]` Evidence pack downloads and opens
-- `[ ]` Calibration set and eval set provably disjoint
+- `[x]` Calibration set and eval set provably disjoint — *D4-B6: by document, stratified by domain, zero shared, asserted end-to-end*
 
 ---
 

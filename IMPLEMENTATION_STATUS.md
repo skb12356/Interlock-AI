@@ -108,6 +108,17 @@ so waiting costs what it really costs; or accept "we verify every high-stakes an
 a product stance and re-target the metric per stakes band). Choosing between them is a
 decision to take deliberately, with the numbers above in hand.
 
+**This is demo-blocking, not just a metric.** Scene 1 run live against the real engine
+on 2026-08-26 chose **L5_block** (loss ₹241.89, runner-up L4_hold) for:
+
+> "When prepaying a floating-rate home loan, the applicable charge depends on your loan
+> agreement."
+
+A hedged, non-committal, essentially harmless sentence. The customer received nothing.
+The flagship scene currently blocks a reasonable answer, and it is the same root cause
+as the 91% false-intervention rate rather than a separate bug — which is why F-019 is
+the next thing to resolve, ahead of any new feature.
+
 ### Calibration and conformal
 
 | Quantity | Value | Caveat |

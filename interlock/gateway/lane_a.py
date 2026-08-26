@@ -39,6 +39,7 @@ from interlock.core.clock import Deadline
 from interlock.core.ids import new_stakes_id
 from interlock.core.policy import Policy
 from interlock.core.types import Fragment, GateMode, SignalReading, Stakes
+from interlock.gateway.router import Router
 from interlock.risk.objective import HardRule
 from interlock.signals.base import Detector, DetectorOutcome, PreflightContext
 from interlock.signals.stakes import StakesModel
@@ -92,6 +93,9 @@ class LaneA:
     policy: Policy
     detectors: list[Detector] = field(default_factory=list)
     stakes_model: StakesModel | None = None
+    #: Injected so the difficulty model can be swapped for a trained RouteLLM 'mf'
+    #: controller without touching Lane A.
+    router: Router | None = None
     deadline_ms: float = 120.0
     #: Interlock's own index over the corpus. Used **only** when the caller attached no
     #: context of its own: Interlock is a proxy, not a RAG stack, and silently replacing
@@ -104,6 +108,8 @@ class LaneA:
     def __post_init__(self) -> None:
         if self.stakes_model is None:
             self.stakes_model = StakesModel(policy=self.policy)
+        if self.router is None:
+            self.router = Router(policy=self.policy)
 
     async def run(self, ctx: PreflightContext) -> PreflightResult:
         deadline = Deadline(budget_ms=self.deadline_ms)
@@ -130,7 +136,7 @@ class LaneA:
         flagged = bool(hard_rules) or any(
             signal.name.startswith("injection") and signal.raw >= 0.6 for signal in signals
         )
-        tier, route_reason = self._route(stakes, flagged)
+        tier, route_reason = self._route(stakes, flagged, ctx, retrieved_by)
         mode: GateMode = (
             "buffered"
             if flagged or stakes.impact_inr >= self.policy.thresholds.buffer_above_impact_inr
@@ -228,7 +234,9 @@ class LaneA:
 
         return signals, hard_rules, findings, dropped
 
-    def _route(self, stakes: Stakes, flagged: bool) -> tuple[str, str]:
+    def _route(
+        self, stakes: Stakes, flagged: bool, ctx: PreflightContext, retrieved_by: str
+    ) -> tuple[str, str]:
         """Pick the model tier from the *same* estimate the risk engine will price with.
 
         Contribution 1 in its most literal form. The reason string is recorded on the
@@ -236,7 +244,17 @@ class LaneA:
         rather than being two separately tuned systems.
         """
         if flagged:
+            # A pre-flight flag outranks the router entirely. Something already looks
+            # wrong, and asking a difficulty model whether the cheap tier could cope
+            # would be answering the wrong question.
             return "strong", "preflight_flag"
-        if stakes.impact_inr >= self.policy.thresholds.strong_model_above_impact_inr:
-            return "strong", "stakes_high"
-        return "cheap", "stakes_low"
+        assert self.router is not None
+        decision = self.router.route(
+            stakes=stakes,
+            question=ctx.last_user_message,
+            retrieved=list(ctx.retrieved),
+            # 'none' means retrieval never ran. The router must not read that as a hard
+            # question -- see HeuristicDifficulty.score.
+            retrieval_attempted=retrieved_by != "none",
+        )
+        return decision.tier, decision.reason

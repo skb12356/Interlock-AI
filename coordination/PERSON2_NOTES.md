@@ -97,8 +97,11 @@ rather than crashes. Network failure preserves partial text and never resubmits 
 
 Person 1 must:
 
-1. Publish stakes, calibrated signals, decisions, and holds to `ConsoleHub`, including the
-   request ID in the envelope.
+1. Create one process-lifetime `ConsoleHub` at `app.state.console_hub`, mount the router
+   from `interlock.gateway.console_ws`, and publish stakes, calibrated signals, decisions,
+   and holds with the request ID in every envelope. Set
+   `app.state.console_publishers_integrated = True` only after all four publishers are
+   wired; until then `/console/status` deliberately reports recent live events unavailable.
 2. Add an optional resume token only to the initiating hold SSE event, including response
    holds; never publish that token to console projections.
 3. Add production static/proxy serving and native console supervision.
@@ -106,6 +109,80 @@ Person 1 must:
    retrieval tests with the declared dependency extra. Person 2 installs `sqlite-vec==0.1.9`
    locally only so the existing 653-test baseline can run.
 5. Supply real Lane C economics, regret, rework, net-value, and confidence-interval data.
+
+## Delivered implementation
+
+The `console` branch now contains the complete Person 2 replay implementation:
+
+- React 19, TypeScript, Vite, Vitest, Testing Library, Recharts, and Playwright tooling.
+- Runtime-validated direct SSE and projection events, sentence-keyed state, partial-output
+  preservation, eventually consistent decision-detail hydration, reconnect cursors, stream
+  reset handling, duplicate suppression, and replay-gap buffering.
+- Responsive Live, Reviews, and Evidence workspaces with keyboard focus behavior, reduced
+  motion-safe charts, source provenance, action totals, confidence intervals, and explicit
+  unavailable economics.
+- Request-scoped replay decisions, holds, and resume tokens. The L4 response remains
+  withheld until review; L5 emits no customer content. Expected-loss tables agree with the
+  declared winner, runner-up, and margin.
+- Recursive server-side token redaction, an allowlisted JSON artefact surface, no browser
+  storage of secrets, no unsafe HTML injection, and no WebSocket mutation commands.
+
+The standards, specification, independent code, bug, and security reviews were completed
+over `002e8600cb8252f03d448610a8469228703648b5..HEAD`. All verified findings were covered by
+regression tests and resolved in the focused review-fix commit. The security review found no
+remaining high-confidence vulnerability in the owned Person 2 surface.
+
+## Runbook
+
+Install the frontend once:
+
+```bash
+npm --prefix console ci
+```
+
+Start the deterministic replay server and UI in separate terminals:
+
+```bash
+uv run python scripts/replay_console.py --port 8099
+npm --prefix console run dev -- --host 127.0.0.1
+```
+
+For direct live-gateway development, point Vite at port 8080:
+
+```bash
+CONSOLE_BACKEND_URL=http://127.0.0.1:8080 npm --prefix console run dev -- --host 127.0.0.1
+```
+
+Run the complete quality gate:
+
+```bash
+npm --prefix console run test:unit -- --run
+npm --prefix console run typecheck
+npm --prefix console run build
+uv run ruff check .
+uv run mypy --strict interlock/core interlock/retrieval interlock/interlock_tools
+uv run pytest -q tests console/tests/python
+npm --prefix console run test:e2e
+```
+
+The final local gate on 26 August 2026 produced 43 passing frontend unit tests, 665 passing
+Python tests, and 8 passing Playwright journeys: the four replay scenarios at desktop
+1440×900 and mobile 390×844. TypeScript, Vite build, Ruff, and strict mypy also passed. The
+production npm dependency audit reported zero vulnerabilities. The Vite build emits only a
+non-blocking bundle-size warning, and its development WebSocket proxy can log `EPIPE` or
+`ECONNRESET` when Playwright closes a page.
+
+## Known unavailable data and integration
+
+- Live `ConsoleHub` publishers, production router mounting, static/proxy serving, and native
+  console supervision remain Person 1 work. Direct SSE still operates, while the status
+  projection labels missing history honestly.
+- A live initiating-stream resume token, especially for response holds, remains Person 1
+  gateway integration. A browser without that token can reject but cannot approve.
+- Lane C regret, rework, running net value, economics, and their confidence intervals do not
+  exist and remain visibly unavailable.
+- `sqlite-vec==0.1.9` is installed only in the local environment. The repository dependency
+  declaration still does not provide it along the baseline retrieval-test path.
 
 ## Acceptance
 

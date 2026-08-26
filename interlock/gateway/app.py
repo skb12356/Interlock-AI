@@ -779,6 +779,17 @@ def _build_risk_engine(settings: Settings, policy: Any, canaries: Any) -> Any:
             settings.probe_path,
         )
 
+    # The verifier is opt-in. It loads a second model and adds ~100 ms per buffered
+    # sentence, and what it buys is precision in the repair SPAN rather than accuracy in
+    # the decision -- worth it where repairs matter more than latency, and a poor default
+    # for a demo where they do not.
+    verifier = None
+    if settings.verifier_enabled:
+        from interlock.observer.verifier import ClaimVerifier
+
+        verifier = ClaimVerifier()
+        _log.info("claim verifier enabled; repairs will target a clause rather than a sentence")
+
     return RealRiskEngine(
         policy=policy,
         calibrator=calibrator,
@@ -787,6 +798,7 @@ def _build_risk_engine(settings: Settings, policy: Any, canaries: Any) -> Any:
         conformal_filter=settings.conformal_filter,
         calib_version=calib_version,
         probe=probe if probe.available else None,
+        verifier=verifier,
     )
 
 

@@ -128,6 +128,10 @@ class Settings:
     #: false-intervention target for the escape guarantee. That is a deployment choice,
     #: not a default.
     conformal_filter: bool = False
+    #: Claim-level verifier (D2-B6). Off by default: it loads a second model and adds
+    #: ~100 ms per buffered sentence, and it buys precision in the repair SPAN rather
+    #: than accuracy in the decision. Turn it on where repairs matter more than latency.
+    verifier_enabled: bool = False
     #: Trained observer probe. Absent on a clean checkout, and that is fine: the
     #: engine runs on the deterministic signals and reports the absence on /health.
     probe_path: Path = REPO_ROOT / "artifacts" / "probes" / "probe.json"
@@ -185,6 +189,7 @@ def load_settings() -> Settings:
             _env("INTERLOCK_CALIBRATION_DIR", str(REPO_ROOT / "artifacts" / "calibration"))
         ),
         conformal_filter=_env_bool("INTERLOCK_CONFORMAL_FILTER", False),
+        verifier_enabled=_env_bool("INTERLOCK_VERIFIER", False),
         probe_path=Path(
             _env("INTERLOCK_PROBE_PATH", str(REPO_ROOT / "artifacts" / "probes" / "probe.json"))
         ),

@@ -208,7 +208,9 @@ class RealRiskEngine:
         if reading is None:
             why.append("observer probe returned nothing (no trusted context, or it failed)")
         else:
-            why.append(f"observer probe: {reading.raw:.3f} in {deadline.elapsed_ms - started:.0f} ms")
+            why.append(
+                f"observer probe: {reading.raw:.3f} in {deadline.elapsed_ms - started:.0f} ms"
+            )
         return reading
 
     def _verify(self, ctx: RiskContext, deadline: Deadline, why: list[str]) -> Any:

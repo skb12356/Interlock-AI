@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { streamChat } from "./api/chatClient";
-import { ConsoleApiError, getHolds, resolveHold } from "./api/consoleClient";
+import {
+  ConsoleApiError,
+  getEvidenceBundle,
+  getHolds,
+  getLedgerSummary,
+  getStatus,
+  resolveHold,
+} from "./api/consoleClient";
 import type { HoldProjection } from "./domain/contracts";
+import type { ConsoleStatus, EvidenceBundle, LedgerSummary } from "./domain/evidence";
 import { ResumeTokenVault } from "./security/resumeTokens";
 import { consoleReducer, initialConsoleState } from "./state/consoleStore";
 import { LiveWorkspace } from "./workspaces/LiveWorkspace";
+import { EvidenceWorkspace } from "./workspaces/EvidenceWorkspace";
 import { ReviewsWorkspace } from "./workspaces/ReviewsWorkspace";
 
 import "./styles.css";
@@ -24,6 +33,13 @@ const headings: Record<Workspace, string> = {
   evidence: "Evidence ledger",
 };
 
+const emptyEvidence: EvidenceBundle = {
+  calibration: null,
+  conformal: null,
+  evaluation: null,
+  latency: null,
+};
+
 export function App() {
   const [workspace, setWorkspace] = useState<Workspace>("live");
   const [state, dispatch] = useReducer(consoleReducer, initialConsoleState);
@@ -34,6 +50,11 @@ export function App() {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [resolvingHoldId, setResolvingHoldId] = useState<string | null>(null);
+  const [consoleStatus, setConsoleStatus] = useState<ConsoleStatus | null>(null);
+  const [ledger, setLedger] = useState<LedgerSummary | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceBundle>(emptyEvidence);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const vault = useRef(new ResumeTokenVault());
   const activeController = useRef<AbortController | null>(null);
 
@@ -57,6 +78,29 @@ export function App() {
   useEffect(() => {
     if (workspace === "reviews") void loadReviews();
   }, [loadReviews, workspace]);
+
+  const loadEvidence = useCallback(async () => {
+    setEvidenceLoading(true);
+    setEvidenceError(null);
+    try {
+      const [nextStatus, nextLedger, nextEvidence] = await Promise.all([
+        getStatus(),
+        getLedgerSummary(),
+        getEvidenceBundle(),
+      ]);
+      setConsoleStatus(nextStatus);
+      setLedger(nextLedger);
+      setEvidence(nextEvidence);
+    } catch (error) {
+      setEvidenceError(error instanceof Error ? error.message : "Evidence projections could not be loaded");
+    } finally {
+      setEvidenceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (workspace === "evidence") void loadEvidence();
+  }, [loadEvidence, workspace]);
 
   const chooseScenario = (next: typeof scenario) => {
     const prompts: Record<typeof scenario, string> = {
@@ -177,9 +221,13 @@ export function App() {
             onRefresh={() => void loadReviews()}
           />
         ) : (
-          <p className="workspace-intro">
-            {workspace === "evidence" && "Read measured performance with its limits kept attached."}
-          </p>
+          <EvidenceWorkspace
+            bundle={evidence}
+            status={consoleStatus}
+            ledger={ledger}
+            loading={evidenceLoading}
+            error={evidenceError}
+          />
         )}
       </main>
     </div>

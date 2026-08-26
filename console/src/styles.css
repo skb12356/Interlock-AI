@@ -211,6 +211,50 @@ h2 { margin: 0; font: 600 24px/1.05 Charter, Georgia, serif; letter-spacing: -0.
 .reject-action { border: 1px solid var(--stop); color: var(--stop); background: white; }
 .approve-action { border: 1px solid var(--ledger); color: var(--paper); background: var(--ledger); }
 
+.evidence-desk { border: 1px solid var(--rule); background: rgba(245, 247, 242, 0.9); box-shadow: 0 18px 50px rgba(23, 54, 56, 0.09); }
+.evidence-overview { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 22px; border-bottom: 1px solid var(--rule); }
+.evidence-overview .eyebrow { margin-bottom: 7px; }
+.source-badge { padding: 7px 10px; color: var(--paper); background: var(--bank-blue); font: 800 9px "SFMono-Regular", Consolas, monospace; letter-spacing: 0.12em; }
+.ledger-strip { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--rule); }
+.ledger-strip > div { min-width: 0; padding: 14px 18px; border-right: 1px dashed var(--rule); }
+.ledger-strip > div:last-child { border-right: 0; }
+.ledger-strip span { display: block; margin-bottom: 5px; color: var(--ledger-soft); font: 700 8px "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+.ledger-strip strong { font: 800 12px "SFMono-Regular", Consolas, monospace; font-variant-numeric: tabular-nums; }
+.evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--rule); }
+.evidence-card { min-width: 0; padding: 20px 22px; background: var(--paper); }
+.evidence-card > header { margin-bottom: 15px; }
+.evidence-card .section-label { display: block; margin: 0; }
+.guarantee-card { background: var(--ledger); color: var(--paper); }
+.guarantee-card .section-label { color: var(--evidence); }
+.guarantee-number { font: 600 clamp(54px, 7vw, 88px)/0.88 Charter, Georgia, serif; letter-spacing: -0.07em; }
+.guarantee-card > p { margin: 10px 0 18px; color: rgba(245, 247, 242, 0.68); font: 10px "SFMono-Regular", Consolas, monospace; }
+.intervention-cost { padding: 13px 0 0; border-top: 1px solid rgba(245, 247, 242, 0.2); }
+.intervention-cost strong, .intervention-cost span { display: block; }
+.intervention-cost strong { color: #f0bb75; font: 800 15px "SFMono-Regular", Consolas, monospace; }
+.intervention-cost span { margin-top: 7px; color: rgba(245, 247, 242, 0.68); font-size: 10px; }
+.calibration-summary { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0 0 10px; border: 1px solid var(--rule); }
+.calibration-summary div { padding: 9px 11px; border-right: 1px dashed var(--rule); }
+.calibration-summary div:last-child { border-right: 0; }
+.calibration-summary dt { color: var(--ledger-soft); font: 700 8px "SFMono-Regular", Consolas, monospace; }
+.calibration-summary dd { margin: 4px 0 0; font: 800 12px "SFMono-Regular", Consolas, monospace; }
+.chart-frame { width: 100%; min-height: 190px; }
+.metric-list { border-top: 1px solid var(--rule); }
+.metric-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(130px, .8fr) auto; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--rule); }
+.metric-row div strong, .metric-row div span { display: block; }
+.metric-row div strong { font-size: 11px; }
+.metric-row div span { margin-top: 4px; color: var(--ledger-soft); font: 9px "SFMono-Regular", Consolas, monospace; }
+.metric-pass, .metric-miss { padding: 5px 7px; border: 1px solid currentColor; font: 800 8px "SFMono-Regular", Consolas, monospace; }
+.metric-pass { color: #285f51; }
+.metric-miss { color: var(--stop); }
+.latency-values { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.latency-values span { padding: 8px 10px; border-left: 3px solid var(--bank-blue); background: white; color: var(--ledger-soft); font-size: 9px; }
+.latency-values strong { display: block; color: var(--ledger); font: 800 12px "SFMono-Regular", Consolas, monospace; }
+.economics-card { grid-column: 1 / -1; background: repeating-linear-gradient(-45deg, var(--paper) 0 10px, #edf2ef 10px 20px); }
+.evidence-unavailable { display: grid; gap: 7px; align-content: center; min-height: 80px; color: var(--ledger-soft); }
+.evidence-unavailable strong { color: var(--stop); font: 600 24px Charter, Georgia, serif; }
+.evidence-unavailable span { font-size: 11px; }
+.evidence-loading { border: 1px solid var(--rule); background: rgba(245, 247, 242, 0.9); }
+
 @media (max-width: 720px) {
   .app-shell { grid-template-columns: 1fr; grid-template-rows: 70px auto 1fr; }
   .masthead { padding: 0 16px; }
@@ -235,6 +279,14 @@ h2 { margin: 0; font: 600 24px/1.05 Charter, Georgia, serif; letter-spacing: -0.
   .review-detail-grid section:first-child { border-right: 0; border-bottom: 1px dashed var(--rule); }
   .review-card > footer { grid-template-columns: 1fr; }
   .review-actions { grid-column: 1; grid-row: auto; flex-direction: column-reverse; }
+  .ledger-strip { grid-template-columns: 1fr 1fr; }
+  .ledger-strip > div:nth-child(2) { border-right: 0; }
+  .ledger-strip > div:nth-child(-n+2) { border-bottom: 1px dashed var(--rule); }
+  .evidence-grid { grid-template-columns: 1fr; }
+  .economics-card { grid-column: auto; }
+  .metric-row { grid-template-columns: 1fr auto; }
+  .metric-row > div:nth-child(2) { grid-row: 2; }
+  .metric-row b { grid-column: 2; grid-row: 1 / span 2; }
 }
 
 @media (min-width: 721px) and (max-width: 1180px) {

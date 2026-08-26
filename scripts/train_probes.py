@@ -32,6 +32,8 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+
+NEWLINE = chr(10)
 warnings.filterwarnings("ignore")
 
 from interlock.eval.induce import TripleGenerator  # noqa: E402
@@ -58,7 +60,25 @@ def main() -> int:
     # NLI shape: the retrieved context is the premise, the answer sentence is the
     # hypothesis. This is the pairing the encoder was fine-tuned on, which is the whole
     # reason for choosing an NLI checkpoint over a plain masked-LM one.
-    premises = ["\n".join(f.text for f in t.context) or "(no context retrieved)" for t in triples]
+    # Untrusted passages are excluded, and this MUST match how the probe is SERVED
+    # (interlock/signals/probe_signal.py and scripts/calibrate.py both exclude them).
+    #
+    # It did not, at first, and the cost was measurable: a probe trained on all context
+    # scored AUROC 0.907 on a fresh seed of its own distribution but only 0.837 when
+    # served without the untrusted passages it had learned to expect. Classic
+    # train/serve skew -- nothing errors, the number is just quietly worse, and it would
+    # have been read as "the probe is weak" rather than as a mismatch.
+    #
+    # Serving is the side that cannot move: a poisoned document in the premise makes the
+    # attacker's own claim genuinely entailed, so the probe would faithfully report
+    # "supported". Training matches serving.
+    premises = [
+        NEWLINE.join(
+            f.text for f in t.context if not str(f.provenance).endswith("untrusted")
+        )
+        or "(no context retrieved)"
+        for t in triples
+    ]
     hypotheses = [t.answer for t in triples]
 
     encoder = ObserverEncoder(model_name=args.model)

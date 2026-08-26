@@ -133,6 +133,29 @@ them is a deliberate call, **not** a tuning pass. CLAUDE.md is explicit that F-0
 not be tuned away, and `tests/unit/test_sensitivity.py` pins the arithmetic so a later
 attempt to edit `impact_inr` fails loudly next to an explanation.
 
+**Confirmed with a real probe, 2026-08-26.** The sensitivity sweep *predicted* that no
+achievable detector closes this. A trained observer probe now confirms it directly.
+
+The probe is real and it works: an NLI cross-encoder, linear probes on every layer,
+selected on held-out AUROC, peaking **mid-stack** (layer 4 of 6) at **0.945** against
+0.833 for the best free lexical signal. That is a genuine improvement in *ranking*.
+
+It does not move the number F-019 turns on. Calibrated, out-of-fold, n=2000:
+
+| | clean-text floor (median) |
+|---|---|
+| deterministic signals only | 0.0306 |
+| **with the observer probe added** | **0.029** |
+| what the objective needs at ₹3,000 | 0.00033 |
+| what the objective needs at ₹40,000 | 0.000025 |
+
+Roughly **100× above the ₹3,000 bar and 1,000× above the ₹40,000 one**, with or without
+the probe. AUROC measures how well a detector *ranks*; the objective cares how far down
+it can push a genuinely clean sentence, and those are different quantities. A detector
+can rank almost perfectly and still never say "certainly fine".
+
+So F-019 is not waiting on better ML. It is waiting on a decision about the impact model.
+
 **Still demo-blocking.** Scene 1 run live on 2026-08-26 chose **L5_block** (loss ₹241.89)
 for *"When prepaying a floating-rate home loan, the applicable charge depends on your
 loan agreement."* — a hedged, harmless sentence. The customer received nothing.

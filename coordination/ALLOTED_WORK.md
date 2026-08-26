@@ -24,6 +24,8 @@ Everything Person 2 builds against is already committed and frozen:
 | Calibration artefacts | `artifacts/calibration/*.json` | committed |
 | Eval results (both modes) | `artifacts/eval/*.json` | committed |
 | Measured action latencies | `artifacts/action_latency.json` | committed |
+| **Probe accuracy-by-layer curve** | `artifacts/probes/curve.json` | committed — a real chart |
+| **Detector sensitivity sweep** | `artifacts/eval/sensitivity.json` | committed — the F-019 experiment |
 | A replay server | `scripts/replay_console.py` | **no Ollama, no GPU, no calibration** |
 
 Run this and you have a live SSE stream with real interlock events, on the frozen wire
@@ -165,6 +167,7 @@ Ask for events with the header `X-Interlock-Events: all`.
 | `POST /v1/chat/completions` | the SSE stream, OpenAI-compatible |
 | `GET  /health` | engine, retrieval, governor state, policy version |
 | `GET  /admin/governor` | state, p95, what was given up, transition log |
+| `GET  /admin/latency` | added latency p50/p95, **split by lane**, buffered vs not |
 | `GET  /v1/holds` | the review queue (never leaks resume tokens) |
 | `POST /v1/holds/{id}/approve` | body `{"resume_token": "...", "resolved_by": "you"}` |
 | `POST /v1/holds/{id}/reject` | body optional |
@@ -176,6 +179,11 @@ Ask for events with the header `X-Interlock-Events: all`.
 - `artifacts/calibration/report.json` — ECE, Brier, AUROC, per-bin reliability curve
 - `artifacts/calibration/lambda.json` — the certified threshold and its caveats
 - `artifacts/action_latency.json` — measured L2/L3 latencies
+- `artifacts/probes/curve.json` — accuracy-by-layer for the observer probe. Peaks
+  **mid-stack** (layer 4 of 6 at AUROC 0.945), which is the shape that says the probe
+  found grounding rather than the encoder's own task head. Worth a chart.
+- `artifacts/eval/sensitivity.json` — the F-019 experiment: how good a detector would
+  have to be. Two series worth plotting against each other, since they diverge sharply.
 
 ### Stack
 
@@ -184,6 +192,27 @@ dependency-light (no Redis, no Postgres, no Kubernetes). Keep the console in tha
 spirit — a small Vite + React app, no component library unless it earns its place.
 If you would rather do plain HTML + a bit of JS to move faster on day one, that is
 fine; say so in `MERGE_PLAN.md`'s checklist so P1 knows what landed.
+
+### The one number that needs the most careful presentation
+
+`make eval` reports **false interventions at 91.08%** against a ≤2% target. Rendering
+that as a big red number would be accurate and would misrepresent the system. Split, it
+is:
+
+| band | any intervention | disruptive (L2+) |
+|---|---|---|
+| < ₹100 | 0% | **0%** |
+| ₹100–1,000 | 100% | **17%** |
+| ₹1,000–10,000 | 100% | 100% |
+| ₹10,000+ | 100% | 100% |
+
+`L1_annotate` appends a citation and ships the answer otherwise unchanged, for 5 ms. At
+moderate stakes that is the entire difference between 100% and 17%. If the console shows
+only the aggregate, a judge will conclude the system is uniformly over-eager when it is
+doing something much more specific: passing cheap traffic, citing sources at moderate
+stakes, and verifying everything expensive.
+
+Show both, always. `artifacts/eval/report.json` carries the per-band rows.
 
 ### Three things that will make a judge trust it
 
@@ -217,6 +246,7 @@ These are **recorded findings**, not bugs for you to fix. Full detail in
 | ID | What you will observe | Whose |
 |---|---|---|
 | **F-019** | High-stakes traffic intervenes ~100% of the time; Scene 1 may **block** a reasonable answer | P1 — blocking |
+| F-019b | The false-intervention rate looks catastrophic in aggregate (91%) and much less so split by stakes and by *disruption* — see below | P1 |
 | F-021 | Strong tier can 500 with "requires more system memory" | P1 |
 | F-016 | Conformal guarantee holds only at a 100% intervention rate | P1 |
 | F-015 | On an L4 hold at sentence 0, later sentences still stream | P1 — unsettled |

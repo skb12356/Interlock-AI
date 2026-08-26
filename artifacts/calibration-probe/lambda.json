@@ -1,0 +1,21 @@
+{
+  "threshold": null,
+  "alpha": 0.01,
+  "delta": 0.1,
+  "n_eval": 168,
+  "escape_rate": null,
+  "intervention_rate": null,
+  "candidates": [
+    {
+      "threshold": 0.0,
+      "intervention_rate": 1.0,
+      "escape_rate": 0.0,
+      "n_eval": 168,
+      "p_value": 0.502350887997631,
+      "rejected": false
+    }
+  ],
+  "notes": [
+    "no threshold in the grid could be certified: the tightest achievable p-value was 0.5024 against delta=0.1"
+  ]
+}

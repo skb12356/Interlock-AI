@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 4 backend complete - ledger economics and all of Lane C built; console (Person 2) not started",
-  "last_completed_task": "D4-A6 (evidence pack) + D3-A4 (router/cache) + real per-model pricing wired into the eval",
-  "next_task": "F-019 is YOUR decision and blocks the demo. Otherwise: D3-A6 (latency split by lane), or wire the cache onto the request path. Console is Person 2's.",
+  "current_phase": "Day 4 backend complete + observer probe trained; console (Person 2) not started",
+  "last_completed_task": "D2-B4/B7 (observer encoder + linear probes) and the measurement that confirms the probe does not close F-019",
+  "next_task": "F-019 IS YOUR DECISION and blocks the demo -- now confirmed empirically as a policy question, not an ML one. Then: wire the cache/regret/rework onto the request path, or D2-B6 (MiniCheck verifier).",
   "system_status": "Amber -- everything builds, 653 tests pass, six metrics measured; but F-019 makes the live high-stakes path block reasonable answers, which blocks the Scene 1 demo",
   "verification": {
     "ruff": "clean across interlock/, tests/, scripts/",
     "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
-    "pytest": "788 passed",
+    "pytest": "812 passed (fast suite; observer tests marked slow)",
     "make_eval": "runs; prints six numbers; five PASS, false interventions MISS",
     "sensitivity": "make sensitivity: the F-019 experiment; disruptive target achievable below a 0.001% clean floor, annotation-inclusive target missed at every floor"
   },
@@ -21,7 +21,9 @@
     "false_interventions": "91.08% [85.6, 94.6] n=157 -- MISS against a 2% target. See F-019.",
     "twin_pairs_treated_alike": "100% (5 pairs)",
     "calibration": "ECE 0.0037, Brier 0.0206, AUROC 0.8944, out-of-fold at n=10,000",
-    "conformal": "threshold 0.0150 at alpha=0.01 delta=0.10, certified on n=840 ungrounded items, at a 100% intervention rate"
+    "conformal": "threshold 0.0150 at alpha=0.01 delta=0.10, certified on n=840 ungrounded items, at a 100% intervention rate",
+    "observer_probe": "NLI cross-encoder, linear probes per layer, selected on held-out AUROC: peaks MID-STACK at layer 4 of 6, AUROC 0.945 vs 0.833 for the best free lexical signal. 123 ms/pair on CPU.",
+    "clean_text_floor": "THE number F-019 turns on. Calibrated out-of-fold n=2000: 0.0306 without the probe, 0.029 WITH it. The objective needs 0.00033 at Rs.3,000 and 0.000025 at Rs.40,000 -- so ~100x and ~1000x too high either way. AUROC measures ranking; this measures how far down a clean sentence can be pushed, and they are different quantities."
   },
   "never_cut_status": {
     "calibration_step": "BUILT (D2-B1/B2)",
@@ -31,7 +33,7 @@
     "governor_invariant_4": "BUILT (D2-A6) -- five nested states, circuit breaker, fail-open low / fail-closed high"
   },
   "open_findings": [
-    "F-002 / F-019 OPEN, MEASURED, MUST NOT BE TUNED AWAY: false interventions are 91.08% against a 2% target. Broken out by stakes: 0% below Rs.100, 100% above. NOT detector noise -- at Rs.40,000 impact with a 2.5x reversibility multiplier, L0_pass only wins if P(defect) < ~0.0001, and the detector's floor on clean text is ~0.019. 'false interventions <= 2%' and 'impact_inr: 40000 with lambda_time 0.40' cannot both hold. The live question is the IMPACT MODEL: impact_inr is a per-request stake charged in full to every sentence, so a five-sentence answer is charged five times the harm the request can cause. Three defensible resolutions (discount per sentence / raise lambda_time / re-target the metric per stakes band); choosing is a deliberate decision, not a tuning pass. LIVE EVIDENCE 2026-08-26: Scene 1 against the real engine on real Ollama produced L5_block (loss Rs.241.89, runner-up L4_hold) on the sentence 'When prepaying a floating-rate home loan, the applicable charge depends on your loan agreement.' -- a hedged, non-committal, essentially harmless answer. Nothing was delivered to the customer. THIS IS DEMO-BLOCKING: the flagship scene currently blocks a reasonable answer, and it is the same root cause as the 91% false-intervention rate rather than a separate bug.",
+    "F-002 / F-019 OPEN, MEASURED, MUST NOT BE TUNED AWAY: false interventions are 91.08% against a 2% target. Broken out by stakes: 0% below Rs.100, 100% above. NOT detector noise -- at Rs.40,000 impact with a 2.5x reversibility multiplier, L0_pass only wins if P(defect) < ~0.0001, and the detector's floor on clean text is ~0.019. 'false interventions <= 2%' and 'impact_inr: 40000 with lambda_time 0.40' cannot both hold. The live question is the IMPACT MODEL: impact_inr is a per-request stake charged in full to every sentence, so a five-sentence answer is charged five times the harm the request can cause. Three defensible resolutions (discount per sentence / raise lambda_time / re-target the metric per stakes band); choosing is a deliberate decision, not a tuning pass. LIVE EVIDENCE 2026-08-26: Scene 1 against the real engine on real Ollama produced L5_block (loss Rs.241.89, runner-up L4_hold) on the sentence 'When prepaying a floating-rate home loan, the applicable charge depends on your loan agreement.' -- a hedged, non-committal, essentially harmless answer. Nothing was delivered to the customer. THIS IS DEMO-BLOCKING: the flagship scene currently blocks a reasonable answer, and it is the same root cause as the 91% false-intervention rate rather than a separate bug. CONFIRMED EMPIRICALLY 2026-08-26: a trained observer probe (AUROC 0.945 held-out, +0.11 over the best lexical signal) leaves the clean-text floor essentially unchanged at 0.029. Better ML does not close this. It is a decision about the impact model.",
     "F-003 recorded: impact_inr is a base that multipliers scale",
     "F-015 open: on an L4_hold at sentence 0 the held sentence is suppressed but later sentences still stream. Whether a hold terminates the response or holds only the flagged span is unsettled.",
     "F-016 OPEN, MEASURED: the conformal bound is certified only at a 100% intervention rate, because 'unanswerable' is invisible to the deterministic signals (0.025 vs a clean baseline of 0.025). Guaranteed mode measured: false interventions 91.08% -> 100.00%. Never present the bound without the intervention rate beside it.",
@@ -48,12 +50,14 @@
     "F-019 ANSWERED (not closed -- it needs your decision): my first verdict 'jointly infeasible' was WRONG. Decomposed, the disruptive false-intervention target IS achievable below a ~0.001% detector floor (zero repairs/holds/blocks on clean traffic, 100% catch). The annotation-inclusive target is missed at every floor and the entire residual is L1_annotate on high-stakes answers. So: a stateable ML goal for the observer probe, plus one definitional question about whether adding a citation counts as a false intervention.",
     "rework confidence scaled from zero at the similarity bar, making the bar meaningless -- a match that just cleared it charged nothing. Now has an explicit floor.",
     "fairness extractor flagged a paraphrased approval as bias; decided-vs-unreadable is now extraction_uncertain, not disparity.",
-    "judge confidence parser dropped any value with trailing punctuation ('confidence 0.85.'), silently losing every stated confidence."
+    "judge confidence parser dropped any value with trailing punctuation ('confidence 0.85.'), silently losing every stated confidence.",
+    "TRAIN/SERVE SKEW in the observer probe: trained with untrusted passages in the premise, served without them. Cost ~0.07 AUROC (0.907 -> 0.837) and nothing errored -- it would have read as 'the probe is weak'. Training now matches serving; serving is the side that cannot move, because a poisoned document in the premise makes the attacker's own claim genuinely entailed."
   ],
   "deviations_recorded": [
     "D-009: the dense retrieval arm is a hashed lexical vector, not bge-small-en-v1.5 (no torch). BM25 carries retrieval; declares semantic=False and gets half a vote.",
     "D-010: calibration is fitted on INDUCED failures, not human labels. It calibrates; it does not audit. D2-B3's hand-labelled 300 remains outstanding and is what the meta-monitor must re-score.",
-    "D-011: `make eval` holds generation FIXED across both arms (paired design). This is a methodological choice, not a shortcut -- it attributes every off-vs-on difference to Interlock rather than to sampling noise -- but it means generation latency and billing are modelled rather than observed."
+    "D-011: `make eval` holds generation FIXED across both arms (paired design). This is a methodological choice, not a shortcut -- it attributes every off-vs-on difference to Interlock rather than to sampling noise -- but it means generation latency and billing are modelled rather than observed.",
+    "D-012: the plan names DeBERTa-v3-base for the observer. transformers 5.x cannot load its tokenizer -- it misroutes the SentencePiece model to the tiktoken parser, which fails on the binary file, and installing sentencepiece/tiktoken does not help because the routing happens before either is consulted. The encoder is configurable and defaults to an NLI cross-encoder whose tokenizer loads natively; NLI is arguably the better base since grounding IS entailment."
   ],
-  "updated_utc": "2026-08-26T09:00:00Z"
+  "updated_utc": "2026-08-26T12:00:00Z"
 }

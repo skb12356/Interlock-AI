@@ -153,13 +153,12 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         },
         "holds": [
             {
-                "hold_id": "hold_01REPLAY000000000000TOOL",
-                "kind": "tool_call",
-                "tool": "send_email",
+                "hold_id": "hold_01REPLAY000000000RESPONSE",
+                "kind": "response",
+                "tool": None,
                 "reason": (
-                    "send_email is irreversible and was influenced by "
-                    "retrieved_untrusted content (traced to that content); "
-                    "frozen for human approval"
+                    "The claim-payment statement is unsupported by retrieved evidence; "
+                    "the complete response is frozen for human approval before release"
                 ),
             }
         ],
@@ -183,29 +182,37 @@ SCENARIOS: dict[str, dict[str, Any]] = {
 }
 
 
-def loss_table(action: str, chosen: float) -> list[dict[str, Any]]:
+def loss_table(
+    action: str, chosen: float, runner_up: str, margin: float
+) -> list[dict[str, Any]]:
     """A full six-row table. The console must render all six, including what was
     unavailable and why -- the table IS the explanation, so showing only the winner
     hides the argument."""
     order = ["L0_pass", "L1_annotate", "L2_repair", "L3_reroute", "L4_hold", "L5_block"]
     rows = []
     step = max(chosen * 0.17, 1.0)
-    for index, name in enumerate(order):
-        total = chosen if name == action else round(chosen + step * (index + 1), 2)
+    next_rank = 1
+    for name in order:
+        if name == action:
+            total = chosen
+        elif name == runner_up:
+            total = round(chosen + margin, 2)
+        else:
+            next_rank += 1
+            total = round(chosen + margin + step * next_rank, 2)
+        nuisance = round(total * 0.18, 2)
+        compute = round(total * 0.02, 2)
+        latency = round(total * 0.08, 2)
         rows.append(
             {
                 "action": name,
-                "residual_harm": round(total * 0.72, 2),
-                "nuisance": round(total * 0.18, 2),
-                "compute": round(total * 0.02, 2),
-                "latency": round(total * 0.08, 2),
+                "residual_harm": round(total - nuisance - compute - latency, 2),
+                "nuisance": nuisance,
+                "compute": compute,
+                "latency": latency,
                 "total": total,
-                "available": not (name == "L2_repair" and action == "L5_block"),
-                "unavailable_reason": (
-                    "the sentence was already emitted"
-                    if (name == "L2_repair" and action == "L5_block")
-                    else None
-                ),
+                "available": True,
+                "unavailable_reason": None,
             }
         )
     return rows
@@ -380,11 +387,28 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
         name = pick_scenario(body if isinstance(body, dict) else {})
         scenario = SCENARIOS[name]
         request_id = f"req_replay_{next(app.state.request_ids):04d}"
-        decision_event = dict(scenario["decision"])
+        decision_event = {
+            **scenario["decision"],
+            "decision_id": f"{scenario['decision']['decision_id']}_{request_id}",
+        }
+        request_holds = [
+            {**hold, "hold_id": f"{hold['hold_id']}_{request_id}"}
+            for hold in scenario["holds"]
+        ]
+        request_scenario = {
+            **scenario,
+            "decision": decision_event,
+            "holds": request_holds,
+        }
         app.state.decisions[decision_event["decision_id"]] = {
             **decision_event,
             "request_id": request_id,
-            "loss_table": loss_table(decision_event["action"], decision_event["chosen_loss"]),
+            "loss_table": loss_table(
+                decision_event["action"],
+                decision_event["chosen_loss"],
+                decision_event["runner_up"],
+                decision_event["margin"],
+            ),
             "probs": {signal_name: prob for signal_name, prob in scenario["signals"]},
             "why": [
                 "Replay scenario uses fixed calibrated probabilities",
@@ -397,18 +421,21 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
             "latency_ms": 15.0,
         }
 
-        for hold in scenario["holds"]:
+        for hold in request_holds:
             app.state.holds[hold["hold_id"]] = {
                 **hold,
                 "request_id": request_id,
-                "payload": {"name": hold.get("tool"), "recipient": "customer@example.test"},
+                "payload": {
+                    "name": hold.get("tool"),
+                    "response": decision_event["counterfactual"],
+                },
                 "evidence": ["retrieved_untrusted content"],
                 "flagged_span": "retrieved_untrusted",
                 "state": "pending",
                 "created_ts": 1_700_000_000.0,
                 "sla_deadline_ts": None,
                 "expired": False,
-                "resume_token": "replay-token-0001",
+                "resume_token": f"replay-token-{request_id}-{hold['hold_id']}",
             }
 
         stats = app.state.replay_stats
@@ -419,7 +446,7 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
         stats["overheads"].append(15.0)
 
         return StreamingResponse(
-            _stream(scenario, request_id),
+            _stream(request_scenario, request_id),
             media_type="text/event-stream",
             headers={
                 "cache-control": "no-cache",
@@ -447,7 +474,7 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
 
         # A blocked response never reaches the customer, so no content is streamed --
         # the console must handle a stream that carries decisions and no text at all.
-        if scenario["decision"]["action"] != "L5_block":
+        if scenario["decision"]["action"] not in {"L4_hold", "L5_block"}:
             for raw in load_fixture(scenario["fixture"]):
                 if raw == "[DONE]":
                     break
@@ -459,7 +486,10 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
         yield sse("interlock.decision", decision)
 
         for hold in scenario["holds"]:
-            stream_hold = {**hold, "resume_token": "replay-token-0001"}
+            stream_hold = {
+                **hold,
+                "resume_token": app.state.holds[hold["hold_id"]]["resume_token"],
+            }
             app.state.console_hub.publish("interlock.hold", stream_hold, request_id=request_id)
             yield sse("interlock.hold", stream_hold)
 

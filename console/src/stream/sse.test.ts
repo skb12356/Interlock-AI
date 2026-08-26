@@ -49,6 +49,18 @@ describe("SseParser", () => {
     ]);
   });
 
+  it("rejects structurally invalid named and OpenAI payloads", () => {
+    const parser = new SseParser();
+    const frames = parser.push(
+      "event: interlock.decision\ndata: {}\n\ndata: {\"choices\":\"not-an-array\"}\n\n",
+    );
+
+    expect(frames).toEqual([
+      expect.objectContaining({ kind: "diagnostic", code: "malformed-frame" }),
+      expect.objectContaining({ kind: "diagnostic", code: "malformed-frame" }),
+    ]);
+  });
+
   it("captures and removes a hold token before returning ordinary event data", () => {
     const capture = vi.fn();
     const parser = new SseParser({ onResumeToken: capture });

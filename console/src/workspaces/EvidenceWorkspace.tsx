@@ -92,6 +92,14 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
         ) : <Unavailable detail="Ledger projection could not be read" />}
       </div>
 
+      {ledger && (
+        <div className="action-counts" aria-label="Decision action counts">
+          {Object.entries(ledger.action_counts).map(([action, count]) => (
+            <span key={action}><strong>{action.replace("_", " ")}</strong>{integer.format(count)} decisions</span>
+          ))}
+        </div>
+      )}
+
       <div className="evidence-grid">
         <article className="evidence-card guarantee-card" aria-label="Certified guarantee" role="region">
           <header><span className="section-label">Certified ungrounded escape</span></header>
@@ -123,8 +131,8 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
                     <XAxis dataKey="confidence" unit="%" tick={{ fontSize: 9 }} />
                     <YAxis unit="%" domain={[0, 100]} tick={{ fontSize: 9 }} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="predicted" stroke="#276079" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="observed" stroke="#c47a28" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="predicted" stroke="#276079" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="observed" stroke="#c47a28" strokeWidth={2} dot={false} isAnimationActive={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -161,8 +169,8 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
                     <XAxis dataKey="action" tick={{ fontSize: 9 }} />
                     <YAxis tick={{ fontSize: 9 }} />
                     <Tooltip />
-                    <Bar dataKey="median" fill="#276079" />
-                    <Bar dataKey="max" fill="#c47a28" />
+                    <Bar dataKey="median" fill="#276079" isAnimationActive={false} />
+                    <Bar dataKey="max" fill="#c47a28" isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

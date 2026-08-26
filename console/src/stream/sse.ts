@@ -1,9 +1,5 @@
-import type {
-  HoldEvent,
-  InterlockEventName,
-  OpenAIChunk,
-  ParsedFrame,
-} from "../domain/contracts";
+import type { InterlockEventName, ParsedFrame } from "../domain/contracts";
+import { parseInterlockEvent, parseOpenAIChunk } from "../domain/eventValidation";
 
 const knownEvents = new Set<InterlockEventName>([
   "interlock.stakes",
@@ -91,18 +87,19 @@ export class SseParser {
       return { kind: "diagnostic", code: "malformed-frame", message: "SSE data must be a JSON object" };
     }
 
-    if (!eventName) return { kind: "openai", data: data as OpenAIChunk };
+    if (!eventName) return parseOpenAIChunk(data);
 
     if (eventName === "interlock.hold") {
-      const holdData = { ...(data as HoldEvent & { resume_token?: unknown }) };
+      const holdData = { ...(data as Record<string, unknown>) };
       const token = holdData.resume_token;
       delete holdData.resume_token;
-      if (typeof holdData.hold_id === "string" && typeof token === "string") {
-        this.onResumeToken?.(holdData.hold_id, token);
+      const frame = parseInterlockEvent(eventName, holdData);
+      if (frame.kind === "interlock" && frame.event === "interlock.hold" && typeof token === "string") {
+        this.onResumeToken?.(frame.data.hold_id, token);
       }
-      return { kind: "interlock", event: eventName, data: holdData };
+      return frame;
     }
 
-    return { kind: "interlock", event: eventName, data } as ParsedFrame;
+    return parseInterlockEvent(eventName as InterlockEventName, data);
   }
 }

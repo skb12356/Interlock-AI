@@ -48,8 +48,9 @@ test("L4 initiating tab approves a durable secret-free hold", async ({ page, req
   await runScenario(page, "held");
 
   await expect(page.locator(".action-stamp")).toHaveText("L4 hold");
+  await expect(page.getByText("No content released.")).toBeVisible();
   await page.getByRole("button", { name: /reviews/i }).click();
-  await expect(page.getByRole("heading", { name: "send_email" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Response review" })).toBeVisible();
   await expect(page.getByText("Approval secret captured")).toBeVisible();
 
   const projection = await request.get(`${baseURL}/console/holds`);

@@ -44,7 +44,7 @@ def test_replay_stream_and_projection_share_one_secret_safe_contract() -> None:
         decision_event = next(data for name, data in named if name == "interlock.decision")
         assert "loss_table" not in decision_event
         hold_event = next(data for name, data in named if name == "interlock.hold")
-        assert hold_event["resume_token"] == "replay-token-0001"
+        assert hold_event["resume_token"].startswith("replay-token-req_replay_0001")
 
         decision = client.get(f"/console/decisions/{decision_event['decision_id']}")
         assert decision.status_code == 200
@@ -71,7 +71,7 @@ def test_replay_stream_and_projection_share_one_secret_safe_contract() -> None:
     [
         ("clean", "L0_pass", True),
         ("scene1", "L2_repair", True),
-        ("held", "L4_hold", True),
+        ("held", "L4_hold", False),
         ("blocked", "L5_block", False),
     ],
 )
@@ -101,7 +101,14 @@ def test_all_replay_scenarios_are_deterministic(
         assert second.headers["x-interlock-request-id"] == "req_replay_0002"
 
         detail = client.get(f"/console/decisions/{decision['decision_id']}").json()
-        assert detail["loss_table"] == loss_table(action, decision["chosen_loss"])
+        assert detail["request_id"] == "req_replay_0001"
+        assert detail["loss_table"] == loss_table(
+            action, decision["chosen_loss"], decision["runner_up"], decision["margin"]
+        )
+        second_decision = next(
+            data for name, data in events(second.text) if name == "interlock.decision"
+        )
+        assert second_decision["decision_id"] != decision["decision_id"]
 
 
 def test_replay_status_ledger_and_artifacts_are_projection_routes() -> None:
@@ -126,9 +133,9 @@ def test_replay_status_ledger_and_artifacts_are_projection_routes() -> None:
         assert client.get("/console/artifacts/calibration/dataset.json").status_code == 404
 
 
-def test_loss_table_is_repeatable_and_uses_the_frozen_action_names() -> None:
-    first = loss_table("L2_repair", 10.0)
-    assert first == loss_table("L2_repair", 10.0)
+def test_loss_table_is_repeatable_and_agrees_with_runner_up_and_margin() -> None:
+    first = loss_table("L2_repair", 10.0, "L4_hold", 4.0)
+    assert first == loss_table("L2_repair", 10.0, "L4_hold", 4.0)
     assert [row["action"] for row in first] == [
         "L0_pass",
         "L1_annotate",
@@ -137,3 +144,31 @@ def test_loss_table_is_repeatable_and_uses_the_frozen_action_names() -> None:
         "L4_hold",
         "L5_block",
     ]
+    ranked = sorted((row["total"], row["action"]) for row in first if row["available"])
+    assert ranked[:2] == [(10.0, "L2_repair"), (14.0, "L4_hold")]
+
+
+def test_repeated_held_requests_keep_secrets_and_projection_records_isolated() -> None:
+    with TestClient(build_app(token_delay_s=0)) as client:
+        first = client.post("/v1/chat/completions", json={"scenario": "held"})
+        second = client.post("/v1/chat/completions", json={"scenario": "held"})
+        first_named = [(name, data) for name, data in events(first.text) if name]
+        second_named = [(name, data) for name, data in events(second.text) if name]
+        first_decision = next(data for name, data in first_named if name == "interlock.decision")
+        second_decision = next(data for name, data in second_named if name == "interlock.decision")
+        first_hold = next(data for name, data in first_named if name == "interlock.hold")
+        second_hold = next(data for name, data in second_named if name == "interlock.hold")
+
+        assert first_decision["decision_id"] != second_decision["decision_id"]
+        assert first_hold["hold_id"] != second_hold["hold_id"]
+        assert first_hold["resume_token"] != second_hold["resume_token"]
+        assert client.get(f"/console/decisions/{first_decision['decision_id']}").json()["request_id"] == "req_replay_0001"
+        assert client.get(f"/console/decisions/{second_decision['decision_id']}").json()["request_id"] == "req_replay_0002"
+        assert len(client.get("/console/holds").json()["holds"]) == 2
+
+        approved = client.post(
+            f"/v1/holds/{first_hold['hold_id']}/approve",
+            json={"resume_token": first_hold["resume_token"]},
+        )
+        assert approved.status_code == 200
+        assert [hold["hold_id"] for hold in client.get("/console/holds").json()["holds"]] == [second_hold["hold_id"]]

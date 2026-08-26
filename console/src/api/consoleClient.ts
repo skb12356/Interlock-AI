@@ -1,4 +1,4 @@
-import type { HoldProjection } from "../domain/contracts";
+import type { DecisionDetail, HoldProjection } from "../domain/contracts";
 import type {
   ActionLatency,
   CalibrationReport,
@@ -50,6 +50,21 @@ export function getStatus(fetcher: typeof fetch = fetch): Promise<ConsoleStatus>
 
 export function getLedgerSummary(fetcher: typeof fetch = fetch): Promise<LedgerSummary> {
   return getProjection<LedgerSummary>("/console/ledger/summary", fetcher);
+}
+
+export async function getDecisionDetail(
+  decisionId: string,
+  signal?: AbortSignal,
+  fetcher: typeof fetch = fetch,
+  waits: number[] = [0, 100, 250, 500, 1_000, 2_000],
+): Promise<DecisionDetail | null> {
+  for (const wait of waits) {
+    if (wait) await new Promise((resolve) => globalThis.setTimeout(resolve, wait));
+    const response = await fetcher(`/console/decisions/${encodeURIComponent(decisionId)}`, { signal });
+    if (response.ok) return response.json() as Promise<DecisionDetail>;
+    if (response.status !== 404) throw new Error(`Decision detail request failed with ${response.status}`);
+  }
+  return null;
 }
 
 async function getArtifact<T>(name: string, fetcher: typeof fetch): Promise<T | null> {

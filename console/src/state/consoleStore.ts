@@ -7,6 +7,7 @@ import type {
   SignalEvent,
   StakesEvent,
 } from "../domain/contracts";
+import { parseInterlockEvent } from "../domain/eventValidation";
 
 export interface RequestTrace {
   requestId: string;
@@ -15,10 +16,16 @@ export interface RequestTrace {
   status: "streaming" | "complete" | "failed";
   error: string | null;
   stakes: StakesEvent | null;
+  sentenceOrder: number[];
+  sentences: Record<number, SentenceTrace>;
+  holds: HoldEvent[];
+}
+
+export interface SentenceTrace {
+  sentenceIdx: number;
   signals: SignalEvent[];
   decisions: DecisionEvent[];
   decisionDetails: Record<string, DecisionDetail>;
-  holds: HoldEvent[];
 }
 
 export interface ConsoleState {
@@ -51,10 +58,29 @@ function emptyTrace(requestId: string, prompt = ""): RequestTrace {
     status: "streaming",
     error: null,
     stakes: null,
+    sentenceOrder: [],
+    sentences: {},
+    holds: [],
+  };
+}
+
+function updateSentence(
+  trace: RequestTrace,
+  sentenceIdx: number,
+  update: (sentence: SentenceTrace) => SentenceTrace,
+): RequestTrace {
+  const sentence = trace.sentences[sentenceIdx] ?? {
+    sentenceIdx,
     signals: [],
     decisions: [],
     decisionDetails: {},
-    holds: [],
+  };
+  return {
+    ...trace,
+    sentenceOrder: trace.sentenceOrder.includes(sentenceIdx)
+      ? trace.sentenceOrder
+      : [...trace.sentenceOrder, sentenceIdx].sort((left, right) => left - right),
+    sentences: { ...trace.sentences, [sentenceIdx]: update(sentence) },
   };
 }
 
@@ -73,15 +99,25 @@ function applyFrame(state: ConsoleState, requestId: string, frame: ParsedFrame):
   } else if (frame.event === "interlock.stakes") {
     nextTrace = { ...trace, stakes: frame.data };
   } else if (frame.event === "interlock.signal") {
-    const duplicate = trace.signals.some((signal) =>
+    const sentence = trace.sentences[frame.data.sentence_idx];
+    const duplicate = sentence?.signals.some((signal) =>
       signal.sentence_idx === frame.data.sentence_idx &&
       signal.name === frame.data.name &&
       signal.prob === frame.data.prob
-    );
-    if (!duplicate) nextTrace = { ...trace, signals: [...trace.signals, frame.data] };
+    ) ?? false;
+    if (!duplicate) {
+      nextTrace = updateSentence(trace, frame.data.sentence_idx, (current) => ({
+        ...current,
+        signals: [...current.signals, frame.data],
+      }));
+    }
   } else if (frame.event === "interlock.decision") {
-    if (!trace.decisions.some((decision) => decision.decision_id === frame.data.decision_id)) {
-      nextTrace = { ...trace, decisions: [...trace.decisions, frame.data] };
+    const sentence = trace.sentences[frame.data.sentence_idx];
+    if (!sentence?.decisions.some((decision) => decision.decision_id === frame.data.decision_id)) {
+      nextTrace = updateSentence(trace, frame.data.sentence_idx, (current) => ({
+        ...current,
+        decisions: [...current.decisions, frame.data],
+      }));
     }
   } else if (frame.event === "interlock.hold") {
     if (!trace.holds.some((hold) => hold.hold_id === frame.data.hold_id)) {
@@ -104,11 +140,7 @@ function frameFromEnvelope(envelope: ConsoleEnvelope): ParsedFrame | null {
     envelope.event === "interlock.decision" ||
     envelope.event === "interlock.hold"
   ) {
-    return {
-      kind: "interlock",
-      event: envelope.event,
-      data: envelope.data,
-    } as ParsedFrame;
+    return parseInterlockEvent(envelope.event, envelope.data);
   }
   return null;
 }
@@ -144,17 +176,24 @@ export function consoleReducer(state: ConsoleState, action: ConsoleAction): Cons
 
   if (action.type === "decision.loaded") {
     const trace = state.requests[action.detail.request_id] ?? emptyTrace(action.detail.request_id);
+    const existingSentence = trace.sentenceOrder.find((sentenceIdx) =>
+      trace.sentences[sentenceIdx].decisions.some(
+        (decision) => decision.decision_id === action.detail.decision_id,
+      ),
+    );
+    const sentenceIdx = action.detail.sentence_idx ?? existingSentence ?? 0;
+    const nextTrace = updateSentence(trace, sentenceIdx, (sentence) => ({
+      ...sentence,
+      decisionDetails: {
+        ...sentence.decisionDetails,
+        [action.detail.decision_id]: action.detail,
+      },
+    }));
     return {
       ...state,
       requests: {
         ...state.requests,
-        [action.detail.request_id]: {
-          ...trace,
-          decisionDetails: {
-            ...trace.decisionDetails,
-            [action.detail.decision_id]: action.detail,
-          },
-        },
+        [action.detail.request_id]: nextTrace,
       },
     };
   }

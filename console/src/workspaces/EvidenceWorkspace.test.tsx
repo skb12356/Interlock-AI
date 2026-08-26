@@ -69,6 +69,8 @@ describe("EvidenceWorkspace", () => {
     expect(screen.getByText("13,704 ms")).toBeInTheDocument();
     expect(screen.getByText("Lane C economics have not been produced")).toBeInTheDocument();
     expect(screen.getByText("Unavailable", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("L0 pass")).toBeInTheDocument();
+    expect(screen.getByText("8 decisions")).toBeInTheDocument();
   });
 
   it("labels missing committed evidence as unavailable", () => {

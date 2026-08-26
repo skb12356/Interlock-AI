@@ -56,6 +56,9 @@ export class ProjectionConnection {
   private socket: SocketLike | null = null;
   private reconnectTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   private stopped = true;
+  private generation = 0;
+  private recoveringGeneration: number | null = null;
+  private pendingEnvelopes: ConsoleEnvelope[] = [];
   private currentCursor: ProjectionCursor = { streamId: null, lastSeq: 0 };
 
   constructor(options: ProjectionConnectionOptions) {
@@ -80,6 +83,9 @@ export class ProjectionConnection {
 
   stop(): void {
     this.stopped = true;
+    this.generation += 1;
+    this.recoveringGeneration = null;
+    this.pendingEnvelopes = [];
     if (this.reconnectTimer !== null) globalThis.clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
     this.socket?.close();
@@ -91,12 +97,15 @@ export class ProjectionConnection {
     if (this.stopped) return;
     this.options.onStatus?.(status);
     const socket = this.options.createSocket(projectionWebSocketUrl(this.options.location));
+    const generation = ++this.generation;
     this.socket = socket;
     socket.onopen = () => {
       this.options.onStatus?.("connected");
-      void this.recoverRecent();
+      this.recoveringGeneration = generation;
+      this.pendingEnvelopes = [];
+      void this.recoverRecent(generation);
     };
-    socket.onmessage = (event) => this.handleMessage(event.data);
+    socket.onmessage = (event) => this.handleMessage(event.data, generation);
     socket.onerror = () => {
       if (this.stopped || this.socket !== socket) return;
       this.options.onDiagnostic?.("Projection connection encountered a transport error");
@@ -113,14 +122,15 @@ export class ProjectionConnection {
     };
   }
 
-  private handleMessage(data: string): void {
+  private handleMessage(data: string, generation: number): void {
     try {
       const value: unknown = JSON.parse(data);
       if (!isEnvelope(value)) {
         this.options.onDiagnostic?.("Projection received an invalid envelope");
         return;
       }
-      this.accept(value);
+      if (this.recoveringGeneration === generation) this.pendingEnvelopes.push(value);
+      else this.accept(value);
     } catch {
       this.options.onDiagnostic?.("Projection received malformed JSON");
     }
@@ -133,15 +143,21 @@ export class ProjectionConnection {
     this.options.onEnvelope(envelope);
   }
 
-  private async recoverRecent(): Promise<void> {
+  private async recoverRecent(generation: number): Promise<void> {
     const query = new URLSearchParams({ after: String(this.currentCursor.lastSeq) });
     if (this.currentCursor.streamId) query.set("stream_id", this.currentCursor.streamId);
     try {
       const fetcher = this.options.fetcher;
       const response = await fetcher(`/console/recent?${query.toString()}`);
+      if (generation !== this.generation || this.stopped) return;
       if (!response.ok) throw new Error(`Recent projection request failed with ${response.status}`);
       const payload = (await response.json()) as RecentProjection;
-      if (!payload || typeof payload.stream_id !== "string" || !Array.isArray(payload.events)) {
+      if (generation !== this.generation || this.stopped) return;
+      if (
+        !payload || typeof payload.stream_id !== "string" ||
+        !Number.isInteger(payload.latest_seq) || payload.latest_seq < 0 ||
+        !Array.isArray(payload.events)
+      ) {
         throw new Error("Recent projection response was malformed");
       }
       for (const event of payload.events) {
@@ -151,8 +167,19 @@ export class ProjectionConnection {
       if (this.currentCursor.streamId !== payload.stream_id || payload.latest_seq > this.currentCursor.lastSeq) {
         this.currentCursor = { streamId: payload.stream_id, lastSeq: payload.latest_seq };
       }
+      this.finishRecovery(generation);
     } catch (error) {
+      if (generation !== this.generation || this.stopped) return;
       this.options.onDiagnostic?.(error instanceof Error ? error.message : "Recent projection recovery failed");
+      this.finishRecovery(generation);
     }
+  }
+
+  private finishRecovery(generation: number): void {
+    if (this.recoveringGeneration !== generation) return;
+    const pending = this.pendingEnvelopes;
+    this.recoveringGeneration = null;
+    this.pendingEnvelopes = [];
+    for (const envelope of pending) this.accept(envelope);
   }
 }

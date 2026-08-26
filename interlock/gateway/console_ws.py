@@ -165,13 +165,25 @@ class LiveConsoleSource:
             name: (self.artifacts_root / name).is_file() for name in sorted(ALLOWED_ARTIFACTS)
         }
         ledger_stats = self.app.state.ledger.stats()
+        publishers_integrated = bool(
+            getattr(self.app.state, "console_publishers_integrated", False)
+        )
         return {
             "source": "live",
             "replay": False,
             "health": {"ok": True, "ledger": ledger_stats},
             "capabilities": {
                 "direct_stream": {"available": True},
-                "recent_events": {"available": True},
+                "recent_events": {
+                    "available": publishers_integrated,
+                    **(
+                        {}
+                        if publishers_integrated
+                        else {
+                            "reason": "Person 1 has not integrated live ConsoleHub publishers yet"
+                        }
+                    ),
+                },
                 "decision_details": {"available": True, "eventually_consistent": True},
                 "holds": {"available": True, "approval_requires_token": True},
                 "artifacts": artifact_status,

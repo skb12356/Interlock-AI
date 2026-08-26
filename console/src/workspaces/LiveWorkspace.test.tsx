@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { RequestTrace } from "../state/consoleStore";
@@ -27,22 +28,21 @@ function trace(): RequestTrace {
       mode: "buffered",
       model_served: "qwen3:8b",
     },
-    signals: [
-      { sentence_idx: 0, name: "grounding.citation_unsupported", prob: 0.94 },
-    ],
-    decisions: [
-      {
-        decision_id: "dec_1",
-        sentence_idx: 0,
-        action: "L2_repair",
-        chosen_loss: 494.36,
-        runner_up: "L4_hold",
-        margin: 88.46,
-        counterfactual: "A 2% charge applies under Clause 7.4.",
-      },
-    ],
-    decisionDetails: {
-      dec_1: {
+    sentenceOrder: [0],
+    sentences: {
+      0: {
+        sentenceIdx: 0,
+        signals: [{ sentence_idx: 0, name: "grounding.citation_unsupported", prob: 0.94 }],
+        decisions: [{
+          decision_id: "dec_1",
+          sentence_idx: 0,
+          action: "L2_repair",
+          chosen_loss: 494.36,
+          runner_up: "L4_hold",
+          margin: 88.46,
+          counterfactual: "A 2% charge applies under Clause 7.4.",
+        }],
+        decisionDetails: { dec_1: {
         decision_id: "dec_1",
         request_id: "req_1",
         sentence_idx: 0,
@@ -68,6 +68,7 @@ function trace(): RequestTrace {
         probe_version: "probe-v1",
         inputs_digest: "abc",
         latency_ms: 14,
+        } },
       },
     },
     holds: [],
@@ -106,8 +107,8 @@ describe("LiveWorkspace", () => {
   it("explains an L5 block even when no assistant content exists", () => {
     const blocked = trace();
     blocked.assistantText = "";
-    blocked.decisions[0] = { ...blocked.decisions[0], action: "L5_block", hard_rule: "canary_leak" };
-    blocked.decisionDetails = {};
+    blocked.sentences[0].decisions[0] = { ...blocked.sentences[0].decisions[0], action: "L5_block", hard_rule: "canary_leak" };
+    blocked.sentences[0].decisionDetails = {};
 
     render(
       <LiveWorkspace
@@ -142,5 +143,34 @@ describe("LiveWorkspace", () => {
     expect(screen.getByRole("textbox", { name: "Customer message" })).toHaveValue(
       "A different draft for the next request",
     );
+  });
+
+  it("lets the operator inspect each sentence-level decision", async () => {
+    const user = userEvent.setup();
+    const multi = trace();
+    multi.sentenceOrder = [0, 1];
+    multi.sentences[1] = {
+      sentenceIdx: 1,
+      signals: [{ sentence_idx: 1, name: "grounding.question_drift", prob: 0.62 }],
+      decisions: [{
+        decision_id: "dec_2",
+        sentence_idx: 1,
+        action: "L4_hold",
+        chosen_loss: 582.82,
+        runner_up: "L2_repair",
+        margin: 41.9,
+      }],
+      decisionDetails: {},
+    };
+    render(
+      <LiveWorkspace trace={multi} prompt="" scenario="held" busy={false}
+        onPromptChange={vi.fn()} onScenarioChange={vi.fn()} onSubmit={vi.fn()} />,
+    );
+
+    const timeline = screen.getByRole("navigation", { name: "Sentence timeline" });
+    expect(within(timeline).getByRole("button", { name: "Sentence 2" })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("L4 hold", { selector: ".action-stamp" })).toBeInTheDocument();
+    await user.click(within(timeline).getByRole("button", { name: "Sentence 1" }));
+    expect(screen.getByText("L2 repair", { selector: ".action-stamp" })).toBeInTheDocument();
   });
 });

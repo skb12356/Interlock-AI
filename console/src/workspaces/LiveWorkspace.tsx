@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import type { Action } from "../domain/contracts";
 import type { RequestTrace } from "../state/consoleStore";
@@ -52,8 +52,19 @@ export function LiveWorkspace({
   onScenarioChange,
   onSubmit,
 }: LiveWorkspaceProps) {
-  const decision = trace?.decisions.at(-1) ?? null;
-  const detail = decision ? trace?.decisionDetails[decision.decision_id] ?? null : null;
+  const [selectedSentenceIdx, setSelectedSentenceIdx] = useState<number | null>(null);
+  const sentenceKey = trace?.sentenceOrder.join(",") ?? "";
+  const latestSentenceIdx = trace?.sentenceOrder.at(-1) ?? null;
+  const effectiveSentenceIdx = selectedSentenceIdx !== null && trace?.sentenceOrder.includes(selectedSentenceIdx)
+    ? selectedSentenceIdx
+    : latestSentenceIdx;
+  const sentence = effectiveSentenceIdx === null ? null : trace?.sentences[effectiveSentenceIdx] ?? null;
+  const decision = sentence?.decisions.at(-1) ?? null;
+  const detail = decision ? sentence?.decisionDetails[decision.decision_id] ?? null : null;
+
+  useEffect(() => {
+    setSelectedSentenceIdx(latestSentenceIdx);
+  }, [trace?.requestId, sentenceKey, latestSentenceIdx]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -72,6 +83,23 @@ export function LiveWorkspace({
             {busy ? "Streaming" : trace?.status ?? "Ready"}
           </span>
         </div>
+
+        {trace && trace.sentenceOrder.length > 0 && (
+          <nav className="sentence-timeline" aria-label="Sentence timeline">
+            {trace.sentenceOrder.map((sentenceIdx) => (
+              <button
+                type="button"
+                key={sentenceIdx}
+                onClick={() => setSelectedSentenceIdx(sentenceIdx)}
+                aria-current={effectiveSentenceIdx === sentenceIdx ? "step" : undefined}
+                aria-label={`Sentence ${sentenceIdx + 1}`}
+              >
+                <span aria-hidden="true">{String(sentenceIdx + 1).padStart(2, "0")}</span>
+                Sentence {sentenceIdx + 1}
+              </button>
+            ))}
+          </nav>
+        )}
 
         <div className="transcript" aria-live="polite">
           {trace ? (
@@ -160,7 +188,7 @@ export function LiveWorkspace({
               <div className="decision-evidence">
                 <section className="signal-list" aria-labelledby="signals-title">
                   <div className="section-label" id="signals-title">Calibrated signals</div>
-                  {trace.signals.length ? trace.signals.map((signal, index) => (
+                  {sentence?.signals.length ? sentence.signals.map((signal, index) => (
                     <div className="signal-row" key={`${signal.sentence_idx}-${signal.name}-${index}`}>
                       <span>{signal.name.replaceAll(".", " / ")}</span>
                       <strong>{signal.prob === null ? "Unavailable" : `${Math.round(signal.prob * 100)}%`}</strong>

@@ -67,7 +67,7 @@ describe("streamChat", () => {
     expect(tokens).toEqual([["hld_1", "secret"]]);
     expect(JSON.stringify(frames)).not.toContain("secret");
     expect(frames.at(-1)).toEqual({ kind: "done" });
-    expect(details).toHaveLength(1);
+    await vi.waitFor(() => expect(details).toHaveLength(1));
     expect(fetcher).toHaveBeenNthCalledWith(
       2,
       "/console/decisions/dec_1",
@@ -84,5 +84,63 @@ describe("streamChat", () => {
       streamChat({ prompt: "Hello", scenario: "clean" }, { onFrame: vi.fn() }, fetcher),
     ).rejects.toThrow("Chat request failed with 503");
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails an interrupted body that closes before the DONE sentinel", async () => {
+    const frames: ParsedFrame[] = [];
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      chunkedResponse(["data: {\"choices\":[{\"delta\":{\"content\":\"Partial\"}}]}\n\n"], {
+        "x-interlock-request-id": "req_partial",
+      }),
+    );
+
+    await expect(streamChat(
+      { prompt: "Hello", scenario: "clean" },
+      { onFrame: (frame) => frames.push(frame) },
+      fetcher,
+    )).rejects.toThrow("before [DONE]");
+    expect(frames).toContainEqual(expect.objectContaining({ kind: "openai" }));
+  });
+
+  it("keeps a completed stream successful when decision evidence is temporarily unavailable", async () => {
+    const diagnostics: string[] = [];
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(chunkedResponse([
+        "event: interlock.decision\ndata: {\"decision_id\":\"dec_1\",\"sentence_idx\":0,\"action\":\"L0_pass\",\"chosen_loss\":1}\n\ndata: [DONE]\n\n",
+      ], { "x-interlock-request-id": "req_1" }))
+      .mockResolvedValue(new Response("unavailable", { status: 503 }));
+
+    await expect(streamChat(
+      { prompt: "Hello", scenario: "clean" },
+      { onFrame: vi.fn(), onDecisionDetail: vi.fn(), onDiagnostic: (message) => diagnostics.push(message) },
+      fetcher,
+    )).resolves.toEqual({ requestId: "req_1", replay: false });
+    await vi.waitFor(() => expect(diagnostics).toEqual(["Decision detail request failed with 503"]));
+  });
+
+  it("does not keep stream completion waiting on eventual decision persistence", async () => {
+    let resolveDetail!: (response: Response) => void;
+    const detailResponse = new Promise<Response>((resolve) => { resolveDetail = resolve; });
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(chunkedResponse([
+        "event: interlock.decision\ndata: {\"decision_id\":\"dec_late\",\"sentence_idx\":0,\"action\":\"L0_pass\",\"chosen_loss\":1}\n\ndata: [DONE]\n\n",
+      ], { "x-interlock-request-id": "req_late" }))
+      .mockReturnValueOnce(detailResponse)
+      .mockResolvedValue(new Response("unavailable", { status: 503 }));
+
+    const result = streamChat(
+      { prompt: "Hello", scenario: "clean" },
+      { onFrame: vi.fn(), onDecisionDetail: vi.fn() },
+      fetcher,
+    );
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    const settledBeforeDetail = await Promise.race([
+      result.then(() => true),
+      new Promise<false>((resolve) => globalThis.setTimeout(() => resolve(false), 0)),
+    ]);
+    resolveDetail(new Response("not ready", { status: 404 }));
+    await result;
+
+    expect(settledBeforeDetail).toBe(true);
   });
 });

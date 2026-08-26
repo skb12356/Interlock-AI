@@ -179,6 +179,10 @@ def live_source(tmp_path: Path) -> LiveConsoleSource:
 def test_live_source_returns_complete_decisions_holds_and_ledger_summary(tmp_path: Path) -> None:
     source = live_source(tmp_path)
 
+    status = source.status()
+    assert status["capabilities"]["recent_events"]["available"] is False
+    assert "Person 1" in status["capabilities"]["recent_events"]["reason"]
+
     decision = source.decision("dec_1")
     assert decision["request_id"] == "req_1"
     assert decision["why"] == ["evidence conflicts"]

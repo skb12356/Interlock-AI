@@ -4,6 +4,7 @@ import { streamChat } from "./api/chatClient";
 import { ProjectionConnection } from "./api/projectionClient";
 import {
   ConsoleApiError,
+  getDecisionDetail,
   getEvidenceBundle,
   getHolds,
   getLedgerSummary,
@@ -62,10 +63,33 @@ export function App() {
   const activeController = useRef<AbortController | null>(null);
   const workspaceMain = useRef<HTMLElement | null>(null);
   const mountedWorkspace = useRef(false);
+  const hydratingDecisions = useRef(new Set<string>());
+
+  const hydrateDecision = useCallback(async (decisionId: string) => {
+    if (hydratingDecisions.current.has(decisionId)) return;
+    hydratingDecisions.current.add(decisionId);
+    try {
+      const detail = await getDecisionDetail(decisionId);
+      if (detail) dispatch({ type: "decision.loaded", detail });
+      else dispatch({ type: "diagnostic.received", code: "projection", message: `Decision detail ${decisionId} is not available yet` });
+    } catch (error) {
+      dispatch({
+        type: "diagnostic.received",
+        code: "projection",
+        message: error instanceof Error ? error.message : "Decision detail request failed",
+      });
+    } finally {
+      hydratingDecisions.current.delete(decisionId);
+    }
+  }, []);
 
   useEffect(() => () => {
     activeController.current?.abort();
     vault.current.clear();
+  }, []);
+
+  useEffect(() => {
+    void getStatus().then(setConsoleStatus).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -74,7 +98,16 @@ export function App() {
       return;
     }
     const connection = new ProjectionConnection({
-      onEnvelope: (envelope) => dispatch({ type: "projection.received", envelope }),
+      onEnvelope: (envelope) => {
+        dispatch({ type: "projection.received", envelope });
+        if (
+          envelope.event === "interlock.decision" &&
+          typeof envelope.data === "object" && envelope.data !== null &&
+          "decision_id" in envelope.data && typeof envelope.data.decision_id === "string"
+        ) {
+          void hydrateDecision(envelope.data.decision_id);
+        }
+      },
       onStatus: (status) => {
         if (status !== "stopped") setProjectionStatus(status);
       },
@@ -82,7 +115,7 @@ export function App() {
     });
     connection.start();
     return () => connection.stop();
-  }, []);
+  }, [hydrateDecision]);
 
   useEffect(() => {
     if (!mountedWorkspace.current) {
@@ -163,9 +196,11 @@ export function App() {
           },
           onResumeToken: (holdId, token) => vault.current.store(holdId, token),
           onDecisionDetail: (detail) => dispatch({ type: "decision.loaded", detail }),
+          onDiagnostic: (message) => dispatch({ type: "diagnostic.received", code: "projection", message }),
         },
       );
     } catch (error) {
+      vault.current.clear();
       if (error instanceof DOMException && error.name === "AbortError") return;
       const message = error instanceof Error ? error.message : "The stream ended unexpectedly";
       setChatError(message);
@@ -185,6 +220,7 @@ export function App() {
       await loadReviews();
     } catch (error) {
       if (error instanceof ConsoleApiError && (error.status === 404 || error.status === 409)) {
+        vault.current.delete(holdId);
         await loadReviews();
         setReviewError("This hold changed before the action completed. The queue has been refreshed.");
       } else {
@@ -207,7 +243,9 @@ export function App() {
             <small>Decision console</small>
           </span>
         </div>
-        <div className={`system-state ${projectionStatus}`}><span aria-hidden="true" /> {projectionStatus} projection</div>
+        <div className={`system-state ${projectionStatus}`}>
+          <span aria-hidden="true" /> {consoleStatus?.source.toUpperCase() ?? "UNKNOWN"} · {projectionStatus} projection
+        </div>
       </header>
 
       <nav className="workspace-rail" aria-label="Console workspaces">

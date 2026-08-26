@@ -37,7 +37,7 @@ describe("consoleReducer", () => {
       },
     });
 
-    expect(state.requests.req_2.signals).toEqual([
+    expect(state.requests.req_2.sentences[1].signals).toEqual([
       { sentence_idx: 1, name: "grounding.support", prob: 0.82 },
     ]);
   });
@@ -63,7 +63,7 @@ describe("consoleReducer", () => {
       },
     });
 
-    expect(state.requests.req_2.signals).toHaveLength(1);
+    expect(state.requests.req_2.sentences[1].signals).toHaveLength(1);
   });
 
   it("deduplicates projection envelopes and resets the cursor for a new stream", () => {
@@ -100,5 +100,23 @@ describe("consoleReducer", () => {
 
     expect(state.projection).toEqual({ streamId: "epoch-b", lastSeq: 1 });
     expect(state.requests.req_b.stakes?.impact_inr).toBe(900);
+  });
+
+  it("records malformed projected events without adding unsafe domain state", () => {
+    const state = consoleReducer(initialConsoleState, {
+      type: "projection.received",
+      envelope: {
+        stream_id: "epoch-a",
+        seq: 1,
+        event: "interlock.decision",
+        data: {},
+        ts: 10,
+        request_id: "req_bad",
+        replayed: false,
+      },
+    });
+
+    expect(state.requests.req_bad?.sentenceOrder ?? []).toHaveLength(0);
+    expect(state.diagnostics.at(-1)).toEqual(expect.objectContaining({ code: "malformed-frame" }));
   });
 });

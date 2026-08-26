@@ -41,9 +41,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import random
 import sys
 from collections.abc import AsyncIterator
+from itertools import count
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +54,13 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+
+from interlock.gateway.console_ws import (  # noqa: E402
+    ALLOWED_ARTIFACTS,
+    ConsoleHub,
+    LiveConsoleSource,
+)
+from interlock.gateway.console_ws import router as console_router  # noqa: E402
 
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "streams"
 ARTIFACTS = REPO_ROOT / "artifacts"
@@ -182,8 +189,9 @@ def loss_table(action: str, chosen: float) -> list[dict[str, Any]]:
     hides the argument."""
     order = ["L0_pass", "L1_annotate", "L2_repair", "L3_reroute", "L4_hold", "L5_block"]
     rows = []
-    for name in order:
-        total = chosen if name == action else round(chosen * random.uniform(1.05, 4.0), 2)
+    step = max(chosen * 0.17, 1.0)
+    for index, name in enumerate(order):
+        total = chosen if name == action else round(chosen + step * (index + 1), 2)
         rows.append(
             {
                 "action": name,
@@ -201,6 +209,67 @@ def loss_table(action: str, chosen: float) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+class ReplayConsoleSource:
+    """In-memory implementation of the live read-only projection contract."""
+
+    def __init__(self, app: FastAPI) -> None:
+        self.app = app
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "source": "replay",
+            "replay": True,
+            "health": {"ok": True, "scenario_count": len(SCENARIOS)},
+            "capabilities": {
+                "direct_stream": {"available": True},
+                "recent_events": {"available": True},
+                "decision_details": {"available": True, "eventually_consistent": False},
+                "holds": {"available": True, "approval_requires_token": True},
+                "artifacts": {
+                    name: (ARTIFACTS / name).is_file() for name in sorted(ALLOWED_ARTIFACTS)
+                },
+                "economics": {
+                    "available": False,
+                    "reason": "Replay does not fabricate Lane C economics",
+                },
+            },
+        }
+
+    def decision(self, decision_id: str) -> dict[str, Any]:
+        decision = self.app.state.decisions.get(decision_id)
+        if decision is None:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="decision is not available yet")
+        return decision
+
+    def holds(self) -> list[dict[str, Any]]:
+        return [
+            {key: value for key, value in hold.items() if key != "resume_token"}
+            for hold in self.app.state.holds.values()
+        ]
+
+    def ledger_summary(self) -> dict[str, Any]:
+        stats = self.app.state.replay_stats
+        overheads = stats["overheads"]
+        return {
+            "request_count": stats["request_count"],
+            "spend_inr": round(stats["spend_inr"], 4),
+            "action_counts": dict(sorted(stats["action_counts"].items())),
+            "overhead_ms": {
+                "mean": sum(overheads) / len(overheads) if overheads else None,
+                "p95": max(overheads) if overheads else None,
+            },
+            "economics": {
+                "available": False,
+                "reason": "Replay does not produce regret, rework, net value, or intervals",
+            },
+        }
+
+    def artifact(self, name: str) -> Any:
+        return LiveConsoleSource(self.app, artifacts_root=ARTIFACTS).artifact(name)
 
 
 def pick_scenario(body: dict[str, Any]) -> str:
@@ -221,7 +290,7 @@ def pick_scenario(body: dict[str, Any]) -> str:
     return "scene1"
 
 
-def build_app() -> FastAPI:
+def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
     app = FastAPI(title="Interlock replay (console development)", version="0.1.0")
     # Wide open: this server never sees real data and only ever runs on localhost, and
     # a CORS error is a miserable way to lose an hour of front-end time.
@@ -232,6 +301,17 @@ def build_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.state.holds = {}
+    app.state.decisions = {}
+    app.state.console_hub = ConsoleHub()
+    app.state.console_source = ReplayConsoleSource(app)
+    app.state.request_ids = count(1)
+    app.state.replay_stats = {
+        "request_count": 0,
+        "spend_inr": 0.0,
+        "action_counts": {},
+        "overheads": [],
+    }
+    app.include_router(console_router)
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
@@ -267,12 +347,7 @@ def build_app() -> FastAPI:
     @app.get("/v1/holds")
     async def holds() -> dict[str, Any]:
         # Resume tokens are never listed, exactly as in the real gateway.
-        return {
-            "holds": [
-                {k: v for k, v in hold.items() if k != "resume_token"}
-                for hold in app.state.holds.values()
-            ]
-        }
+        return {"holds": app.state.console_source.holds()}
 
     @app.post("/v1/holds/{hold_id}/approve")
     async def approve(hold_id: str, request: Request) -> Any:
@@ -296,16 +371,6 @@ def build_app() -> FastAPI:
             return JSONResponse({"error": {"message": "no pending hold with that id"}}, 404)
         return {"hold_id": hold_id, "state": "rejected"}
 
-    @app.get("/artifacts/{name:path}")
-    async def artifact(name: str) -> Any:
-        """Serve the committed measurement JSON, so the chart panels have real data."""
-        path = (ARTIFACTS / name).resolve()
-        if not path.is_file() or ARTIFACTS.resolve() not in path.parents:
-            return JSONResponse({"error": {"message": f"no artifact {name!r}"}}, 404)
-        if path.suffix != ".json":
-            return JSONResponse({"error": {"message": "only .json is served here"}}, 415)
-        return json.loads(path.read_text(encoding="utf-8"))
-
     @app.post("/v1/chat/completions")
     async def chat(request: Request) -> Any:
         try:
@@ -314,30 +379,71 @@ def build_app() -> FastAPI:
             body = {}
         name = pick_scenario(body if isinstance(body, dict) else {})
         scenario = SCENARIOS[name]
+        request_id = f"req_replay_{next(app.state.request_ids):04d}"
+        decision_event = dict(scenario["decision"])
+        app.state.decisions[decision_event["decision_id"]] = {
+            **decision_event,
+            "request_id": request_id,
+            "loss_table": loss_table(decision_event["action"], decision_event["chosen_loss"]),
+            "probs": {signal_name: prob for signal_name, prob in scenario["signals"]},
+            "why": [
+                "Replay scenario uses fixed calibrated probabilities",
+                f"{decision_event['action']} has the lowest available expected loss",
+            ],
+            "policy_version": "banking-v3@replay",
+            "calib_version": "calib-replay-v1",
+            "probe_version": "probe-replay-v1",
+            "inputs_digest": f"replay:{name}",
+            "latency_ms": 15.0,
+        }
 
         for hold in scenario["holds"]:
-            app.state.holds[hold["hold_id"]] = {**hold, "resume_token": "replay-token-0001"}
+            app.state.holds[hold["hold_id"]] = {
+                **hold,
+                "request_id": request_id,
+                "payload": {"name": hold.get("tool"), "recipient": "customer@example.test"},
+                "evidence": ["retrieved_untrusted content"],
+                "flagged_span": "retrieved_untrusted",
+                "state": "pending",
+                "created_ts": 1_700_000_000.0,
+                "sla_deadline_ts": None,
+                "expired": False,
+                "resume_token": "replay-token-0001",
+            }
+
+        stats = app.state.replay_stats
+        stats["request_count"] += 1
+        stats["spend_inr"] += 0.04
+        action_counts = stats["action_counts"]
+        action_counts[decision_event["action"]] = action_counts.get(decision_event["action"], 0) + 1
+        stats["overheads"].append(15.0)
 
         return StreamingResponse(
-            _stream(scenario, name),
+            _stream(scenario, request_id),
             media_type="text/event-stream",
-            headers={"cache-control": "no-cache", "x-interlock-replay": name},
+            headers={
+                "cache-control": "no-cache",
+                "x-interlock-replay": name,
+                "x-interlock-request-id": request_id,
+            },
         )
 
-    async def _stream(scenario: dict[str, Any], name: str) -> AsyncIterator[str]:
+    async def _stream(scenario: dict[str, Any], request_id: str) -> AsyncIterator[str]:
+        app.state.console_hub.publish(
+            "interlock.stakes", scenario["stakes"], request_id=request_id
+        )
         yield sse("interlock.stakes", scenario["stakes"])
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(min(0.05, token_delay_s))
 
         for signal_name, prob in scenario["signals"]:
-            yield sse(
-                "interlock.signal",
-                {
-                    "sentence_idx": scenario["decision"]["sentence_idx"],
-                    "name": signal_name,
-                    "prob": prob,
-                },
-            )
-            await asyncio.sleep(0.04)
+            signal = {
+                "sentence_idx": scenario["decision"]["sentence_idx"],
+                "name": signal_name,
+                "prob": prob,
+            }
+            app.state.console_hub.publish("interlock.signal", signal, request_id=request_id)
+            yield sse("interlock.signal", signal)
+            await asyncio.sleep(min(0.04, token_delay_s))
 
         # A blocked response never reaches the customer, so no content is streamed --
         # the console must handle a stream that carries decisions and no text at all.
@@ -346,14 +452,16 @@ def build_app() -> FastAPI:
                 if raw == "[DONE]":
                     break
                 yield sse(None, raw)
-                await asyncio.sleep(TOKEN_DELAY_S)
+                await asyncio.sleep(token_delay_s)
 
         decision = dict(scenario["decision"])
-        decision["loss_table"] = loss_table(decision["action"], decision["chosen_loss"])
+        app.state.console_hub.publish("interlock.decision", decision, request_id=request_id)
         yield sse("interlock.decision", decision)
 
         for hold in scenario["holds"]:
-            yield sse("interlock.hold", hold)
+            stream_hold = {**hold, "resume_token": "replay-token-0001"}
+            app.state.console_hub.publish("interlock.hold", stream_hold, request_id=request_id)
+            yield sse("interlock.hold", stream_hold)
 
         yield sse(None, "[DONE]")
 

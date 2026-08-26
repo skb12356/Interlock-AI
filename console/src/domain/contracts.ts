@@ -2,7 +2,7 @@ export type Action =
   | "L0_pass"
   | "L1_annotate"
   | "L2_repair"
-  | "L3_regenerate"
+  | "L3_reroute"
   | "L4_hold"
   | "L5_block";
 

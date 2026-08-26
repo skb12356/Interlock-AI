@@ -23,7 +23,7 @@
     "calibration": "ECE 0.0037, Brier 0.0206, AUROC 0.8944, out-of-fold at n=10,000",
     "conformal": "threshold 0.0150 at alpha=0.01 delta=0.10, certified on n=840 ungrounded items, at a 100% intervention rate",
     "observer_probe": "NLI cross-encoder, linear probes per layer, selected on held-out AUROC: peaks MID-STACK at layer 4 of 6, AUROC 0.945 vs 0.833 for the best free lexical signal. 123 ms/pair on CPU.",
-    "clean_text_floor": "THE number F-019 turns on. Calibrated out-of-fold n=2000: 0.0306 without the probe, 0.029 WITH it. The objective needs 0.00033 at Rs.3,000 and 0.000025 at Rs.40,000 -- so ~100x and ~1000x too high either way. AUROC measures ranking; this measures how far down a clean sentence can be pushed, and they are different quantities."
+    "clean_text_floor": "THE number F-019 turns on. Calibrated out-of-fold, n=2000, median: 0.03056 without the probe, 0.02501 WITH it -- an 18% improvement, real but not close. The objective needs 0.00033 at Rs.3,000 and 0.000025 at Rs.40,000, i.e. ~75x and ~1000x lower. AUROC measures ranking; this measures how far down a clean sentence can be pushed. Different quantities: +0.11 AUROC bought 0.006 of floor."
   },
   "never_cut_status": {
     "calibration_step": "BUILT (D2-B1/B2)",

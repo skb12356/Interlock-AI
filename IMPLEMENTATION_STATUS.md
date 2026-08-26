@@ -142,17 +142,21 @@ selected on held-out AUROC, peaking **mid-stack** (layer 4 of 6) at **0.945** ag
 
 It does not move the number F-019 turns on. Calibrated, out-of-fold, n=2000:
 
-| | clean-text floor (median) |
-|---|---|
-| deterministic signals only | 0.0306 |
-| **with the observer probe added** | **0.029** |
-| what the objective needs at ₹3,000 | 0.00033 |
-| what the objective needs at ₹40,000 | 0.000025 |
+| clean-text floor | 25th pct | **median** | 75th pct |
+|---|---|---|---|
+| deterministic signals only | 0.02910 | **0.03056** | 0.03158 |
+| with the observer probe added | 0.02342 | **0.02501** | 0.02688 |
+| what the objective needs at ₹3,000 | | 0.00033 | |
+| what the objective needs at ₹40,000 | | 0.000025 | |
 
-Roughly **100× above the ₹3,000 bar and 1,000× above the ₹40,000 one**, with or without
-the probe. AUROC measures how well a detector *ranks*; the objective cares how far down
-it can push a genuinely clean sentence, and those are different quantities. A detector
-can rank almost perfectly and still never say "certainly fine".
+The probe helps — an 18% reduction in the floor, which is a real improvement and not
+nothing. It is also nowhere near enough: the floor is still **~75× above the ₹3,000 bar
+and ~1,000× above the ₹40,000 one**.
+
+The distinction that matters: AUROC measures how well a detector *ranks*. The objective
+cares how far down it can push a genuinely clean sentence. Those are different
+quantities, and a detector can rank almost perfectly while never being able to say
+"certainly fine" — which is why +0.11 AUROC bought a 0.006 change in the floor.
 
 So F-019 is not waiting on better ML. It is waiting on a decision about the impact model.
 

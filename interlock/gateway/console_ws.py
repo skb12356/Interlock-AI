@@ -1,22 +1,7 @@
-"""Console websocket — **Person 2 owns this file** (see `coordination/ALLOTED_WORK.md`).
+"""Read-only console projections — owned by Person 2.
 
-It exists and is already mounted in `app.py` for one reason: so that building the
-console never requires editing `app.py`. That is the only file the two work streams
-would otherwise collide on, and the collision has been removed in advance rather than
-resolved afterwards.
-
-Everything below is a working skeleton, not a placeholder. It broadcasts real decision
-events to connected clients today; what it does not yet do is anything opinionated about
-what the console wants to see. Reshape it freely — the only things that must not change
-are the event *names* and *payload shapes*, which are Contract 3 and frozen.
-
-    ws://127.0.0.1:8080/console/ws
-
-**Invariant 2 applies here as much as in the UI.** This socket pushes decisions that
-have already been made. It must never grow an inbound message that sets a threshold,
-overrides an action, or asks the operator to choose a number. Approve/reject on a hold
-goes through the existing REST endpoints, which are audited and durable; a websocket
-command would not be.
+The console observes decisions that have already been made. Its websocket is push-only;
+hold resolution remains on the existing audited REST routes in ``gateway.app``.
 """
 
 from __future__ import annotations
@@ -24,59 +9,111 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import math
+import statistics
+import time
+import uuid
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import Any, Protocol, cast
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
-__all__ = ["ConsoleHub", "router"]
+__all__ = ["ConsoleHub", "ConsoleSource", "LiveConsoleSource", "router"]
 
-#: Recent events replayed to a client that connects mid-conversation, so a console
-#: opened at the wrong moment does not show an empty screen for the whole demo.
 REPLAY_BUFFER = 200
+ARTIFACTS_ROOT = Path(__file__).resolve().parents[2] / "artifacts"
+ALLOWED_ARTIFACTS = frozenset(
+    {
+        "action_latency.json",
+        "calibration/report.json",
+        "calibration/lambda.json",
+        "eval/report.json",
+        "eval/report-guaranteed.json",
+    }
+)
+
+
+def _without_secrets(value: Any) -> Any:
+    """Copy JSON-like data while removing resume tokens at every nesting level."""
+    if isinstance(value, dict):
+        return {
+            key: _without_secrets(item)
+            for key, item in value.items()
+            if key != "resume_token"
+        }
+    if isinstance(value, list):
+        return [_without_secrets(item) for item in value]
+    return value
 
 
 @dataclass
 class ConsoleHub:
-    """Fan-out of interlock events to every connected console.
+    """Non-blocking fan-out with a bounded, secret-free replay buffer."""
 
-    Deliberately fire-and-forget. A console that is slow, wedged or gone must never
-    slow down or fail a customer's request -- the observability path is not allowed to
-    become a dependency of the token path. A send that fails drops the client, and the
-    request never learns about it.
-    """
-
+    stream_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     _clients: set[WebSocket] = field(default_factory=set, init=False)
     _recent: deque[dict[str, Any]] = field(
         default_factory=lambda: deque(maxlen=REPLAY_BUFFER), init=False
     )
+    _seq: int = field(default=0, init=False)
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
         self._clients.add(websocket)
-        for event in list(self._recent):
+        for event in self.recent():
             with contextlib.suppress(Exception):
-                await websocket.send_text(json.dumps(event))
+                await websocket.send_json(event)
 
     def disconnect(self, websocket: WebSocket) -> None:
         self._clients.discard(websocket)
 
-    def publish(self, event_name: str, payload: dict[str, Any]) -> None:
-        """Called from the request path. **Synchronous and non-blocking on purpose.**"""
-        event = {"event": event_name, "data": payload}
+    def publish(
+        self,
+        event_name: str,
+        payload: dict[str, Any],
+        *,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Append and schedule broadcast without awaiting on the request path."""
+        self._seq += 1
+        event: dict[str, Any] = {
+            "stream_id": self.stream_id,
+            "seq": self._seq,
+            "event": event_name,
+            "data": _without_secrets(payload),
+            "ts": time.time(),
+            "replayed": False,
+        }
+        if request_id is not None:
+            event["request_id"] = request_id
         self._recent.append(event)
-        if not self._clients:
-            return
-        with contextlib.suppress(RuntimeError):  # no running loop, e.g. in a sync test
-            asyncio.get_running_loop().create_task(self._broadcast(event))
+        if self._clients:
+            with contextlib.suppress(RuntimeError):
+                asyncio.get_running_loop().create_task(self._broadcast(event))
+        return event
+
+    def recent(self, *, after: int = 0, stream_id: str | None = None) -> list[dict[str, Any]]:
+        cursor = after if stream_id in (None, self.stream_id) else 0
+        return [
+            {**event, "replayed": True}
+            for event in self._recent
+            if cast(int, event["seq"]) > cursor
+        ]
+
+    def snapshot(self, *, after: int = 0, stream_id: str | None = None) -> dict[str, Any]:
+        return {
+            "stream_id": self.stream_id,
+            "latest_seq": self._seq,
+            "events": self.recent(after=after, stream_id=stream_id),
+        }
 
     async def _broadcast(self, event: dict[str, Any]) -> None:
-        text = json.dumps(event)
         dead: list[WebSocket] = []
         for client in list(self._clients):
             try:
-                await client.send_text(text)
+                await client.send_json(event)
             except Exception:
                 dead.append(client)
         for client in dead:
@@ -87,19 +124,181 @@ class ConsoleHub:
         return len(self._clients)
 
 
+class ConsoleSource(Protocol):
+    def status(self) -> dict[str, Any]: ...
+
+    def decision(self, decision_id: str) -> dict[str, Any]: ...
+
+    def holds(self) -> list[dict[str, Any]]: ...
+
+    def ledger_summary(self) -> dict[str, Any]: ...
+
+    def artifact(self, name: str) -> Any: ...
+
+
+def _json_object(value: Any) -> dict[str, Any]:
+    if not value:
+        return {}
+    parsed = json.loads(str(value))
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _json_list(value: Any) -> list[Any]:
+    if not value:
+        return []
+    parsed = json.loads(str(value))
+    return parsed if isinstance(parsed, list) else []
+
+
+@dataclass
+class LiveConsoleSource:
+    """Read-only projection over the already-mounted live gateway state."""
+
+    app: Any
+    artifacts_root: Path = ARTIFACTS_ROOT
+
+    def _connection(self) -> Any:
+        return self.app.state.ledger._require_connection()
+
+    def status(self) -> dict[str, Any]:
+        artifact_status = {
+            name: (self.artifacts_root / name).is_file() for name in sorted(ALLOWED_ARTIFACTS)
+        }
+        ledger_stats = self.app.state.ledger.stats()
+        return {
+            "source": "live",
+            "replay": False,
+            "health": {"ok": True, "ledger": ledger_stats},
+            "capabilities": {
+                "direct_stream": {"available": True},
+                "recent_events": {"available": True},
+                "decision_details": {"available": True, "eventually_consistent": True},
+                "holds": {"available": True, "approval_requires_token": True},
+                "artifacts": artifact_status,
+                "economics": {
+                    "available": False,
+                    "reason": "Lane C regret, rework, net-value, and confidence intervals are not produced yet",
+                },
+            },
+        }
+
+    def decision(self, decision_id: str) -> dict[str, Any]:
+        row = self._connection().execute(
+            "SELECT decision_id, request_id, sentence_idx, action, loss_table_json,"
+            " chosen_loss, runner_up, margin, probs_json, why_json, hard_rule,"
+            " policy_version, calib_version, probe_version, inputs_digest, latency_ms"
+            " FROM decisions WHERE decision_id=?",
+            (decision_id,),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="decision is not available yet")
+        record = dict(row)
+        return {
+            "decision_id": record["decision_id"],
+            "request_id": record["request_id"],
+            "sentence_idx": record["sentence_idx"],
+            "action": record["action"],
+            "loss_table": _json_list(record["loss_table_json"]),
+            "chosen_loss": record["chosen_loss"],
+            "runner_up": record["runner_up"],
+            "margin": record["margin"],
+            "probs": _json_object(record["probs_json"]),
+            "why": _json_list(record["why_json"]),
+            "hard_rule": record["hard_rule"],
+            "policy_version": record["policy_version"] or "",
+            "calib_version": record["calib_version"] or "",
+            "probe_version": record["probe_version"] or "",
+            "inputs_digest": record["inputs_digest"] or "",
+            "latency_ms": record["latency_ms"] or 0.0,
+        }
+
+    def holds(self) -> list[dict[str, Any]]:
+        now = time.time()
+        cards: list[dict[str, Any]] = []
+        for raw in self.app.state.ledger.pending_holds():
+            payload = _json_object(raw.get("payload_json"))
+            deadline = raw.get("sla_deadline_ts")
+            cards.append(
+                {
+                    "hold_id": raw["hold_id"],
+                    "request_id": raw["request_id"],
+                    "kind": raw["kind"],
+                    "reason": raw.get("reason") or "review required",
+                    "tool": payload.get("name") or payload.get("tool"),
+                    "sentence_idx": payload.get("sentence_idx"),
+                    "payload": _without_secrets(payload),
+                    "evidence": _json_list(raw.get("evidence_json")),
+                    "flagged_span": raw.get("flagged_span"),
+                    "state": "pending",
+                    "created_ts": raw.get("created_ts"),
+                    "sla_deadline_ts": deadline,
+                    "expired": deadline is not None and float(deadline) <= now,
+                }
+            )
+        return cards
+
+    def ledger_summary(self) -> dict[str, Any]:
+        connection = self._connection()
+        request_count = int(connection.execute("SELECT COUNT(*) FROM requests").fetchone()[0])
+        spend = float(
+            connection.execute("SELECT COALESCE(SUM(inr), 0) FROM spend").fetchone()[0]
+        )
+        action_counts = {
+            str(row[0]): int(row[1])
+            for row in connection.execute(
+                "SELECT action, COUNT(*) FROM decisions GROUP BY action ORDER BY action"
+            )
+        }
+        overheads = sorted(
+            float(row[0])
+            for row in connection.execute(
+                "SELECT overhead_ms FROM requests WHERE overhead_ms IS NOT NULL"
+            )
+        )
+        p95_index = max(0, math.ceil(0.95 * len(overheads)) - 1)
+        overhead_summary = {
+            "mean": statistics.fmean(overheads) if overheads else None,
+            "p95": overheads[p95_index] if overheads else None,
+        }
+        return {
+            "request_count": request_count,
+            "spend_inr": spend,
+            "action_counts": action_counts,
+            "overhead_ms": overhead_summary,
+            "economics": {
+                "available": False,
+                "reason": "Lane C economics have not been produced",
+            },
+        }
+
+    def artifact(self, name: str) -> Any:
+        if name not in ALLOWED_ARTIFACTS:
+            raise HTTPException(status_code=404, detail="artifact is not allowlisted")
+        path = (self.artifacts_root / name).resolve()
+        root = self.artifacts_root.resolve()
+        if not path.is_file() or root not in path.parents or path.suffix != ".json":
+            raise HTTPException(status_code=404, detail="artifact is unavailable")
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=503, detail="artifact could not be read") from exc
+
+
 router = APIRouter(prefix="/console", tags=["console"])
+
+
+def _source(request: Request) -> ConsoleSource:
+    configured = getattr(request.app.state, "console_source", None)
+    return cast(ConsoleSource, configured) if configured is not None else LiveConsoleSource(request.app)
 
 
 @router.websocket("/ws")
 async def console_ws(websocket: WebSocket) -> None:
-    """Push-only. Inbound frames are read solely to detect disconnects."""
     hub: ConsoleHub = websocket.app.state.console_hub
     await hub.connect(websocket)
     try:
         while True:
-            # Nothing inbound is acted on -- see the invariant-2 note in the module
-            # docstring. This await exists to notice the client going away.
-            await websocket.receive_text()
+            await websocket.receive()
     except WebSocketDisconnect:
         pass
     except Exception:
@@ -109,10 +308,35 @@ async def console_ws(websocket: WebSocket) -> None:
 
 
 @router.get("/recent")
-async def recent_events(websocket_free: bool = True) -> dict[str, Any]:
-    """The replay buffer over plain HTTP.
+async def recent_events(
+    request: Request,
+    after: int = Query(default=0, ge=0),
+    stream_id: str | None = None,
+) -> dict[str, Any]:
+    hub: ConsoleHub = request.app.state.console_hub
+    return hub.snapshot(after=after, stream_id=stream_id)
 
-    Here so the console can be built and debugged with `curl` before any websocket code
-    is written, and so a browser with a blocked websocket still has something to render.
-    """
-    return {"events": []}
+
+@router.get("/status")
+async def console_status(request: Request) -> dict[str, Any]:
+    return _source(request).status()
+
+
+@router.get("/decisions/{decision_id}")
+async def decision_detail(decision_id: str, request: Request) -> dict[str, Any]:
+    return _source(request).decision(decision_id)
+
+
+@router.get("/holds")
+async def console_holds(request: Request) -> dict[str, Any]:
+    return {"holds": _source(request).holds()}
+
+
+@router.get("/ledger/summary")
+async def ledger_summary(request: Request) -> dict[str, Any]:
+    return _source(request).ledger_summary()
+
+
+@router.get("/artifacts/{name:path}")
+async def console_artifact(name: str, request: Request) -> Any:
+    return _source(request).artifact(name)

@@ -157,9 +157,33 @@ def test_untrusted_passages_are_excluded_from_the_premise() -> None:
     assert hypothesis == SENTENCE
 
 
+def test_context_premise_cache_is_keyed_by_retrieved_content() -> None:
+    signal = _signal()
+    signal.score(SENTENCE, [POISONED, CLEAN])
+    signal.score("Floating-rate home loans have no prepayment charge.", [POISONED, CLEAN])
+
+    health = signal.health()
+    assert health["context_cache"]["misses"] == 1
+    assert health["context_cache"]["hits"] == 1
+    assert health["context_cache"]["size"] == 1
+    assert len(signal.encoder.calls) == 2
+    assert signal.encoder.calls[0][0] == signal.encoder.calls[1][0]
+
+
+def test_context_premise_cache_separates_trust_labels() -> None:
+    signal = _signal()
+    signal.score(SENTENCE, [CLEAN])
+    signal.score(SENTENCE, [CLEAN.model_copy(update={"provenance": "retrieved_untrusted"})])
+
+    health = signal.health()
+    assert health["context_cache"]["misses"] == 2
+    assert health["context_cache"]["hits"] == 0
+
+
 def test_health_reports_what_is_loaded() -> None:
     health = _signal().health()
     assert health["available"] is True
     assert health["layer"] == 1
     assert health["held_out_auroc"] == 0.94
     assert health["version"] == "probe@test"
+    assert health["context_cache"]["capacity"] == 64

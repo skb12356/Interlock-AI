@@ -35,64 +35,64 @@
   "sweep": [
     {
       "clean_floor": 1e-05,
-      "false_intervention_rate_any": 0.09554140127388536,
+      "false_intervention_rate_any": 0.0,
+      "false_intervention_rate_disruptive": 0.0,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": true,
+      "meets_targets_disruptive_only": true
+    },
+    {
+      "clean_floor": 3e-05,
+      "false_intervention_rate_any": 0.47770700636942676,
       "false_intervention_rate_disruptive": 0.0,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": true
     },
     {
-      "clean_floor": 3e-05,
-      "false_intervention_rate_any": 0.36942675159235666,
-      "false_intervention_rate_disruptive": 0.06369426751592357,
-      "catch_rate": 1.0,
-      "meets_targets_counting_annotation": false,
-      "meets_targets_disruptive_only": false
-    },
-    {
       "clean_floor": 0.0001,
-      "false_intervention_rate_any": 0.5732484076433121,
-      "false_intervention_rate_disruptive": 0.18471337579617833,
+      "false_intervention_rate_any": 0.6369426751592356,
+      "false_intervention_rate_disruptive": 0.1337579617834395,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     },
     {
       "clean_floor": 0.0003,
-      "false_intervention_rate_any": 0.5859872611464968,
-      "false_intervention_rate_disruptive": 0.4140127388535032,
+      "false_intervention_rate_any": 0.6369426751592356,
+      "false_intervention_rate_disruptive": 0.47770700636942676,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     },
     {
       "clean_floor": 0.001,
-      "false_intervention_rate_any": 0.643312101910828,
-      "false_intervention_rate_disruptive": 0.5859872611464968,
+      "false_intervention_rate_any": 0.6815286624203821,
+      "false_intervention_rate_disruptive": 0.6369426751592356,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     },
     {
       "clean_floor": 0.003,
-      "false_intervention_rate_any": 0.643312101910828,
-      "false_intervention_rate_disruptive": 0.643312101910828,
+      "false_intervention_rate_any": 0.6815286624203821,
+      "false_intervention_rate_disruptive": 0.6815286624203821,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     },
     {
       "clean_floor": 0.01,
-      "false_intervention_rate_any": 0.7579617834394905,
-      "false_intervention_rate_disruptive": 0.643312101910828,
+      "false_intervention_rate_any": 0.7707006369426752,
+      "false_intervention_rate_disruptive": 0.6815286624203821,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     },
     {
       "clean_floor": 0.019,
-      "false_intervention_rate_any": 0.910828025477707,
-      "false_intervention_rate_disruptive": 0.643312101910828,
+      "false_intervention_rate_any": 0.8535031847133758,
+      "false_intervention_rate_disruptive": 0.6815286624203821,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
@@ -100,11 +100,11 @@
     {
       "clean_floor": 0.05,
       "false_intervention_rate_any": 1.0,
-      "false_intervention_rate_disruptive": 0.7579617834394905,
+      "false_intervention_rate_disruptive": 0.7707006369426752,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     }
   ],
-  "verdict": "disruptive target achievable below a clean floor of 1e-05; annotation-inclusive target missed at every floor"
+  "verdict": "disruptive target achievable below a clean floor of 3e-05"
 }

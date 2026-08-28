@@ -54,6 +54,7 @@ from interlock.core.sse import (
 from interlock.gate.repair import SentenceRepairer
 from interlock.gate.sentence_gate import CommitGate, Emission
 from interlock.gateway.config import Settings, load_settings
+from interlock.gateway.cache import SemanticCache
 from interlock.gateway.console_ws import ConsoleHub
 from interlock.gateway.console_ws import router as console_router
 from interlock.gateway.governor import Governor
@@ -64,7 +65,7 @@ from interlock.interlock_tools.holds import ToolInterlock
 from interlock.interlock_tools.holds import new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
 from interlock.ledger.writer import Ledger, RequestBatch
-from interlock.retrieval.embedder import load_embedder
+from interlock.retrieval.embedder import embed_query, load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever
 from interlock.risk.calibration import MultiDefectCalibrator
 from interlock.risk.engine import RealRiskEngine, load_conformal
@@ -130,6 +131,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.providers = build_providers(settings, client)
         app.state.risk_engine = _build_risk_engine(settings, policy, canaries)
         app.state.retriever = _open_retriever(settings)
+        app.state.cache_embedder = load_embedder(settings.embedder)
+        app.state.semantic_cache = SemanticCache(
+            policy_version=policy.policy_version,
+            max_stakes_inr=policy.thresholds.buffer_above_impact_inr,
+        )
         app.state.tool_interlock = ToolInterlock(policy=policy, ledger=ledger)
         app.state.governor = Governor(
             # One estimate, one threshold: 'high stakes' means the same thing to the
@@ -174,6 +180,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "ledger": app.state.ledger.stats(),
             "lane_a_deadline_ms": app.state.settings.lane_a_deadline_ms,
             "retrieval": _retrieval_health(app.state.retriever),
+            "cache": app.state.semantic_cache.stats(),
             "governor": app.state.governor.snapshot()["state"],
             "tiers": {
                 name: f"{tier.provider}:{tier.model}"
@@ -293,6 +300,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 code=rule.name,
             )
 
+        cache_lookup = _cache_lookup(app, body, lane) if body.get("stream", False) else None
+        if cache_lookup is not None and cache_lookup.hit and cache_lookup.entry is not None:
+            lane.route_reason = "cache_hit"
+            generator = _cached_stream_response(
+                app=app,
+                body=body,
+                request_id=request_id,
+                trace_id=trace_id,
+                lane=lane,
+                entry=cache_lookup.entry,
+                similarity=cache_lookup.similarity,
+                options=_stream_options(x_interlock_events),
+                started_ms=started_ms,
+            )
+            return StreamingResponse(
+                generator,
+                media_type="text/event-stream",
+                headers={
+                    **_STREAM_HEADERS,
+                    "x-interlock-request-id": request_id,
+                    "x-interlock-trace-id": trace_id,
+                    "x-interlock-stakes-id": lane.stakes_id,
+                    "x-interlock-route-reason": "cache_hit",
+                    "x-interlock-cache": "hit",
+                },
+            )
+
         provider, model = _select_provider(app.state, body, lane.tier)
         upstream_body = {**body, "model": model}
         headers = {
@@ -363,6 +397,84 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 # --------------------------------------------------------------------------- #
 
 
+async def _cached_stream_response(
+    *,
+    app: FastAPI,
+    body: dict[str, Any],
+    request_id: str,
+    trace_id: str,
+    lane: PreflightResult,
+    entry: Any,
+    similarity: float,
+    options: StreamOptions,
+    started_ms: float,
+) -> AsyncIterator[str]:
+    """Serve a safe cache hit while preserving the observable contract."""
+    settings: Settings = app.state.settings
+    ledger: Ledger = app.state.ledger
+    chunk_id = f"chatcmpl-{request_id}"
+
+    stakes_event = StakesEvent(
+        impact_inr=lane.stakes.impact_inr,
+        reversibility=lane.stakes.reversibility,
+        domain=lane.stakes.domain,
+        mode=lane.mode,
+        stakes_id=lane.stakes_id,
+        route_reason="cache_hit",
+        model_served=entry.model,
+    )
+    decision_event = DecisionEvent(
+        decision_id="dec_cache_hit",
+        sentence_idx=-1,
+        action="L0_pass",
+        chosen_loss=0.0,
+        runner_up=None,
+        margin=0.0,
+        counterfactual=None,
+        degraded=False,
+        why=[
+            f"semantic cache hit at similarity {similarity:.3f}",
+            "cached answer previously passed verification",
+        ],
+    )
+
+    _publish_console(app, EVENT_STAKES, stakes_event)
+    _publish_console(app, EVENT_DECISION, decision_event)
+    if options.allows(EVENT_STAKES):
+        yield format_event(EVENT_STAKES, stakes_event)
+    if options.allows(EVENT_DECISION):
+        yield format_event(EVENT_DECISION, decision_event)
+    yield format_data(_chunk(chunk_id, entry.model, entry.answer))
+    yield format_done()
+
+    app.state.risk_engine.disarm(request_id)
+    app.state.governor.observe(monotonic_ms() - started_ms)
+    app.state.latency.record(
+        LatencySample(
+            request_id=request_id,
+            overhead_ms=monotonic_ms() - started_ms,
+            ttft_ms=0.0,
+            by_lane={"lane_a": lane.elapsed_ms},
+            buffered=lane.buffered,
+            tier=lane.tier,
+        )
+    )
+    ledger.record(
+        _batch_from(
+            request_id,
+            trace_id,
+            settings,
+            lane,
+            body,
+            model_served=entry.model,
+            overhead_ms=monotonic_ms() - started_ms,
+            completion_tokens=max(1, len(entry.answer) // 4),
+            finish_reason="cache_hit",
+            cache_hit=True,
+        )
+    )
+
+
 async def _stream_response(
     *,
     app: FastAPI,
@@ -431,6 +543,7 @@ async def _stream_response(
     upstream_started = monotonic_ms()
     ttft_ms = 0.0
     completion_chars = 0
+    answer_parts: list[str] = []
     finish_reason: str | None = None
     completed = False
     capacity_fallback = False
@@ -459,6 +572,8 @@ async def _stream_response(
                         # Withheld, not dropped: replayed below if the interlock clears them.
                         if tool_calls.absorb(event.data):
                             continue
+                        if event.text:
+                            answer_parts.append(event.text)
                         # A chunk we could not parse carries text we cannot segment, verify or
                         # repair. Dropping it would violate "never drop a token", so it is
                         # forwarded raw and unverified -- an honest, narrow gap, and better than
@@ -621,6 +736,15 @@ async def _stream_response(
         yield format_done()
         completed = True
     finally:
+        _store_cache(
+            app=app,
+            question=_last_user_message(original_body),
+            answer="".join(answer_parts).strip(),
+            lane=lane,
+            decisions=gate.decisions,
+            model=model,
+            degraded=lane.degraded or capacity_fallback,
+        )
         upstream_ms = monotonic_ms() - upstream_started
         ledger.record(
             _batch_from(
@@ -743,6 +867,54 @@ def _publish_console(app: FastAPI | None, event_name: str, payload: Any) -> None
         hub.publish(event_name, body)
     except Exception:
         _log.debug("console publish failed for %s", event_name, exc_info=True)
+
+
+def _cache_lookup(app: FastAPI, body: dict[str, Any], lane: PreflightResult) -> Any | None:
+    """Try the semantic cache, reporting misses in cache stats rather than logs."""
+    question = _last_user_message(body)
+    if not question:
+        return None
+    try:
+        embedding = embed_query(app.state.cache_embedder, question)
+        return app.state.semantic_cache.lookup(
+            question=question,
+            embedding=embedding,
+            retrieved=lane.fragments,
+            stakes_inr=lane.stakes.impact_inr,
+        )
+    except Exception:
+        _log.debug("semantic cache lookup failed", exc_info=True)
+        return None
+
+
+def _store_cache(
+    *,
+    app: FastAPI,
+    question: str,
+    answer: str,
+    lane: PreflightResult,
+    decisions: list[Any],
+    model: str,
+    degraded: bool,
+) -> None:
+    """Store only answers that passed verification unchanged."""
+    if degraded or not question or not answer:
+        return
+    if not decisions or any(decision.action != "L0_pass" for decision in decisions):
+        return
+    try:
+        embedding = embed_query(app.state.cache_embedder, question)
+        app.state.semantic_cache.store(
+            question=question,
+            answer=answer,
+            embedding=embedding,
+            retrieved=lane.fragments,
+            stakes_inr=lane.stakes.impact_inr,
+            action="L0_pass",
+            model=model,
+        )
+    except Exception:
+        _log.debug("semantic cache store failed", exc_info=True)
 
 
 async def _complete_capacity_fallback(

@@ -295,6 +295,36 @@ def test_opting_out_still_delivers_every_token(client: TestClient) -> None:
     assert assembled_text(payloads) == assembled_text(raws)
 
 
+@respx.mock
+def test_a_verified_clean_answer_is_served_from_cache_on_repeat(
+    forcing_client: TestClient,
+) -> None:
+    _, raws = load_fixture("branch_hours")
+    route = respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    context = {
+        "text": "The Andheri East branch is open from 10:00 to 16:00 on working days.",
+        "provenance": "retrieved_verified",
+        "doc_id": "branch#1",
+        "domain": "branch_info",
+    }
+    request = _request(
+        messages=[{"role": "user", "content": "What time does the branch open?"}],
+        interlock={"retrieved": [context]},
+    )
+
+    first = forcing_client.post("/v1/chat/completions", json=request)
+    second = forcing_client.post("/v1/chat/completions", json=request)
+
+    assert first.status_code == 200
+    assert second.headers["x-interlock-cache"] == "hit"
+    assert len(route.calls) == 1
+    _, events = parse_stream(second.text)
+    assert any(
+        name == "interlock.decision" and payload["decision_id"] == "dec_cache_hit"
+        for name, payload in events
+    )
+
+
 # --------------------------------------------------------------------------- #
 # The claim Contract 3 makes, verified against the real SDK
 # --------------------------------------------------------------------------- #

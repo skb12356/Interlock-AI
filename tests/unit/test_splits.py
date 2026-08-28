@@ -154,7 +154,7 @@ def test_the_eval_set_uses_the_split_by_default(chunks: list) -> None:
 
 
 def test_the_report_names_the_documents_on_each_side(chunks: list) -> None:
-    """"Provably disjoint" has to be checkable by a reader, not taken on trust."""
+    """ "Provably disjoint" has to be checkable by a reader, not taken on trust."""
     report = split_corpus(chunks).report()
     assert report["disjoint"] is True
     assert report["calibration_documents"]

@@ -53,16 +53,15 @@ from interlock.core.sse import (
 )
 from interlock.gate.repair import SentenceRepairer
 from interlock.gate.sentence_gate import CommitGate, Emission
-from interlock.gateway.config import Settings, load_settings
 from interlock.gateway.cache import SemanticCache
+from interlock.gateway.config import Settings, load_settings
 from interlock.gateway.console_ws import ConsoleHub
 from interlock.gateway.console_ws import router as console_router
 from interlock.gateway.governor import Governor
 from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.latency import LaneTimer, LatencyRecorder, LatencySample
 from interlock.gateway.providers import Provider, build_providers
-from interlock.interlock_tools.holds import ToolInterlock
-from interlock.interlock_tools.holds import new_resume_token
+from interlock.interlock_tools.holds import ToolInterlock, new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
 from interlock.ledger.writer import Ledger, RequestBatch, SpanEntry
 from interlock.retrieval.embedder import embed_query, load_embedder

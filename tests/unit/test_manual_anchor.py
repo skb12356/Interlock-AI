@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from scripts.build_manual_anchor import build_labels, import_labels, summary, write_jsonl
+
 from interlock.ledger.writer import connect
 
 

@@ -1,0 +1,1486 @@
+{
+  "started_at": "2026-08-28T19:46:09Z",
+  "gateway": "http://127.0.0.1:8080",
+  "console": "http://127.0.0.1:5173",
+  "strict_actions": true,
+  "scenarios": [
+    {
+      "scenario": "clean",
+      "status_code": 200,
+      "request_id": "req_01M14YH0TVX9VMTCYGEQR9NWMB",
+      "data_payloads": [
+        "{\"impact_inr\":50.0,\"reversibility\":\"reversible\",\"domain\":\"branch_info\",\"mode\":\"unbuffered\",\"stakes_id\":\"stk_01REPLAY0000000000CLEAN\",\"route_reason\":\"stakes_low\",\"model_served\":\"qwen3:4b\"}",
+        "{\"sentence_idx\":0,\"name\":\"grounding.unsupported_content\",\"prob\":0.02}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664160,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\\u003cthink\\u003e\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664160,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\\n\\n\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664160,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\\u003c/think\\u003e\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664160,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\\n\\n\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664160,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Bank\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664160,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\" branches\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664160,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\" typically\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\" open\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\" at\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\" \"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"9\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\":\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"0\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"0\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\" AM\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\".\"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":\"stop\"}]}",
+        "{\"decision_id\":\"dec_01REPLAY000000000CLEAN\",\"sentence_idx\":0,\"action\":\"L0_pass\",\"chosen_loss\":1.3,\"runner_up\":\"L1_annotate\",\"margin\":3.91,\"counterfactual\":null,\"hard_rule\":null,\"degraded\":false,\"loss_table\":[{\"action\":\"L0_pass\",\"residual_harm\":0.94,\"nuisance\":0.23,\"compute\":0.03,\"latency\":0.1,\"total\":1.3,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L1_annotate\",\"residual_harm\":3.59,\"nuisance\":0.9,\"compute\":0.1,\"latency\":0.4,\"total\":4.99,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L2_repair\",\"residual_harm\":1.58,\"nuisance\":0.39,\"compute\":0.04,\"latency\":0.18,\"total\":2.19,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L3_reroute\",\"residual_harm\":3.05,\"nuisance\":0.76,\"compute\":0.08,\"latency\":0.34,\"total\":4.23,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L4_hold\",\"residual_harm\":2.14,\"nuisance\":0.53,\"compute\":0.06,\"latency\":0.24,\"total\":2.97,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L5_block\",\"residual_harm\":2.61,\"nuisance\":0.65,\"compute\":0.07,\"latency\":0.29,\"total\":3.63,\"available\":true,\"unavailable_reason\":null}]}",
+        "[DONE]"
+      ],
+      "events": [
+        {
+          "event": "interlock.stakes",
+          "data": {
+            "impact_inr": 50.0,
+            "reversibility": "reversible",
+            "domain": "branch_info",
+            "mode": "unbuffered",
+            "stakes_id": "stk_01M14YH0TVS4K67FPF1DYFKAZE",
+            "route_reason": "stakes_low",
+            "model_served": "qwen3:4b"
+          }
+        },
+        {
+          "event": "interlock.decision",
+          "data": {
+            "decision_id": "dec_01M14YH1QGT1EWGYHYWZJZY6AE",
+            "sentence_idx": 0,
+            "action": "L0_pass",
+            "chosen_loss": 0.0,
+            "runner_up": "L1_annotate",
+            "margin": 0.502,
+            "counterfactual": null,
+            "hard_rule": null,
+            "degraded": false,
+            "loss_table": [
+              {
+                "action": "L0_pass",
+                "residual_harm": 0.0,
+                "nuisance": 0.0,
+                "compute": 0.0,
+                "latency": 0.0,
+                "total": 0.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L1_annotate",
+                "residual_harm": 0.0,
+                "nuisance": 0.5,
+                "compute": 0.0,
+                "latency": 0.002,
+                "total": 0.502,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L2_repair",
+                "residual_harm": 0.0,
+                "nuisance": 2.0,
+                "compute": 0.072,
+                "latency": 5.4816,
+                "total": 7.5536,
+                "available": false,
+                "unavailable_reason": "already_emitted"
+              },
+              {
+                "action": "L3_reroute",
+                "residual_harm": 0.0,
+                "nuisance": 4.0,
+                "compute": 0.5399999999999999,
+                "latency": 12.287600000000001,
+                "total": 16.8276,
+                "available": false,
+                "unavailable_reason": "already_emitted"
+              },
+              {
+                "action": "L4_hold",
+                "residual_harm": 0.0,
+                "nuisance": 220.0,
+                "compute": 220.0,
+                "latency": 96.0,
+                "total": 536.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L5_block",
+                "residual_harm": 0.0,
+                "nuisance": 1500.0,
+                "compute": 220.0,
+                "latency": 0.0,
+                "total": 1720.0,
+                "available": false,
+                "unavailable_reason": "already_emitted"
+              }
+            ],
+            "probs": {},
+            "why": [
+              "stakes: branch_info at Rs.50 (reversible)",
+              "L0_pass costs Rs.0.00 (harm 0.00 + nuisance 0.00 + compute 0.00 + latency 0.00)",
+              "next best L1_annotate at Rs.0.50 (margin Rs.0.50)"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "scene1",
+      "status_code": 200,
+      "request_id": "req_01M14YH1QJHWYXK3TQD0ZV58VW",
+      "data_payloads": [
+        "[DONE]"
+      ],
+      "events": [
+        {
+          "event": "interlock.stakes",
+          "data": {
+            "impact_inr": 40000.0,
+            "reversibility": "costly",
+            "domain": "loan_terms",
+            "mode": "buffered",
+            "stakes_id": "stk_01M14YH1QJA7DX50XXHEH29T9A",
+            "route_reason": "stakes_high",
+            "model_served": "qwen3:8b"
+          }
+        },
+        {
+          "event": "interlock.decision",
+          "data": {
+            "decision_id": "dec_01M14YH345NV3463SN3VY3N69Z",
+            "sentence_idx": 0,
+            "action": "L5_block",
+            "chosen_loss": 370.0,
+            "runner_up": "L4_hold",
+            "margin": 1768.0000000000018,
+            "counterfactual": "Yes, prepaying your home loan may attract a penalty, depending on the terms of your loan agreement.",
+            "hard_rule": null,
+            "degraded": false,
+            "loss_table": [
+              {
+                "action": "L0_pass",
+                "residual_harm": 90000.0,
+                "nuisance": 0.0,
+                "compute": 0.0,
+                "latency": 0.0,
+                "total": 90000.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L1_annotate",
+                "residual_harm": 72000.0,
+                "nuisance": 0.04999999999999999,
+                "compute": 0.0,
+                "latency": 0.002,
+                "total": 72000.052,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L2_repair",
+                "residual_harm": 17999.999999999996,
+                "nuisance": 0.19999999999999996,
+                "compute": 0.072,
+                "latency": 5.4816,
+                "total": 18005.753599999996,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L3_reroute",
+                "residual_harm": 27000.000000000004,
+                "nuisance": 0.3999999999999999,
+                "compute": 0.5399999999999999,
+                "latency": 12.287600000000001,
+                "total": 27013.227600000006,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L4_hold",
+                "residual_harm": 1800.0000000000016,
+                "nuisance": 21.999999999999996,
+                "compute": 220.0,
+                "latency": 96.0,
+                "total": 2138.000000000002,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L5_block",
+                "residual_harm": 0.0,
+                "nuisance": 149.99999999999997,
+                "compute": 220.0,
+                "latency": 0.0,
+                "total": 370.0,
+                "available": true,
+                "unavailable_reason": null
+              }
+            ],
+            "probs": {
+              "ungrounded": 0.9
+            },
+            "why": [
+              "forced by x-interlock-force: ungrounded@0",
+              "stakes: loan_terms at Rs.40,000 (costly)",
+              "P(ungrounded) = 0.90",
+              "L5_block costs Rs.370.00 (harm 0.00 + nuisance 150.00 + compute 220.00 + latency 0.00)",
+              "next best L4_hold at Rs.2,138.00 (margin Rs.1,768.00)"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "held",
+      "status_code": 200,
+      "request_id": "req_01M14YH3M5DTTT7TGZ17B1J0DV",
+      "data_payloads": [
+        "{\"id\":\"chatcmpl-req_01M14YH3M5DTTT7TGZ17B1J0DV\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"2. You may need to submit a prepayment request form and provide proof of funds. \"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-req_01M14YH3M5DTTT7TGZ17B1J0DV\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"3. The lender will review your application and confirm the remaining loan balance. \"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-req_01M14YH3M5DTTT7TGZ17B1J0DV\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"4. Once approved, the prepayment amount is transferred to the lender, reducing your loan balance. \"},\"finish_reason\":null}]}",
+        "[DONE]"
+      ],
+      "events": [
+        {
+          "event": "interlock.stakes",
+          "data": {
+            "impact_inr": 12000.0,
+            "reversibility": "costly",
+            "domain": "claims",
+            "mode": "buffered",
+            "stakes_id": "stk_01M14YH3M6QZAE5DW48FQPW6AS",
+            "route_reason": "preflight_flag",
+            "model_served": "qwen3:8b"
+          }
+        },
+        {
+          "event": "interlock.decision",
+          "data": {
+            "decision_id": "dec_01M14YH4TJEGSFS26T4NVE7384",
+            "sentence_idx": 0,
+            "action": "L4_hold",
+            "chosen_loss": 1148.0000000000007,
+            "runner_up": null,
+            "margin": 0.0,
+            "counterfactual": "1. To initiate a home loan prepayment, contact your lender to discuss the options and requirements.",
+            "hard_rule": "untrusted_irreversible_tool",
+            "degraded": false,
+            "loss_table": [
+              {
+                "action": "L0_pass",
+                "residual_harm": 81000.0,
+                "nuisance": 0.0,
+                "compute": 0.0,
+                "latency": 0.0,
+                "total": 81000.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L1_annotate",
+                "residual_harm": 81000.0,
+                "nuisance": 0.04999999999999999,
+                "compute": 0.0,
+                "latency": 0.002,
+                "total": 81000.052,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L2_repair",
+                "residual_harm": 81000.0,
+                "nuisance": 0.19999999999999996,
+                "compute": 0.072,
+                "latency": 5.4816,
+                "total": 81005.7536,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L3_reroute",
+                "residual_harm": 81000.0,
+                "nuisance": 0.3999999999999999,
+                "compute": 0.5399999999999999,
+                "latency": 12.287600000000001,
+                "total": 81013.22759999998,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L4_hold",
+                "residual_harm": 810.0000000000007,
+                "nuisance": 21.999999999999996,
+                "compute": 220.0,
+                "latency": 96.0,
+                "total": 1148.0000000000007,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L5_block",
+                "residual_harm": 0.0,
+                "nuisance": 149.99999999999997,
+                "compute": 220.0,
+                "latency": 0.0,
+                "total": 370.0,
+                "available": true,
+                "unavailable_reason": null
+              }
+            ],
+            "probs": {
+              "unsafe_action": 0.9
+            },
+            "why": [
+              "forced by x-interlock-force: unsafe_action@0",
+              "hard rule: irreversible action x untrusted provenance"
+            ]
+          }
+        },
+        {
+          "event": "interlock.decision",
+          "data": {
+            "decision_id": "dec_01M14YH5PD97HCK7NTB611RF3D",
+            "sentence_idx": 1,
+            "action": "L0_pass",
+            "chosen_loss": 0.0,
+            "runner_up": "L1_annotate",
+            "margin": 0.502,
+            "counterfactual": null,
+            "hard_rule": null,
+            "degraded": false,
+            "loss_table": [
+              {
+                "action": "L0_pass",
+                "residual_harm": 0.0,
+                "nuisance": 0.0,
+                "compute": 0.0,
+                "latency": 0.0,
+                "total": 0.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L1_annotate",
+                "residual_harm": 0.0,
+                "nuisance": 0.5,
+                "compute": 0.0,
+                "latency": 0.002,
+                "total": 0.502,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L2_repair",
+                "residual_harm": 0.0,
+                "nuisance": 2.0,
+                "compute": 0.072,
+                "latency": 5.4816,
+                "total": 7.5536,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L3_reroute",
+                "residual_harm": 0.0,
+                "nuisance": 4.0,
+                "compute": 0.5399999999999999,
+                "latency": 12.287600000000001,
+                "total": 16.8276,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L4_hold",
+                "residual_harm": 0.0,
+                "nuisance": 220.0,
+                "compute": 220.0,
+                "latency": 96.0,
+                "total": 536.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L5_block",
+                "residual_harm": 0.0,
+                "nuisance": 1500.0,
+                "compute": 220.0,
+                "latency": 0.0,
+                "total": 1720.0,
+                "available": true,
+                "unavailable_reason": null
+              }
+            ],
+            "probs": {},
+            "why": [
+              "stakes: claims at Rs.12,000 (costly)",
+              "L0_pass costs Rs.0.00 (harm 0.00 + nuisance 0.00 + compute 0.00 + latency 0.00)",
+              "next best L1_annotate at Rs.0.50 (margin Rs.0.50)"
+            ]
+          }
+        },
+        {
+          "event": "interlock.decision",
+          "data": {
+            "decision_id": "dec_01M14YH6DRPZ8Y2ZMGEE0Y1W4B",
+            "sentence_idx": 2,
+            "action": "L0_pass",
+            "chosen_loss": 0.0,
+            "runner_up": "L1_annotate",
+            "margin": 0.502,
+            "counterfactual": null,
+            "hard_rule": null,
+            "degraded": false,
+            "loss_table": [
+              {
+                "action": "L0_pass",
+                "residual_harm": 0.0,
+                "nuisance": 0.0,
+                "compute": 0.0,
+                "latency": 0.0,
+                "total": 0.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L1_annotate",
+                "residual_harm": 0.0,
+                "nuisance": 0.5,
+                "compute": 0.0,
+                "latency": 0.002,
+                "total": 0.502,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L2_repair",
+                "residual_harm": 0.0,
+                "nuisance": 2.0,
+                "compute": 0.072,
+                "latency": 5.4816,
+                "total": 7.5536,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L3_reroute",
+                "residual_harm": 0.0,
+                "nuisance": 4.0,
+                "compute": 0.5399999999999999,
+                "latency": 12.287600000000001,
+                "total": 16.8276,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L4_hold",
+                "residual_harm": 0.0,
+                "nuisance": 220.0,
+                "compute": 220.0,
+                "latency": 96.0,
+                "total": 536.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L5_block",
+                "residual_harm": 0.0,
+                "nuisance": 1500.0,
+                "compute": 220.0,
+                "latency": 0.0,
+                "total": 1720.0,
+                "available": true,
+                "unavailable_reason": null
+              }
+            ],
+            "probs": {},
+            "why": [
+              "stakes: claims at Rs.12,000 (costly)",
+              "L0_pass costs Rs.0.00 (harm 0.00 + nuisance 0.00 + compute 0.00 + latency 0.00)",
+              "next best L1_annotate at Rs.0.50 (margin Rs.0.50)"
+            ]
+          }
+        },
+        {
+          "event": "interlock.decision",
+          "data": {
+            "decision_id": "dec_01M14YH7CGPG6Q6KEV1KBP5Y54",
+            "sentence_idx": 3,
+            "action": "L0_pass",
+            "chosen_loss": 0.0,
+            "runner_up": "L1_annotate",
+            "margin": 0.502,
+            "counterfactual": null,
+            "hard_rule": null,
+            "degraded": false,
+            "loss_table": [
+              {
+                "action": "L0_pass",
+                "residual_harm": 0.0,
+                "nuisance": 0.0,
+                "compute": 0.0,
+                "latency": 0.0,
+                "total": 0.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L1_annotate",
+                "residual_harm": 0.0,
+                "nuisance": 0.5,
+                "compute": 0.0,
+                "latency": 0.002,
+                "total": 0.502,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L2_repair",
+                "residual_harm": 0.0,
+                "nuisance": 2.0,
+                "compute": 0.072,
+                "latency": 5.4816,
+                "total": 7.5536,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L3_reroute",
+                "residual_harm": 0.0,
+                "nuisance": 4.0,
+                "compute": 0.5399999999999999,
+                "latency": 12.287600000000001,
+                "total": 16.8276,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L4_hold",
+                "residual_harm": 0.0,
+                "nuisance": 220.0,
+                "compute": 220.0,
+                "latency": 96.0,
+                "total": 536.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L5_block",
+                "residual_harm": 0.0,
+                "nuisance": 1500.0,
+                "compute": 220.0,
+                "latency": 0.0,
+                "total": 1720.0,
+                "available": true,
+                "unavailable_reason": null
+              }
+            ],
+            "probs": {},
+            "why": [
+              "stakes: claims at Rs.12,000 (costly)",
+              "L0_pass costs Rs.0.00 (harm 0.00 + nuisance 0.00 + compute 0.00 + latency 0.00)",
+              "next best L1_annotate at Rs.0.50 (margin Rs.0.50)"
+            ]
+          }
+        },
+        {
+          "event": "interlock.hold",
+          "data": {
+            "hold_id": "hld_01M14YH7FDV9ZQVS36XZRG0ATP",
+            "kind": "response",
+            "reason": "untrusted_irreversible_tool",
+            "tool": null,
+            "sentence_idx": null,
+            "resume_token": "<present>"
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "blocked",
+      "status_code": 200,
+      "request_id": "req_01M14YH7FJSG50S80K7XAJK5V9",
+      "data_payloads": [
+        "[DONE]"
+      ],
+      "events": [
+        {
+          "event": "interlock.stakes",
+          "data": {
+            "impact_inr": 36000.0,
+            "reversibility": "costly",
+            "domain": "claims",
+            "mode": "buffered",
+            "stakes_id": "stk_01M14YH7FNK20R0WKNQC1JT5KR",
+            "route_reason": "stakes_high",
+            "model_served": "qwen3:8b"
+          }
+        },
+        {
+          "event": "interlock.decision",
+          "data": {
+            "decision_id": "dec_01M14YH8BNWQHM2DPYJRDK0MY5",
+            "sentence_idx": 0,
+            "action": "L5_block",
+            "chosen_loss": 370.0,
+            "runner_up": null,
+            "margin": 0.0,
+            "counterfactual": "Bank branches typically open at 9:00 AM.",
+            "hard_rule": "canary_leak",
+            "degraded": false,
+            "loss_table": [
+              {
+                "action": "L0_pass",
+                "residual_harm": 810000.0,
+                "nuisance": 0.0,
+                "compute": 0.0,
+                "latency": 0.0,
+                "total": 810000.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L1_annotate",
+                "residual_harm": 810000.0,
+                "nuisance": 0.04999999999999999,
+                "compute": 0.0,
+                "latency": 0.002,
+                "total": 810000.052,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L2_repair",
+                "residual_harm": 810000.0,
+                "nuisance": 0.19999999999999996,
+                "compute": 0.072,
+                "latency": 5.4816,
+                "total": 810005.7536,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L3_reroute",
+                "residual_harm": 810000.0,
+                "nuisance": 0.3999999999999999,
+                "compute": 0.5399999999999999,
+                "latency": 12.287600000000001,
+                "total": 810013.2276000001,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L4_hold",
+                "residual_harm": 810000.0,
+                "nuisance": 21.999999999999996,
+                "compute": 220.0,
+                "latency": 96.0,
+                "total": 810338.0,
+                "available": true,
+                "unavailable_reason": null
+              },
+              {
+                "action": "L5_block",
+                "residual_harm": 0.0,
+                "nuisance": 149.99999999999997,
+                "compute": 220.0,
+                "latency": 0.0,
+                "total": 370.0,
+                "available": true,
+                "unavailable_reason": null
+              }
+            ],
+            "probs": {
+              "canary_leak": 0.9
+            },
+            "why": [
+              "forced by x-interlock-force: canary_leak@0",
+              "hard rule: canary token matched on egress"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "gateway_health": {
+    "ok": true,
+    "service": "gateway",
+    "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+    "risk_engine": {
+      "engine": "stub",
+      "ok": true,
+      "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+      "probe_version": "stub",
+      "calib_version": "stub",
+      "armed_requests": 0
+    },
+    "providers": [
+      "anthropic",
+      "ollama",
+      "openai"
+    ],
+    "ledger": {
+      "written": 0,
+      "dropped": 0,
+      "queued": 0
+    },
+    "lane_a_deadline_ms": 120.0,
+    "retrieval": {
+      "available": true,
+      "chunks": 47,
+      "embedder": "hashing-v1",
+      "semantic": false,
+      "corpus_version": "1",
+      "k": 4
+    },
+    "cache": {
+      "entries": 0,
+      "capacity": 512,
+      "hits": 0,
+      "misses": 0,
+      "hit_rate": 0.0,
+      "miss_reasons": {},
+      "similarity_threshold": 0.95,
+      "max_stakes_inr": 1000.0,
+      "note": "four conjunctive conditions: similarity, context hash, stakes ceiling, and the cached answer having passed verification"
+    },
+    "governor": "normal",
+    "tiers": {
+      "cheap": "ollama:qwen3:4b",
+      "strong": "ollama:qwen3:8b"
+    }
+  },
+  "console_health": {
+    "ok": true,
+    "service": "console",
+    "static_root": "C:\\Users\\saksh\\OneDrive\\Desktop\\Projects\\AIC\\console",
+    "artifacts": true
+  },
+  "console_recent": {
+    "events": [
+      {
+        "event": "interlock.stakes",
+        "data": {
+          "impact_inr": 50.0,
+          "reversibility": "reversible",
+          "domain": "branch_info",
+          "mode": "unbuffered",
+          "stakes_id": "stk_01M14YH0TVS4K67FPF1DYFKAZE",
+          "route_reason": "stakes_low",
+          "model_served": "qwen3:4b"
+        }
+      },
+      {
+        "event": "interlock.decision",
+        "data": {
+          "decision_id": "dec_01M14YH1QGT1EWGYHYWZJZY6AE",
+          "sentence_idx": 0,
+          "action": "L0_pass",
+          "chosen_loss": 0.0,
+          "runner_up": "L1_annotate",
+          "margin": 0.502,
+          "counterfactual": null,
+          "hard_rule": null,
+          "degraded": false,
+          "loss_table": [
+            {
+              "action": "L0_pass",
+              "residual_harm": 0.0,
+              "nuisance": 0.0,
+              "compute": 0.0,
+              "latency": 0.0,
+              "total": 0.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L1_annotate",
+              "residual_harm": 0.0,
+              "nuisance": 0.5,
+              "compute": 0.0,
+              "latency": 0.002,
+              "total": 0.502,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L2_repair",
+              "residual_harm": 0.0,
+              "nuisance": 2.0,
+              "compute": 0.072,
+              "latency": 5.4816,
+              "total": 7.5536,
+              "available": false,
+              "unavailable_reason": "already_emitted"
+            },
+            {
+              "action": "L3_reroute",
+              "residual_harm": 0.0,
+              "nuisance": 4.0,
+              "compute": 0.5399999999999999,
+              "latency": 12.287600000000001,
+              "total": 16.8276,
+              "available": false,
+              "unavailable_reason": "already_emitted"
+            },
+            {
+              "action": "L4_hold",
+              "residual_harm": 0.0,
+              "nuisance": 220.0,
+              "compute": 220.0,
+              "latency": 96.0,
+              "total": 536.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L5_block",
+              "residual_harm": 0.0,
+              "nuisance": 1500.0,
+              "compute": 220.0,
+              "latency": 0.0,
+              "total": 1720.0,
+              "available": false,
+              "unavailable_reason": "already_emitted"
+            }
+          ],
+          "probs": {},
+          "why": [
+            "stakes: branch_info at Rs.50 (reversible)",
+            "L0_pass costs Rs.0.00 (harm 0.00 + nuisance 0.00 + compute 0.00 + latency 0.00)",
+            "next best L1_annotate at Rs.0.50 (margin Rs.0.50)"
+          ]
+        }
+      },
+      {
+        "event": "interlock.stakes",
+        "data": {
+          "impact_inr": 40000.0,
+          "reversibility": "costly",
+          "domain": "loan_terms",
+          "mode": "buffered",
+          "stakes_id": "stk_01M14YH1QJA7DX50XXHEH29T9A",
+          "route_reason": "stakes_high",
+          "model_served": "qwen3:8b"
+        }
+      },
+      {
+        "event": "interlock.decision",
+        "data": {
+          "decision_id": "dec_01M14YH345NV3463SN3VY3N69Z",
+          "sentence_idx": 0,
+          "action": "L5_block",
+          "chosen_loss": 370.0,
+          "runner_up": "L4_hold",
+          "margin": 1768.0000000000018,
+          "counterfactual": "Yes, prepaying your home loan may attract a penalty, depending on the terms of your loan agreement.",
+          "hard_rule": null,
+          "degraded": false,
+          "loss_table": [
+            {
+              "action": "L0_pass",
+              "residual_harm": 90000.0,
+              "nuisance": 0.0,
+              "compute": 0.0,
+              "latency": 0.0,
+              "total": 90000.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L1_annotate",
+              "residual_harm": 72000.0,
+              "nuisance": 0.04999999999999999,
+              "compute": 0.0,
+              "latency": 0.002,
+              "total": 72000.052,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L2_repair",
+              "residual_harm": 17999.999999999996,
+              "nuisance": 0.19999999999999996,
+              "compute": 0.072,
+              "latency": 5.4816,
+              "total": 18005.753599999996,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L3_reroute",
+              "residual_harm": 27000.000000000004,
+              "nuisance": 0.3999999999999999,
+              "compute": 0.5399999999999999,
+              "latency": 12.287600000000001,
+              "total": 27013.227600000006,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L4_hold",
+              "residual_harm": 1800.0000000000016,
+              "nuisance": 21.999999999999996,
+              "compute": 220.0,
+              "latency": 96.0,
+              "total": 2138.000000000002,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L5_block",
+              "residual_harm": 0.0,
+              "nuisance": 149.99999999999997,
+              "compute": 220.0,
+              "latency": 0.0,
+              "total": 370.0,
+              "available": true,
+              "unavailable_reason": null
+            }
+          ],
+          "probs": {
+            "ungrounded": 0.9
+          },
+          "why": [
+            "forced by x-interlock-force: ungrounded@0",
+            "stakes: loan_terms at Rs.40,000 (costly)",
+            "P(ungrounded) = 0.90",
+            "L5_block costs Rs.370.00 (harm 0.00 + nuisance 150.00 + compute 220.00 + latency 0.00)",
+            "next best L4_hold at Rs.2,138.00 (margin Rs.1,768.00)"
+          ]
+        }
+      },
+      {
+        "event": "interlock.stakes",
+        "data": {
+          "impact_inr": 12000.0,
+          "reversibility": "costly",
+          "domain": "claims",
+          "mode": "buffered",
+          "stakes_id": "stk_01M14YH3M6QZAE5DW48FQPW6AS",
+          "route_reason": "preflight_flag",
+          "model_served": "qwen3:8b"
+        }
+      },
+      {
+        "event": "interlock.decision",
+        "data": {
+          "decision_id": "dec_01M14YH4TJEGSFS26T4NVE7384",
+          "sentence_idx": 0,
+          "action": "L4_hold",
+          "chosen_loss": 1148.0000000000007,
+          "runner_up": null,
+          "margin": 0.0,
+          "counterfactual": "1. To initiate a home loan prepayment, contact your lender to discuss the options and requirements.",
+          "hard_rule": "untrusted_irreversible_tool",
+          "degraded": false,
+          "loss_table": [
+            {
+              "action": "L0_pass",
+              "residual_harm": 81000.0,
+              "nuisance": 0.0,
+              "compute": 0.0,
+              "latency": 0.0,
+              "total": 81000.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L1_annotate",
+              "residual_harm": 81000.0,
+              "nuisance": 0.04999999999999999,
+              "compute": 0.0,
+              "latency": 0.002,
+              "total": 81000.052,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L2_repair",
+              "residual_harm": 81000.0,
+              "nuisance": 0.19999999999999996,
+              "compute": 0.072,
+              "latency": 5.4816,
+              "total": 81005.7536,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L3_reroute",
+              "residual_harm": 81000.0,
+              "nuisance": 0.3999999999999999,
+              "compute": 0.5399999999999999,
+              "latency": 12.287600000000001,
+              "total": 81013.22759999998,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L4_hold",
+              "residual_harm": 810.0000000000007,
+              "nuisance": 21.999999999999996,
+              "compute": 220.0,
+              "latency": 96.0,
+              "total": 1148.0000000000007,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L5_block",
+              "residual_harm": 0.0,
+              "nuisance": 149.99999999999997,
+              "compute": 220.0,
+              "latency": 0.0,
+              "total": 370.0,
+              "available": true,
+              "unavailable_reason": null
+            }
+          ],
+          "probs": {
+            "unsafe_action": 0.9
+          },
+          "why": [
+            "forced by x-interlock-force: unsafe_action@0",
+            "hard rule: irreversible action x untrusted provenance"
+          ]
+        }
+      },
+      {
+        "event": "interlock.decision",
+        "data": {
+          "decision_id": "dec_01M14YH5PD97HCK7NTB611RF3D",
+          "sentence_idx": 1,
+          "action": "L0_pass",
+          "chosen_loss": 0.0,
+          "runner_up": "L1_annotate",
+          "margin": 0.502,
+          "counterfactual": null,
+          "hard_rule": null,
+          "degraded": false,
+          "loss_table": [
+            {
+              "action": "L0_pass",
+              "residual_harm": 0.0,
+              "nuisance": 0.0,
+              "compute": 0.0,
+              "latency": 0.0,
+              "total": 0.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L1_annotate",
+              "residual_harm": 0.0,
+              "nuisance": 0.5,
+              "compute": 0.0,
+              "latency": 0.002,
+              "total": 0.502,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L2_repair",
+              "residual_harm": 0.0,
+              "nuisance": 2.0,
+              "compute": 0.072,
+              "latency": 5.4816,
+              "total": 7.5536,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L3_reroute",
+              "residual_harm": 0.0,
+              "nuisance": 4.0,
+              "compute": 0.5399999999999999,
+              "latency": 12.287600000000001,
+              "total": 16.8276,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L4_hold",
+              "residual_harm": 0.0,
+              "nuisance": 220.0,
+              "compute": 220.0,
+              "latency": 96.0,
+              "total": 536.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L5_block",
+              "residual_harm": 0.0,
+              "nuisance": 1500.0,
+              "compute": 220.0,
+              "latency": 0.0,
+              "total": 1720.0,
+              "available": true,
+              "unavailable_reason": null
+            }
+          ],
+          "probs": {},
+          "why": [
+            "stakes: claims at Rs.12,000 (costly)",
+            "L0_pass costs Rs.0.00 (harm 0.00 + nuisance 0.00 + compute 0.00 + latency 0.00)",
+            "next best L1_annotate at Rs.0.50 (margin Rs.0.50)"
+          ]
+        }
+      },
+      {
+        "event": "interlock.decision",
+        "data": {
+          "decision_id": "dec_01M14YH6DRPZ8Y2ZMGEE0Y1W4B",
+          "sentence_idx": 2,
+          "action": "L0_pass",
+          "chosen_loss": 0.0,
+          "runner_up": "L1_annotate",
+          "margin": 0.502,
+          "counterfactual": null,
+          "hard_rule": null,
+          "degraded": false,
+          "loss_table": [
+            {
+              "action": "L0_pass",
+              "residual_harm": 0.0,
+              "nuisance": 0.0,
+              "compute": 0.0,
+              "latency": 0.0,
+              "total": 0.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L1_annotate",
+              "residual_harm": 0.0,
+              "nuisance": 0.5,
+              "compute": 0.0,
+              "latency": 0.002,
+              "total": 0.502,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L2_repair",
+              "residual_harm": 0.0,
+              "nuisance": 2.0,
+              "compute": 0.072,
+              "latency": 5.4816,
+              "total": 7.5536,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L3_reroute",
+              "residual_harm": 0.0,
+              "nuisance": 4.0,
+              "compute": 0.5399999999999999,
+              "latency": 12.287600000000001,
+              "total": 16.8276,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L4_hold",
+              "residual_harm": 0.0,
+              "nuisance": 220.0,
+              "compute": 220.0,
+              "latency": 96.0,
+              "total": 536.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L5_block",
+              "residual_harm": 0.0,
+              "nuisance": 1500.0,
+              "compute": 220.0,
+              "latency": 0.0,
+              "total": 1720.0,
+              "available": true,
+              "unavailable_reason": null
+            }
+          ],
+          "probs": {},
+          "why": [
+            "stakes: claims at Rs.12,000 (costly)",
+            "L0_pass costs Rs.0.00 (harm 0.00 + nuisance 0.00 + compute 0.00 + latency 0.00)",
+            "next best L1_annotate at Rs.0.50 (margin Rs.0.50)"
+          ]
+        }
+      },
+      {
+        "event": "interlock.decision",
+        "data": {
+          "decision_id": "dec_01M14YH7CGPG6Q6KEV1KBP5Y54",
+          "sentence_idx": 3,
+          "action": "L0_pass",
+          "chosen_loss": 0.0,
+          "runner_up": "L1_annotate",
+          "margin": 0.502,
+          "counterfactual": null,
+          "hard_rule": null,
+          "degraded": false,
+          "loss_table": [
+            {
+              "action": "L0_pass",
+              "residual_harm": 0.0,
+              "nuisance": 0.0,
+              "compute": 0.0,
+              "latency": 0.0,
+              "total": 0.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L1_annotate",
+              "residual_harm": 0.0,
+              "nuisance": 0.5,
+              "compute": 0.0,
+              "latency": 0.002,
+              "total": 0.502,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L2_repair",
+              "residual_harm": 0.0,
+              "nuisance": 2.0,
+              "compute": 0.072,
+              "latency": 5.4816,
+              "total": 7.5536,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L3_reroute",
+              "residual_harm": 0.0,
+              "nuisance": 4.0,
+              "compute": 0.5399999999999999,
+              "latency": 12.287600000000001,
+              "total": 16.8276,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L4_hold",
+              "residual_harm": 0.0,
+              "nuisance": 220.0,
+              "compute": 220.0,
+              "latency": 96.0,
+              "total": 536.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L5_block",
+              "residual_harm": 0.0,
+              "nuisance": 1500.0,
+              "compute": 220.0,
+              "latency": 0.0,
+              "total": 1720.0,
+              "available": true,
+              "unavailable_reason": null
+            }
+          ],
+          "probs": {},
+          "why": [
+            "stakes: claims at Rs.12,000 (costly)",
+            "L0_pass costs Rs.0.00 (harm 0.00 + nuisance 0.00 + compute 0.00 + latency 0.00)",
+            "next best L1_annotate at Rs.0.50 (margin Rs.0.50)"
+          ]
+        }
+      },
+      {
+        "event": "interlock.hold",
+        "data": {
+          "hold_id": "hld_01M14YH7FDV9ZQVS36XZRG0ATP",
+          "kind": "response",
+          "reason": "untrusted_irreversible_tool",
+          "tool": null,
+          "sentence_idx": null,
+          "resume_token": "<present>"
+        }
+      },
+      {
+        "event": "interlock.stakes",
+        "data": {
+          "impact_inr": 36000.0,
+          "reversibility": "costly",
+          "domain": "claims",
+          "mode": "buffered",
+          "stakes_id": "stk_01M14YH7FNK20R0WKNQC1JT5KR",
+          "route_reason": "stakes_high",
+          "model_served": "qwen3:8b"
+        }
+      },
+      {
+        "event": "interlock.decision",
+        "data": {
+          "decision_id": "dec_01M14YH8BNWQHM2DPYJRDK0MY5",
+          "sentence_idx": 0,
+          "action": "L5_block",
+          "chosen_loss": 370.0,
+          "runner_up": null,
+          "margin": 0.0,
+          "counterfactual": "Bank branches typically open at 9:00 AM.",
+          "hard_rule": "canary_leak",
+          "degraded": false,
+          "loss_table": [
+            {
+              "action": "L0_pass",
+              "residual_harm": 810000.0,
+              "nuisance": 0.0,
+              "compute": 0.0,
+              "latency": 0.0,
+              "total": 810000.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L1_annotate",
+              "residual_harm": 810000.0,
+              "nuisance": 0.04999999999999999,
+              "compute": 0.0,
+              "latency": 0.002,
+              "total": 810000.052,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L2_repair",
+              "residual_harm": 810000.0,
+              "nuisance": 0.19999999999999996,
+              "compute": 0.072,
+              "latency": 5.4816,
+              "total": 810005.7536,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L3_reroute",
+              "residual_harm": 810000.0,
+              "nuisance": 0.3999999999999999,
+              "compute": 0.5399999999999999,
+              "latency": 12.287600000000001,
+              "total": 810013.2276000001,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L4_hold",
+              "residual_harm": 810000.0,
+              "nuisance": 21.999999999999996,
+              "compute": 220.0,
+              "latency": 96.0,
+              "total": 810338.0,
+              "available": true,
+              "unavailable_reason": null
+            },
+            {
+              "action": "L5_block",
+              "residual_harm": 0.0,
+              "nuisance": 149.99999999999997,
+              "compute": 220.0,
+              "latency": 0.0,
+              "total": 370.0,
+              "available": true,
+              "unavailable_reason": null
+            }
+          ],
+          "probs": {
+            "canary_leak": 0.9
+          },
+          "why": [
+            "forced by x-interlock-force: canary_leak@0",
+            "hard rule: canary token matched on egress"
+          ]
+        }
+      }
+    ]
+  },
+  "holds": {
+    "holds": [
+      {
+        "hold_id": "hld_01M14YH7FDV9ZQVS36XZRG0ATP",
+        "request_id": "req_01M14YH3M5DTTT7TGZ17B1J0DV",
+        "kind": "response",
+        "state": "pending",
+        "reason": "untrusted_irreversible_tool",
+        "created_ts": 1787946376.6853218,
+        "sla_deadline_ts": null,
+        "expired": false
+      }
+    ]
+  },
+  "economics": {
+    "requests": 4,
+    "cache_hits": 0,
+    "upstream_spend_inr": 0.4816,
+    "verification_spend_inr": 0,
+    "verification_cost_ratio": 0.0,
+    "routing_savings_inr": 0.0224,
+    "regret_inr": 0,
+    "regret_samples": 0,
+    "rework_inr": 0,
+    "rework_by_kind": [],
+    "net_value_inr": 0.0224,
+    "spend_by_component": [],
+    "price_book": {
+      "priced_models": [
+        "claude-haiku-4-5",
+        "claude-sonnet-4",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "qwen3:4b",
+        "qwen3:8b"
+      ],
+      "imputed_models": [
+        "qwen3:4b",
+        "qwen3:8b"
+      ],
+      "unknown_models": {},
+      "fallback_basis": "UNPRICED MODEL -- billed at the local strong tier's rate as a placeholder"
+    },
+    "notes": [
+      "no spend rows yet; upstream spend is imputed from request token counts",
+      "no shadow runs yet; regret is unmeasured, not zero",
+      "no rework edges yet; avoided rework is unmeasured, not zero",
+      "no cache hit has been measured, so no cache saving is claimed"
+    ]
+  },
+  "lanec": {
+    "n_pairs": 0,
+    "by_axis": {},
+    "e_value": {
+      "n": 0,
+      "mu0": 0.05,
+      "alpha": 0.05,
+      "observed_rate": 0.0,
+      "e_value": 1.0,
+      "running_max_e": 1.0,
+      "alert_threshold": 20.0,
+      "alerted": false,
+      "always_valid_p": 1.0,
+      "notes": [
+        "only 0 observations -- below the 10-sample warm-up, so no bets have been placed and e is still exactly 1"
+      ]
+    },
+    "series": {
+      "t": [],
+      "e_value": [],
+      "running_max_e": [],
+      "p_value": [],
+      "alert_line": []
+    },
+    "notes": [
+      "no fairness pairs recorded yet; Lane C projection has no live samples",
+      "only 0 observations -- below the 10-sample warm-up, so no bets have been placed and e is still exactly 1"
+    ]
+  }
+}

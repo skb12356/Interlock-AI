@@ -37,8 +37,8 @@ from interlock.core.types import Decision, SignalReading
 __all__ = [
     "Ledger",
     "RequestBatch",
-    "SpendEntry",
     "SpanEntry",
+    "SpendEntry",
     "apply_migrations",
     "connect",
 ]

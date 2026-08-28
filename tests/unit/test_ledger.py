@@ -25,8 +25,8 @@ from interlock.core.types import Decision, LossRow, SignalReading
 from interlock.ledger.writer import (
     Ledger,
     RequestBatch,
-    SpendEntry,
     SpanEntry,
+    SpendEntry,
     apply_migrations,
     connect,
 )

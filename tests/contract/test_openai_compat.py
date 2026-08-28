@@ -617,6 +617,18 @@ def test_decisions_reach_the_ledger(client: TestClient) -> None:
 
 
 @respx.mock
+def test_a_request_writes_an_opentelemetry_span(client: TestClient) -> None:
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    client.post("/v1/chat/completions", json=_request())
+    rows = _wait_for_rows(client, "SELECT name, attributes_json FROM spans")
+    assert rows[0]["name"] == "interlock.request"
+    attrs = json.loads(rows[0]["attributes_json"])
+    assert attrs["gen_ai.system"] == "interlock"
+    assert attrs["interlock.stakes_id"].startswith("stk_")
+
+
+@respx.mock
 def test_response_hold_stream_event_includes_the_resume_token(
     forcing_client: TestClient,
 ) -> None:

@@ -64,7 +64,7 @@ from interlock.gateway.providers import Provider, build_providers
 from interlock.interlock_tools.holds import ToolInterlock
 from interlock.interlock_tools.holds import new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
-from interlock.ledger.writer import Ledger, RequestBatch
+from interlock.ledger.writer import Ledger, RequestBatch, SpanEntry
 from interlock.retrieval.embedder import embed_query, load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever
 from interlock.risk.calibration import MultiDefectCalibrator
@@ -1067,6 +1067,33 @@ def _batch_from(
     )
     for key, value in overrides.items():
         setattr(batch, key, value)
+    if not batch.spans:
+        finish = batch.ts + max(batch.overhead_ms, 0.0) / 1000.0
+        batch.spans.append(
+            SpanEntry(
+                trace_id=trace_id,
+                name="interlock.request",
+                start_ts=batch.ts,
+                end_ts=finish,
+                duration_ms=batch.overhead_ms,
+                status="error" if str(batch.finish_reason or "").endswith("error") else "ok",
+                attributes={
+                    "gen_ai.system": "interlock",
+                    "gen_ai.request.model": batch.model_requested or "",
+                    "gen_ai.response.model": batch.model_served or "",
+                    "gen_ai.usage.prompt_tokens": batch.prompt_tokens,
+                    "gen_ai.usage.completion_tokens": batch.completion_tokens,
+                    "interlock.request_id": request_id,
+                    "interlock.stakes_id": lane.stakes_id,
+                    "interlock.stakes.impact_inr": lane.stakes.impact_inr,
+                    "interlock.stakes.domain": lane.stakes.domain,
+                    "interlock.route_reason": batch.route_reason or "",
+                    "interlock.gate_mode": lane.mode,
+                    "interlock.cache_hit": batch.cache_hit,
+                    "interlock.degraded": batch.degraded,
+                },
+            )
+        )
     return batch
 
 

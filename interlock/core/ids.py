@@ -26,6 +26,7 @@ __all__ = [
     "new_hold_id",
     "new_id",
     "new_request_id",
+    "new_span_id",
     "new_stakes_id",
     "new_tool_call_id",
     "new_trace_id",
@@ -64,6 +65,10 @@ def new_request_id() -> str:
 
 def new_trace_id() -> str:
     return new_id("trc")
+
+
+def new_span_id() -> str:
+    return new_id("spn")
 
 
 def new_decision_id() -> str:

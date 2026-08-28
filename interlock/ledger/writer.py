@@ -31,10 +31,17 @@ from pathlib import Path
 from typing import Any
 
 from interlock.core.clock import wall_time
-from interlock.core.ids import sha256_text
+from interlock.core.ids import new_span_id, sha256_text
 from interlock.core.types import Decision, SignalReading
 
-__all__ = ["Ledger", "RequestBatch", "SpendEntry", "apply_migrations", "connect"]
+__all__ = [
+    "Ledger",
+    "RequestBatch",
+    "SpendEntry",
+    "SpanEntry",
+    "apply_migrations",
+    "connect",
+]
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 
@@ -101,6 +108,21 @@ class SpendEntry:
 
 
 @dataclass(slots=True)
+class SpanEntry:
+    """One trace span exported to SQLite."""
+
+    span_id: str = field(default_factory=new_span_id)
+    trace_id: str = ""
+    parent_span_id: str | None = None
+    name: str = "interlock.request"
+    start_ts: float = field(default_factory=wall_time)
+    end_ts: float | None = None
+    duration_ms: float | None = None
+    status: str = "ok"
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class RequestBatch:
     """Everything about one request, committed in a single transaction."""
 
@@ -134,6 +156,7 @@ class RequestBatch:
     signals: list[SignalReading] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)
     spend: list[SpendEntry] = field(default_factory=list)
+    spans: list[SpanEntry] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -526,6 +549,24 @@ class Ledger:
                         entry.tokens,
                         entry.inr,
                         batch.ts,
+                    ),
+                )
+
+            for span in batch.spans:
+                connection.execute(
+                    "INSERT OR REPLACE INTO spans(span_id, trace_id, parent_span_id, name,"
+                    " start_ts, end_ts, duration_ms, status, attributes_json)"
+                    " VALUES (?,?,?,?,?,?,?,?,?)",
+                    (
+                        span.span_id,
+                        span.trace_id or batch.trace_id,
+                        span.parent_span_id,
+                        span.name,
+                        span.start_ts,
+                        span.end_ts,
+                        span.duration_ms,
+                        span.status,
+                        json.dumps(span.attributes, sort_keys=True),
                     ),
                 )
 

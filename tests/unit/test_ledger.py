@@ -26,6 +26,7 @@ from interlock.ledger.writer import (
     Ledger,
     RequestBatch,
     SpendEntry,
+    SpanEntry,
     apply_migrations,
     connect,
 )
@@ -162,6 +163,25 @@ async def test_signals_decisions_and_spend_commit_together(ledger: Ledger) -> No
     assert connection.execute("SELECT COUNT(*) FROM signals").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM spend").fetchone()[0] == 1
+
+
+async def test_spans_commit_with_the_request(ledger: Ledger) -> None:
+    ledger.record(
+        _batch(
+            spans=[
+                SpanEntry(
+                    trace_id="trc_1",
+                    name="interlock.request",
+                    duration_ms=12.0,
+                    attributes={"interlock.stakes_id": "stk_1"},
+                )
+            ]
+        )
+    )
+    await ledger.flush()
+    row = ledger._require_connection().execute("SELECT * FROM spans").fetchone()
+    assert row["trace_id"] == "trc_1"
+    assert json.loads(row["attributes_json"])["interlock.stakes_id"] == "stk_1"
 
 
 async def test_the_full_loss_table_is_stored(ledger: Ledger) -> None:

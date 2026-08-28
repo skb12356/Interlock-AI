@@ -261,6 +261,148 @@ class Ledger:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def economics_snapshot(self) -> dict[str, Any]:
+        """Read-side economics for the console.
+
+        This is deliberately a ledger method rather than a gateway query. The gateway
+        must not learn SQLite, and a missing measurement must remain visibly missing.
+        """
+        from interlock.ledger.pricing import PriceBook
+
+        connection = self._require_connection()
+        book = PriceBook.default()
+
+        request_rows = connection.execute(
+            "SELECT request_id, model_served, prompt_tokens, completion_tokens, cache_hit "
+            "FROM requests ORDER BY ts"
+        ).fetchall()
+        spend_rows = connection.execute(
+            "SELECT component, model, SUM(tokens) AS tokens, SUM(inr) AS inr "
+            "FROM spend GROUP BY component, model"
+        ).fetchall()
+        shadow_rows = connection.execute(
+            "SELECT inr_saved_if_switched FROM shadow_runs ORDER BY ts"
+        ).fetchall()
+        rework_rows = connection.execute(
+            "SELECT kind, COUNT(*) AS count, SUM(inr_charged) AS inr "
+            "FROM rework_edges GROUP BY kind"
+        ).fetchall()
+
+        actual_modelled = 0.0
+        baseline_strong = 0.0
+        cache_hits = 0
+        for row in request_rows:
+            prompt = int(row["prompt_tokens"] or 0)
+            completion = int(row["completion_tokens"] or 0)
+            actual_modelled += book.cost_inr(
+                row["model_served"], prompt_tokens=prompt, completion_tokens=completion
+            )
+            baseline_strong += book.cost_inr(
+                "qwen3:8b", prompt_tokens=prompt, completion_tokens=completion
+            )
+            cache_hits += int(row["cache_hit"] or 0)
+
+        spend_by_component = [
+            {
+                "component": row["component"],
+                "model": row["model"],
+                "tokens": int(row["tokens"] or 0),
+                "inr": float(row["inr"] or 0.0),
+            }
+            for row in spend_rows
+        ]
+        recorded_upstream = sum(
+            row["inr"] for row in spend_by_component if row["component"] == "upstream"
+        )
+        upstream_spend = recorded_upstream or actual_modelled
+        verification_spend = sum(
+            row["inr"]
+            for row in spend_by_component
+            if row["component"] in {"observer", "verifier", "judge", "repair", "reroute"}
+        )
+        routing_savings = max(0.0, baseline_strong - upstream_spend)
+        regret_values = [float(row["inr_saved_if_switched"] or 0.0) for row in shadow_rows]
+        regret = sum(v for v in regret_values if v > 0.0)
+        rework_by_kind = [
+            {
+                "kind": row["kind"],
+                "count": int(row["count"] or 0),
+                "inr": float(row["inr"] or 0.0),
+            }
+            for row in rework_rows
+        ]
+        rework_total = sum(row["inr"] for row in rework_by_kind)
+        net_value = routing_savings + rework_total - verification_spend - regret
+
+        notes: list[str] = []
+        if not request_rows:
+            notes.append("no requests recorded yet; live economics are unmeasured")
+        if not spend_rows:
+            notes.append("no spend rows yet; upstream spend is imputed from request token counts")
+        if not shadow_rows:
+            notes.append("no shadow runs yet; regret is unmeasured, not zero")
+        if not rework_rows:
+            notes.append("no rework edges yet; avoided rework is unmeasured, not zero")
+        if cache_hits == 0:
+            notes.append("no cache hit has been measured, so no cache saving is claimed")
+
+        return {
+            "requests": len(request_rows),
+            "cache_hits": cache_hits,
+            "upstream_spend_inr": round(upstream_spend, 4),
+            "verification_spend_inr": round(verification_spend, 4),
+            "verification_cost_ratio": (
+                round(verification_spend / upstream_spend, 6) if upstream_spend > 0 else None
+            ),
+            "routing_savings_inr": round(routing_savings, 4),
+            "regret_inr": round(regret, 4),
+            "regret_samples": len(regret_values),
+            "rework_inr": round(rework_total, 4),
+            "rework_by_kind": rework_by_kind,
+            "net_value_inr": round(net_value, 4),
+            "spend_by_component": spend_by_component,
+            "price_book": book.report(),
+            "notes": notes,
+        }
+
+    def lane_c_snapshot(self) -> dict[str, Any]:
+        """Read-side Lane C projection: fairness pairs and the e-value series."""
+        from interlock.lanec.evalues import EValueMonitor
+
+        connection = self._require_connection()
+        rows = connection.execute(
+            "SELECT attribute, base_value, twin_value, delta FROM fairness_pairs ORDER BY ts"
+        ).fetchall()
+
+        monitor = EValueMonitor()
+        by_axis: dict[str, dict[str, int]] = {}
+        for row in rows:
+            axis = str(row["attribute"] or "unknown")
+            disparate = _fairness_row_disparate(row)
+            bucket = by_axis.setdefault(axis, {"n": 0, "disparate": 0})
+            bucket["n"] += 1
+            bucket["disparate"] += int(disparate)
+            monitor.update(1.0 if disparate else 0.0)
+
+        notes: list[str] = []
+        if not rows:
+            notes.append("no fairness pairs recorded yet; Lane C projection has no live samples")
+        report = monitor.report()
+        return {
+            "n_pairs": len(rows),
+            "by_axis": {
+                axis: {
+                    "n": counts["n"],
+                    "disparate": counts["disparate"],
+                    "rate": round(counts["disparate"] / counts["n"], 4) if counts["n"] else 0.0,
+                }
+                for axis, counts in sorted(by_axis.items())
+            },
+            "e_value": report,
+            "series": monitor.chart_series(),
+            "notes": notes + list(report.get("notes", [])),
+        }
+
     # -- internals --------------------------------------------------------- #
 
     def _require_connection(self) -> sqlite3.Connection:
@@ -399,3 +541,13 @@ class Ledger:
             "dropped": self._dropped,
             "queued": self._queue.qsize() if self._queue else 0,
         }
+
+
+def _fairness_row_disparate(row: sqlite3.Row) -> bool:
+    delta = row["delta"]
+    if delta is not None:
+        try:
+            return abs(float(delta)) > 0.0
+        except (TypeError, ValueError):
+            pass
+    return str(row["base_value"] or "") != str(row["twin_value"] or "")

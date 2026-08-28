@@ -14,7 +14,8 @@ $ErrorActionPreference = 'Stop'
 
 $patterns = @(
     '*uvicorn*interlock.gateway*',
-    '*uvicorn*interlock.observer*'
+    '*uvicorn*interlock.observer*',
+    '*uvicorn*interlock.console*'
 )
 
 $stopped = 0

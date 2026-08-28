@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Interlock Console</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Interlock Console</h1>
+          <p id="health">Gateway: checking</p>
+        </div>
+        <div class="toolbar">
+          <input id="gateway-url" aria-label="Gateway URL" value="http://127.0.0.1:8080" />
+          <button id="save-url" title="Save gateway URL">Save</button>
+          <button id="refresh" title="Refresh">Refresh</button>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="pane chat-pane">
+          <div class="pane-head">
+            <h2>Customer Stream</h2>
+            <div class="segmented" role="tablist" aria-label="Scenario">
+              <button class="active" data-scenario="scene1">Scene 1</button>
+              <button data-scenario="held">Scene 2</button>
+              <button data-scenario="blocked">Block</button>
+              <button data-scenario="clean">Clean</button>
+            </div>
+          </div>
+          <div id="transcript" class="transcript" aria-live="polite"></div>
+          <form id="prompt-form" class="composer">
+            <textarea id="prompt" rows="3">When prepaying my floating-rate home loan, what penalty applies?</textarea>
+            <button type="submit">Run</button>
+          </form>
+        </section>
+
+        <section class="pane">
+          <div class="pane-head">
+            <h2>Risk Trail</h2>
+            <span id="client-count" class="pill">ws idle</span>
+          </div>
+          <div id="stakes" class="stakes-row"></div>
+          <div id="events" class="event-list"></div>
+        </section>
+
+        <section class="pane">
+          <div class="pane-head">
+            <h2>Decision</h2>
+            <span id="decision-action" class="pill">none</span>
+          </div>
+          <div id="counterfactual" class="counterfactual"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Residual</th>
+                  <th>Nuisance</th>
+                  <th>Compute</th>
+                  <th>Latency</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="loss-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="pane">
+          <div class="pane-head">
+            <h2>Review Queue</h2>
+            <button id="reload-holds" title="Reload holds">Reload</button>
+          </div>
+          <div id="holds" class="holds"></div>
+        </section>
+
+        <section class="pane wide">
+          <div class="pane-head">
+            <h2>Ledger</h2>
+            <span id="net-value" class="pill">loading</span>
+          </div>
+          <div id="ledger" class="metrics"></div>
+          <canvas id="net-chart" width="900" height="220"></canvas>
+        </section>
+
+        <section class="pane wide">
+          <div class="pane-head">
+            <h2>Lane C</h2>
+            <span id="lane-c-status" class="pill">projection</span>
+          </div>
+          <div class="charts">
+            <canvas id="reliability-chart" width="420" height="220"></canvas>
+            <canvas id="probe-chart" width="420" height="220"></canvas>
+            <canvas id="sensitivity-chart" width="420" height="220"></canvas>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

@@ -40,9 +40,11 @@ from interlock.core.policy import load_policy
 from interlock.core.sse import (
     EVENT_DECISION,
     EVENT_HOLD,
+    EVENT_SIGNAL,
     EVENT_STAKES,
     DecisionEvent,
     HoldEvent,
+    SignalEvent,
     StakesEvent,
     StreamOptions,
     format_data,
@@ -59,6 +61,7 @@ from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.latency import LaneTimer, LatencyRecorder, LatencySample
 from interlock.gateway.providers import Provider, build_providers
 from interlock.interlock_tools.holds import ToolInterlock
+from interlock.interlock_tools.holds import new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
 from interlock.ledger.writer import Ledger, RequestBatch
 from interlock.retrieval.embedder import load_embedder
@@ -192,6 +195,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """What Interlock has given up, and why. Explains; never asks."""
         return app.state.governor.snapshot()
 
+    @app.get("/admin/economics")
+    async def economics() -> dict[str, Any]:
+        """Spend, regret, rework and net value from the live ledger."""
+        return app.state.ledger.economics_snapshot()
+
+    @app.get("/admin/lanec")
+    async def lane_c() -> dict[str, Any]:
+        """Background fairness projection and anytime-valid e-value state."""
+        return app.state.ledger.lane_c_snapshot()
+
     @app.get("/v1/models")
     async def models() -> dict[str, Any]:
         """Advertise the tiers, so an SDK's model list is not empty."""
@@ -294,8 +307,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             try:
                 result = await provider.complete(upstream_body)
             except (UpstreamError, ProviderError) as exc:
-                app.state.risk_engine.disarm(request_id)
-                return _error_from_exception(exc)
+                fallback = await _complete_capacity_fallback(
+                    app=app,
+                    body=body,
+                    provider=provider,
+                    model=model,
+                    lane=lane,
+                    exc=exc,
+                )
+                if fallback is None:
+                    app.state.risk_engine.disarm(request_id)
+                    return _error_from_exception(exc)
+                provider, model, result = fallback
             upstream_ms = monotonic_ms() - upstream_started
             ledger.record(
                 _batch_from(
@@ -392,25 +415,25 @@ async def _stream_response(
 
     chunk_id = f"chatcmpl-{request_id}"
 
+    stakes_event = StakesEvent(
+        impact_inr=lane.stakes.impact_inr,
+        reversibility=lane.stakes.reversibility,
+        domain=lane.stakes.domain,
+        mode=lane.mode,
+        stakes_id=lane.stakes_id,
+        route_reason=lane.route_reason,
+        model_served=model,
+    )
+    _publish_console(app, EVENT_STAKES, stakes_event)
     if options.allows(EVENT_STAKES):
-        yield format_event(
-            EVENT_STAKES,
-            StakesEvent(
-                impact_inr=lane.stakes.impact_inr,
-                reversibility=lane.stakes.reversibility,
-                domain=lane.stakes.domain,
-                mode=lane.mode,
-                stakes_id=lane.stakes_id,
-                route_reason=lane.route_reason,
-                model_served=model,
-            ),
-        )
+        yield format_event(EVENT_STAKES, stakes_event)
 
     upstream_started = monotonic_ms()
     ttft_ms = 0.0
     completion_chars = 0
     finish_reason: str | None = None
     completed = False
+    capacity_fallback = False
 
     # The whole stream sits inside try/finally so the ledger row is written even when
     # the client hangs up mid-stream -- a closed tab, a proxy timeout, a cancelled
@@ -420,30 +443,79 @@ async def _stream_response(
     # stream, and `record` is non-blocking so it is safe to call from there.
     try:
         try:
-            async for event in provider.stream(body):
-                if event.is_done:
+            active_provider = provider
+            active_body = body
+            while True:
+                try:
+                    async for event in active_provider.stream(active_body):
+                        if event.is_done:
+                            break
+                        if ttft_ms == 0.0:
+                            ttft_ms = monotonic_ms() - upstream_started
+                        completion_chars += len(event.text)
+                        if event.data:
+                            for choice in event.data.get("choices", []):
+                                finish_reason = choice.get("finish_reason") or finish_reason
+                        # Withheld, not dropped: replayed below if the interlock clears them.
+                        if tool_calls.absorb(event.data):
+                            continue
+                        # A chunk we could not parse carries text we cannot segment, verify or
+                        # repair. Dropping it would violate "never drop a token", so it is
+                        # forwarded raw and unverified -- an honest, narrow gap, and better than
+                        # silently losing the customer's data. Valid chunks with no content
+                        # (a role-only opener) carry nothing and are simply consumed.
+                        if gate.buffered and event.data is None and event.raw:
+                            yield format_data(event.raw)
+                            continue
+                        for frame in _render(
+                            await gate.push(event.text, raw=event.raw),
+                            options,
+                            chunk_id,
+                            model,
+                            lane,
+                            app=app,
+                        ):
+                            yield frame
                     break
-                if ttft_ms == 0.0:
-                    ttft_ms = monotonic_ms() - upstream_started
-                completion_chars += len(event.text)
-                if event.data:
-                    for choice in event.data.get("choices", []):
-                        finish_reason = choice.get("finish_reason") or finish_reason
-                # Withheld, not dropped: replayed below if the interlock clears them.
-                if tool_calls.absorb(event.data):
+                except (UpstreamError, ProviderError) as exc:
+                    fallback = _stream_capacity_fallback(
+                        app=app,
+                        original_body=original_body,
+                        lane=lane,
+                        provider=active_provider,
+                        model=model,
+                        exc=exc,
+                        already_streamed=bool(completion_chars or ttft_ms),
+                    )
+                    if fallback is None:
+                        raise
+                    active_provider, model, active_body = fallback
+                    gate.repair = SentenceRepairer(
+                        provider=active_provider,
+                        model=model,
+                        risk_engine=engine,
+                        stakes=lane.stakes,
+                        request_id=request_id,
+                        question=_last_user_message(original_body),
+                        retrieved=lane.fragments,
+                    )
+                    capacity_fallback = True
+                    finish_reason = "capacity_fallback"
+                    fallback_event = DecisionEvent(
+                        decision_id="dec_capacity_fallback",
+                        sentence_idx=-1,
+                        action="L0_pass",
+                        chosen_loss=0.0,
+                        degraded=True,
+                        why=[
+                            "strong-tier capacity fallback: retried on the cheap tier "
+                            "after the selected model failed before emitting tokens"
+                        ],
+                    )
+                    _publish_console(app, EVENT_DECISION, fallback_event)
+                    if options.allows(EVENT_DECISION):
+                        yield format_event(EVENT_DECISION, fallback_event)
                     continue
-                # A chunk we could not parse carries text we cannot segment, verify or
-                # repair. Dropping it would violate "never drop a token", so it is
-                # forwarded raw and unverified -- an honest, narrow gap, and better than
-                # silently losing the customer's data. Valid chunks with no content
-                # (a role-only opener) carry nothing and are simply consumed.
-                if gate.buffered and event.data is None and event.raw:
-                    yield format_data(event.raw)
-                    continue
-                for frame in _render(
-                    await gate.push(event.text, raw=event.raw), options, chunk_id, model, lane
-                ):
-                    yield frame
         except (UpstreamError, ProviderError) as exc:
             # Mid-stream failure: the client already has a 200 and some tokens, so the
             # only honest thing left is an in-band error chunk followed by [DONE].
@@ -452,7 +524,7 @@ async def _stream_response(
 
         # Drain the gate: the last buffered sentence is still holding, and abandoning it
         # would silently truncate the answer.
-        for frame in _render(await gate.finish(), options, chunk_id, model, lane):
+        for frame in _render(await gate.finish(), options, chunk_id, model, lane, app=app):
             yield frame
 
         # ---- the tool-call interlock -------------------------------------- #
@@ -466,16 +538,15 @@ async def _stream_response(
             decision, held = await interlock.check(call, lane.fragments, request_id=request_id)
             if held is not None:
                 finish_reason = "tool_call_held"
+                hold_event = HoldEvent(
+                    hold_id=held.hold_id,
+                    kind="tool_call",
+                    reason=decision.reason,
+                    tool=call.name,
+                )
+                _publish_console(app, EVENT_HOLD, hold_event)
                 if options.allows(EVENT_HOLD):
-                    yield format_event(
-                        EVENT_HOLD,
-                        HoldEvent(
-                            hold_id=held.hold_id,
-                            kind="tool_call",
-                            reason=decision.reason,
-                            tool=call.name,
-                        ),
-                    )
+                    yield format_event(EVENT_HOLD, hold_event)
                 released = []
                 break
             released.append(call.call_id)
@@ -512,6 +583,7 @@ async def _stream_response(
         for decision in gate.decisions:
             if decision.action in {"L3_reroute", "L4_hold"}:
                 hold_id = new_hold_id()
+                resume_token = new_resume_token()
                 await ledger.persist_hold(
                     hold_id=hold_id,
                     request_id=request_id,
@@ -519,30 +591,32 @@ async def _stream_response(
                     payload={"action": decision.action, "decision_id": decision.decision_id},
                     evidence=decision.why,
                     reason=decision.hard_rule or decision.action,
+                    resume_token=resume_token,
                 )
+                hold_event = HoldEvent(
+                    hold_id=hold_id,
+                    kind="response",
+                    reason=decision.hard_rule or decision.action,
+                    sentence_idx=None,
+                    resume_token=resume_token,
+                )
+                _publish_console(app, EVENT_HOLD, hold_event)
                 if options.allows(EVENT_HOLD):
-                    yield format_event(
-                        EVENT_HOLD,
-                        HoldEvent(
-                            hold_id=hold_id,
-                            kind="response",
-                            reason=decision.hard_rule or decision.action,
-                        ),
-                    )
+                    yield format_event(EVENT_HOLD, hold_event)
 
         # A degraded Lane A is reported to the console rather than hidden: the reviewer
         # needs to know the answer was checked with fewer detectors than usual.
-        if lane.degraded and options.allows(EVENT_DECISION):
-            yield format_event(
-                EVENT_DECISION,
-                DecisionEvent(
-                    decision_id="dec_degraded",
-                    sentence_idx=-1,
-                    action="L0_pass",
-                    chosen_loss=0.0,
-                    degraded=True,
-                ),
+        if lane.degraded:
+            degraded_event = DecisionEvent(
+                decision_id="dec_degraded",
+                sentence_idx=-1,
+                action="L0_pass",
+                chosen_loss=0.0,
+                degraded=True,
             )
+            _publish_console(app, EVENT_DECISION, degraded_event)
+            if options.allows(EVENT_DECISION):
+                yield format_event(EVENT_DECISION, degraded_event)
 
         yield format_done()
         completed = True
@@ -562,6 +636,7 @@ async def _stream_response(
                 completion_tokens=max(1, completion_chars // 4) if completion_chars else 0,
                 finish_reason=finish_reason or ("stop" if completed else "client_disconnect"),
                 decisions=gate.decisions,
+                degraded=lane.degraded or capacity_fallback,
             )
         )
         engine.disarm(request_id)
@@ -598,6 +673,8 @@ def _render(
     chunk_id: str,
     model: str,
     lane: PreflightResult,
+    *,
+    app: FastAPI | None = None,
 ) -> list[str]:
     """Turn the gate's emissions into SSE frames.
 
@@ -614,30 +691,149 @@ def _render(
         elif emission.kind == "text":
             frames.append(format_data(_chunk(chunk_id, model, emission.text)))
         elif emission.kind == "event" and emission.decision is not None:
-            if not options.allows(EVENT_DECISION):
-                continue
             decision = emission.decision
-            frames.append(
-                format_event(
-                    EVENT_DECISION,
-                    DecisionEvent(
-                        decision_id=decision.decision_id,
-                        sentence_idx=emission.sentence_idx,
-                        action=decision.action,
-                        chosen_loss=decision.chosen_loss,
-                        runner_up=decision.runner_up,
-                        margin=decision.margin,
-                        # What would have shipped. The console renders it in red beside
-                        # what actually did, and it is the line the demo lands on.
-                        counterfactual=(
-                            emission.original if decision.action != "L0_pass" else None
-                        ),
-                        hard_rule=decision.hard_rule,
-                        degraded=lane.degraded,
-                    ),
+            signal_events = [
+                SignalEvent(
+                    sentence_idx=emission.sentence_idx,
+                    name=signal.name,
+                    prob=signal.prob,
                 )
+                for signal in decision.signals
+            ]
+            for signal_event in signal_events:
+                _publish_console(app, EVENT_SIGNAL, signal_event)
+                if options.allows(EVENT_SIGNAL):
+                    frames.append(format_event(EVENT_SIGNAL, signal_event))
+            decision_event = DecisionEvent(
+                decision_id=decision.decision_id,
+                sentence_idx=emission.sentence_idx,
+                action=decision.action,
+                chosen_loss=decision.chosen_loss,
+                runner_up=decision.runner_up,
+                margin=decision.margin,
+                # What would have shipped. The console renders it in red beside
+                # what actually did, and it is the line the demo lands on.
+                counterfactual=(emission.original if decision.action != "L0_pass" else None),
+                hard_rule=decision.hard_rule,
+                degraded=lane.degraded or decision.degraded,
+                loss_table=[row.model_dump() for row in decision.loss_table],
+                probs={str(k): float(v) for k, v in decision.probs.items()},
+                why=list(decision.why),
             )
+            _publish_console(app, EVENT_DECISION, decision_event)
+            if options.allows(EVENT_DECISION):
+                frames.append(format_event(EVENT_DECISION, decision_event))
     return frames
+
+
+def _publish_console(app: FastAPI | None, event_name: str, payload: Any) -> None:
+    """Best-effort fanout to the live console.
+
+    This path must never become a dependency of the stream. Serialization errors,
+    disconnected clients or missing app state are observability failures, not customer
+    request failures.
+    """
+    if app is None:
+        return
+    hub = getattr(app.state, "console_hub", None)
+    if hub is None:
+        return
+    try:
+        body = payload.model_dump(mode="json") if hasattr(payload, "model_dump") else dict(payload)
+        hub.publish(event_name, body)
+    except Exception:
+        _log.debug("console publish failed for %s", event_name, exc_info=True)
+
+
+async def _complete_capacity_fallback(
+    *,
+    app: FastAPI,
+    body: dict[str, Any],
+    provider: Provider,
+    model: str,
+    lane: PreflightResult,
+    exc: Exception,
+) -> tuple[Provider, str, dict[str, Any]] | None:
+    """Retry a non-streaming strong-tier capacity failure on the cheap tier."""
+    fallback = _capacity_fallback_target(
+        app=app,
+        lane=lane,
+        provider=provider,
+        model=model,
+        exc=exc,
+        already_streamed=False,
+    )
+    if fallback is None:
+        return None
+    fallback_provider, fallback_model = fallback
+    result = await fallback_provider.complete({**body, "model": fallback_model, "stream": False})
+    return fallback_provider, fallback_model, result
+
+
+def _stream_capacity_fallback(
+    *,
+    app: FastAPI,
+    original_body: dict[str, Any],
+    lane: PreflightResult,
+    provider: Provider,
+    model: str,
+    exc: Exception,
+    already_streamed: bool,
+) -> tuple[Provider, str, dict[str, Any]] | None:
+    """Retry a streaming strong-tier capacity failure before any model token shipped."""
+    fallback = _capacity_fallback_target(
+        app=app,
+        lane=lane,
+        provider=provider,
+        model=model,
+        exc=exc,
+        already_streamed=already_streamed,
+    )
+    if fallback is None:
+        return None
+    fallback_provider, fallback_model = fallback
+    return fallback_provider, fallback_model, {**original_body, "model": fallback_model, "stream": True}
+
+
+def _capacity_fallback_target(
+    *,
+    app: FastAPI,
+    lane: PreflightResult,
+    provider: Provider,
+    model: str,
+    exc: Exception,
+    already_streamed: bool,
+) -> tuple[Provider, str] | None:
+    """Cheap-tier target for F-021, or None when falling back would be dishonest."""
+    if already_streamed or lane.tier != "strong":
+        return None
+    if not _is_capacity_error(exc):
+        return None
+    settings: Settings = app.state.settings
+    strong = settings.strong_tier
+    cheap = settings.cheap_tier
+    if model != strong.model or cheap.provider not in app.state.providers:
+        return None
+    _log.warning(
+        "strong tier %s failed with capacity-shaped error; retrying visibly on %s",
+        strong.model,
+        cheap.model,
+    )
+    return app.state.providers[cheap.provider], cheap.model
+
+
+def _is_capacity_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(
+        phrase in text
+        for phrase in (
+            "requires more system memory",
+            "out of memory",
+            "insufficient memory",
+            "capacity",
+            "no space left on device",
+        )
+    )
 
 
 def _chunk(chunk_id: str, model: str, text: str) -> str:

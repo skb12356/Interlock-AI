@@ -323,6 +323,66 @@ async def test_resolving_records_who_did_it(ledger: Ledger) -> None:
     assert row["resolved_ts"] is not None
 
 
+async def test_economics_snapshot_reports_missing_measurements(ledger: Ledger) -> None:
+    snapshot = ledger.economics_snapshot()
+    assert snapshot["requests"] == 0
+    assert any("regret is unmeasured" in note for note in snapshot["notes"])
+    assert any("rework edges" in note for note in snapshot["notes"])
+
+
+async def test_economics_snapshot_exposes_net_value(ledger: Ledger) -> None:
+    ledger.record(
+        _batch(
+            prompt_tokens=100,
+            completion_tokens=50,
+            spend=[
+                SpendEntry(component="upstream", model="qwen3:4b", tokens=150, inr=1.0),
+                SpendEntry(component="observer", model="probe", tokens=10, inr=0.1),
+            ],
+        )
+    )
+    await ledger.flush()
+    connection = ledger._require_connection()
+    connection.execute(
+        "INSERT INTO rework_edges(child_request_id, parent_request_id, kind, confidence,"
+        " inr_charged, ts) VALUES ('c','p','retry',0.8,2.0,1.0)"
+    )
+    connection.execute(
+        "INSERT INTO shadow_runs(request_id, cheaper_model, verdict, judged_by,"
+        " inr_saved_if_switched, ts) VALUES ('r','qwen3:4b','parity','risk',0.4,1.0)"
+    )
+    snapshot = ledger.economics_snapshot()
+    assert snapshot["verification_cost_ratio"] == 0.1
+    assert snapshot["regret_inr"] == 0.4
+    assert snapshot["rework_inr"] == 2.0
+    assert "net_value_inr" in snapshot
+
+
+async def test_lane_c_snapshot_computes_e_value_series(ledger: Ledger) -> None:
+    connection = ledger._require_connection()
+    for index in range(12):
+        connection.execute(
+            "INSERT INTO fairness_pairs(pair_id, base_request_id, twin_request_id, attribute,"
+            " decision_field, base_value, twin_value, delta, ts)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                f"pair_{index}",
+                f"base_{index}",
+                f"twin_{index}",
+                "gender",
+                "action",
+                "L0_pass",
+                "L4_hold" if index % 3 == 0 else "L0_pass",
+                1.0 if index % 3 == 0 else 0.0,
+                float(index),
+            ),
+        )
+    snapshot = ledger.lane_c_snapshot()
+    assert snapshot["n_pairs"] == 12
+    assert snapshot["by_axis"]["gender"]["disparate"] == 4
+    assert len(snapshot["series"]["e_value"]) == 12
+
+
 # --------------------------------------------------------------------------- #
 # Contract 5: nothing on the token path writes directly
 # --------------------------------------------------------------------------- #

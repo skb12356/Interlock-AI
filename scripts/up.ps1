@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Start Interlock locally: gateway + observer.
+    Start Interlock locally: gateway + observer + console.
 
 .DESCRIPTION
     Replaces `docker compose up` (deviation D-001: Docker was dropped from this build).
@@ -17,6 +17,7 @@
 param(
     [int]$GatewayPort = 8080,
     [int]$ObserverPort = 8081,
+    [int]$ConsolePort = 5173,
     [int]$TimeoutSeconds = 90,
     [switch]$MockObserver
 )
@@ -41,7 +42,8 @@ $observerApp = if ($MockObserver) {
 
 $services = @(
     @{ Name = 'observer'; App = $observerApp;                  Port = $ObserverPort },
-    @{ Name = 'gateway';  App = 'interlock.gateway.app:app';   Port = $GatewayPort  }
+    @{ Name = 'gateway';  App = 'interlock.gateway.app:app';   Port = $GatewayPort  },
+    @{ Name = 'console';  App = 'interlock.console.app:app';   Port = $ConsolePort  }
 )
 
 function Test-Health {
@@ -100,6 +102,8 @@ if (-not $allHealthy) {
 Write-Host ''
 Write-Host 'Point any OpenAI-compatible client at the gateway:' -ForegroundColor Cyan
 Write-Host '    client = OpenAI(base_url="http://localhost:8080/v1", api_key="local")'
+Write-Host ''
+Write-Host ("Open the console at: http://127.0.0.1:{0}" -f $ConsolePort) -ForegroundColor Cyan
 Write-Host ''
 Write-Host 'Stop with: .\scripts\down.ps1'
 exit 0

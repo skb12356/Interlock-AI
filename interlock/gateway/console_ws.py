@@ -28,7 +28,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 
 __all__ = ["ConsoleHub", "router"]
 
@@ -86,6 +86,10 @@ class ConsoleHub:
     def client_count(self) -> int:
         return len(self._clients)
 
+    def recent(self) -> list[dict[str, Any]]:
+        """Snapshot of the replay buffer for HTTP-only console clients."""
+        return list(self._recent)
+
 
 router = APIRouter(prefix="/console", tags=["console"])
 
@@ -109,10 +113,11 @@ async def console_ws(websocket: WebSocket) -> None:
 
 
 @router.get("/recent")
-async def recent_events(websocket_free: bool = True) -> dict[str, Any]:
+async def recent_events(request: Request) -> dict[str, Any]:
     """The replay buffer over plain HTTP.
 
     Here so the console can be built and debugged with `curl` before any websocket code
     is written, and so a browser with a blocked websocket still has something to render.
     """
-    return {"events": []}
+    hub: ConsoleHub = request.app.state.console_hub
+    return {"events": hub.recent()}

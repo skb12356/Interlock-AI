@@ -272,6 +272,18 @@ def test_a_client_can_opt_out_of_named_events(client: TestClient) -> None:
 
 
 @respx.mock
+def test_opted_out_clients_still_publish_to_console(client: TestClient) -> None:
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    client.post(
+        "/v1/chat/completions", json=_request(), headers={"X-Interlock-Events": "off"}
+    )
+    recent = client.get("/console/recent").json()["events"]
+    assert recent
+    assert recent[0]["event"] == "interlock.stakes"
+
+
+@respx.mock
 def test_opting_out_still_delivers_every_token(client: TestClient) -> None:
     """The escape hatch governs what the client sees, never what the gate does."""
     _, raws = load_fixture("branch_hours")
@@ -492,12 +504,12 @@ def test_buffered_traffic_still_delivers_the_whole_answer(forcing_client: TestCl
 
 
 @respx.mock
-def test_a_forced_defect_produces_a_decision_event(client: TestClient) -> None:
+def test_a_forced_defect_produces_a_decision_event(forcing_client: TestClient) -> None:
     """The Day 1 exit criterion, now end to end: X-Interlock-Force reaches the stub
     engine through the gate and the intervention appears on the wire."""
     _, raws = load_fixture("prepayment_penalty")
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
-    response = client.post(
+    response = forcing_client.post(
         "/v1/chat/completions",
         json=_high_stakes_request(),
         headers={"X-Interlock-Force": "ungrounded@0"},
@@ -509,12 +521,12 @@ def test_a_forced_defect_produces_a_decision_event(client: TestClient) -> None:
 
 
 @respx.mock
-def test_an_intervention_carries_the_counterfactual(client: TestClient) -> None:
+def test_an_intervention_carries_the_counterfactual(forcing_client: TestClient) -> None:
     """'What would have shipped' is the line the demo lands on, so it must be on the
     wire rather than reconstructed by the console."""
     _, raws = load_fixture("prepayment_penalty")
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
-    response = client.post(
+    response = forcing_client.post(
         "/v1/chat/completions",
         json=_high_stakes_request(),
         headers={"X-Interlock-Force": "ungrounded@0"},
@@ -572,3 +584,59 @@ def test_decisions_reach_the_ledger(client: TestClient) -> None:
     assert rows
     assert json.loads(rows[0]["loss_table_json"])
     assert rows[0]["inputs_digest"].startswith("sha256:")
+
+
+@respx.mock
+def test_response_hold_stream_event_includes_the_resume_token(
+    forcing_client: TestClient,
+) -> None:
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    text = forcing_client.post(
+        "/v1/chat/completions",
+        json=_high_stakes_request(),
+        headers={"X-Interlock-Force": "unsafe_action@0"},
+    ).text
+    _, events = parse_stream(text)
+    holds = [payload for name, payload in events if name == "interlock.hold"]
+    assert holds
+    assert holds[0]["kind"] == "response"
+    assert holds[0]["resume_token"]
+    assert "resume_token" not in forcing_client.get("/v1/holds").text
+
+
+@respx.mock
+def test_capacity_failure_on_the_strong_tier_retries_the_cheap_tier(
+    forcing_client: TestClient,
+) -> None:
+    _, raws = load_fixture("short_answer")
+    route = respx.post(UPSTREAM)
+    route.side_effect = [
+        httpx.Response(500, json={"error": "model requires more system memory"}),
+        httpx.Response(200, content=sse_bytes(raws)),
+    ]
+
+    text = forcing_client.post(
+        "/v1/chat/completions", json=_high_stakes_request(model="interlock/auto")
+    ).text
+    payloads, events = parse_stream(text)
+    assert assembled_text(payloads).strip() == "Yes."
+    assert any(
+        name == "interlock.decision" and payload["decision_id"] == "dec_capacity_fallback"
+        for name, payload in events
+    )
+    assert json.loads(route.calls[1].request.content)["model"] == "qwen3:4b"
+
+
+@respx.mock
+def test_capacity_fallback_is_recorded_as_degraded(client: TestClient) -> None:
+    _, raws = load_fixture("short_answer")
+    route = respx.post(UPSTREAM)
+    route.side_effect = [
+        httpx.Response(500, json={"error": "model requires more system memory"}),
+        httpx.Response(200, content=sse_bytes(raws)),
+    ]
+    client.post("/v1/chat/completions", json=_high_stakes_request(model="interlock/auto"))
+    rows = _wait_for_rows(client, "SELECT degraded, model_served FROM requests")
+    assert rows[0]["degraded"] == 1
+    assert rows[0]["model_served"] == "qwen3:4b"

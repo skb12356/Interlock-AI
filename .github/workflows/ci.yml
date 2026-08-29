@@ -35,10 +35,10 @@ jobs:
       # Strict typing on the frozen contract surface. This is the gate that
       # keeps Contract 1 honest across every module that compiles against it.
       - name: Type-check core
-        run: uv run mypy interlock/core
+        run: uv run mypy --strict interlock/core interlock/retrieval interlock/interlock_tools
 
       - name: Tests
-        run: uv run pytest -q --ignore=tests/chaos -m "not slow"
+        run: uv run pytest -q --ignore=tests/chaos -m "not slow" tests console/tests/python
 
   console:
     runs-on: ubuntu-latest
@@ -52,6 +52,17 @@ jobs:
           cache: npm
           cache-dependency-path: console/package-lock.json
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync replay dependencies
+        run: uv sync --group dev
+
       - name: Install console dependencies
         run: npm --prefix console ci
 
@@ -63,3 +74,10 @@ jobs:
 
       - name: Console production build
         run: npm --prefix console run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: console
+
+      - name: Console replay journeys
+        run: npm --prefix console run test:e2e

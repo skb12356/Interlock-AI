@@ -14,6 +14,8 @@ from typing import Any
 
 import yaml
 
+from interlock.core.policy import load_policy
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -79,9 +81,15 @@ def build(output: Path) -> dict[str, Any]:
     ]
     if not reports:
         raise ValueError("no regenerated seed reports found")
-    policy = load_json(REPO_ROOT / "artifacts/eval/report.json")
+    report_policy = load_json(REPO_ROOT / "artifacts/eval/report.json")
+    current_policy = load_policy(REPO_ROOT / "policies/banking.yaml")
+    if report_policy.get("policy_version") != current_policy.policy_version:
+        raise ValueError(
+            "evaluation report policy does not match policies/banking.yaml: "
+            f"{report_policy.get('policy_version')} != {current_policy.policy_version}"
+        )
     payload = {
-        "policy_version": policy["policy_version"],
+        "policy_version": current_policy.policy_version,
         "metrics": metric_table(reports),
         "mechanisms": MECHANISMS,
         "stakes": stakes_table(REPO_ROOT / "policies/banking.yaml"),

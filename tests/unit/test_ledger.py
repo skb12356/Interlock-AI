@@ -405,6 +405,37 @@ async def test_lane_c_snapshot_computes_e_value_series(ledger: Ledger) -> None:
     assert len(snapshot["series"]["e_value"]) == 12
 
 
+async def test_lane_c_pair_writer_persists_observation(ledger: Ledger) -> None:
+    await ledger.persist_fairness_pair(
+        pair_id="pair-imported",
+        base_request_id="base-request",
+        twin_request_id="twin-request",
+        attribute="gender",
+        decision_field="action",
+        base_value="L0_pass",
+        twin_value="L4_hold",
+        delta=1.0,
+    )
+    row = ledger._require_connection().execute(
+        "SELECT attribute, base_value, twin_value, delta FROM fairness_pairs"
+    ).fetchone()
+    assert tuple(row) == ("gender", "L0_pass", "L4_hold", 1.0)
+
+
+async def test_lane_c_pair_writer_rejects_self_pair(ledger: Ledger) -> None:
+    with pytest.raises(ValueError, match="distinct"):
+        await ledger.persist_fairness_pair(
+            pair_id="bad",
+            base_request_id="same",
+            twin_request_id="same",
+            attribute="gender",
+            decision_field="action",
+            base_value="L0_pass",
+            twin_value="L0_pass",
+            delta=0.0,
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Contract 5: nothing on the token path writes directly
 # --------------------------------------------------------------------------- #

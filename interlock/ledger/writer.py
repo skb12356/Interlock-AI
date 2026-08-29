@@ -301,6 +301,46 @@ class Ledger:
                 (request_id, cheaper_model, verdict, judged_by, inr_saved_if_switched, wall_time()),
             )
 
+    async def persist_fairness_pair(
+        self,
+        *,
+        pair_id: str,
+        base_request_id: str,
+        twin_request_id: str,
+        attribute: str,
+        decision_field: str,
+        base_value: str,
+        twin_value: str,
+        delta: float,
+        ts: float | None = None,
+    ) -> None:
+        """Persist one completed Lane C twin observation through the ledger writer."""
+        if not pair_id or not base_request_id or not twin_request_id:
+            raise ValueError("pair and request ids are required")
+        if base_request_id == twin_request_id:
+            raise ValueError("base and twin requests must be distinct")
+        connection = self._require_connection()
+        if self._write_lock is None:
+            raise RuntimeError("ledger write lock is not initialized")
+        async with self._write_lock:
+            await asyncio.to_thread(
+                connection.execute,
+                "INSERT OR REPLACE INTO fairness_pairs(pair_id, base_request_id, twin_request_id,"
+                " attribute, decision_field, base_value, twin_value, delta, ts)"
+                " VALUES (?,?,?,?,?,?,?,?,?)",
+                (
+                    pair_id,
+                    base_request_id,
+                    twin_request_id,
+                    attribute,
+                    decision_field,
+                    base_value,
+                    twin_value,
+                    delta,
+                    wall_time() if ts is None else ts,
+                ),
+            )
+
     def pending_holds(self) -> list[dict[str, Any]]:
         """Every hold still waiting. Read at boot, which is what makes it survive."""
         connection = self._require_connection()

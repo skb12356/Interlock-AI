@@ -53,7 +53,9 @@ without rebuilding the corpus, labels, calibrator and evaluation split.
 Lane C projections are live and exposed, but the current rehearsal database contains no
 fairness pairs. The endpoint correctly reports that no bet has been placed when there
 are too few observations. A fairness claim needs real counterfactual pairs in the ledger,
-not just endpoint availability.
+not just endpoint availability. Completed offline observations can be imported with
+`uv run python scripts/import_fairness_pairs.py pairs.jsonl`; incomplete or self-pairs
+are rejected and writes use the ledger lock.
 
 ## Rehearsal Environment
 

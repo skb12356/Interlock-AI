@@ -26,7 +26,7 @@ test("clean pass keeps its decision evidence and opens the evidence ledger", asy
   await page.getByRole("button", { name: /evidence/i }).click();
   await expect(page.getByRole("region", { name: "Certified guarantee" })).toContainText("0.0%");
   await expect(page.getByRole("region", { name: "Certified guarantee" })).toContainText("100.0% intervention rate");
-  await expect(page.getByText("Unavailable", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Unavailable", { exact: true })).toHaveCount(3);
   await expect(page.getByText("0 observed pairs")).toBeVisible();
   await expect(page.getByText("No observations yet")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("evidence-ledger.png"), fullPage: true });
@@ -60,7 +60,7 @@ test("L4 initiating tab approves a durable secret-free hold", async ({ page, req
   expect(await page.locator("body").textContent()).not.toContain("replay-token-0001");
   expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage }))).not.toContain("replay-token-0001");
 
-  await page.getByRole("button", { name: "Approve and release" }).click();
+  await page.getByRole("button", { name: "Approve hold" }).click();
   await expect(page.getByText("No pending holds")).toBeVisible();
   expect(failures).toEqual([]);
 });

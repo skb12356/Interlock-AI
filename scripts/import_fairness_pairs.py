@@ -54,11 +54,27 @@ def read_rows(path: Path) -> list[dict[str, Any]]:
     return output
 
 
+def is_offline_artifact(path: Path) -> bool:
+    """Return whether a generated fairness report declares itself offline."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    return isinstance(document, dict) and document.get("offline") is True
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="JSONL exported from an offline twin run")
     parser.add_argument("--db", type=Path, default=REPO_ROOT / "data" / "interlock.db")
+    parser.add_argument(
+        "--allow-offline",
+        action="store_true",
+        help="explicitly acknowledge importing an offline report into this ledger",
+    )
     args = parser.parse_args()
+    if is_offline_artifact(args.input) and not args.allow_offline:
+        raise ValueError("offline fairness artifact requires --allow-offline")
     observations = read_rows(args.input)
     ledger = Ledger(args.db)
     await ledger.start()

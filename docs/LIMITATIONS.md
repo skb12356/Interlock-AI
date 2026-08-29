@@ -58,7 +58,7 @@ Lane C projections are live and exposed, but the current rehearsal database cont
 fairness pairs. The endpoint correctly reports that no bet has been placed when there
 are too few observations. A fairness claim needs real counterfactual pairs in the ledger,
 not just endpoint availability. Completed offline observations can be imported with
-`uv run python scripts/import_fairness_pairs.py artifacts/eval/fairness_run.json`; the importer also accepts JSONL. Incomplete or self-pairs
+`uv run python scripts/import_fairness_pairs.py artifacts/eval/fairness_run.json --allow-offline`; the importer also accepts JSONL. The explicit flag is required for an artifact marked offline. Incomplete or self-pairs
 are rejected and writes use the ledger lock.
 
 ## Rehearsal Environment

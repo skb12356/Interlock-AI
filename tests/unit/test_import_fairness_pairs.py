@@ -29,3 +29,5 @@ def test_importer_accepts_fairness_run_object_and_jsonl(tmp_path: Path) -> None:
 
     assert MODULE.read_rows(artifact) == [ROW]
     assert MODULE.read_rows(jsonl) == [ROW]
+    assert MODULE.is_offline_artifact(artifact) is True
+    assert MODULE.is_offline_artifact(jsonl) is False

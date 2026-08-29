@@ -63,11 +63,12 @@ export interface EconomicsProjection {
   available: boolean;
   reason?: string;
   routing_savings_inr?: number;
-  regret_inr?: number;
+  regret_inr?: number | null;
   regret_samples?: number;
-  rework_inr?: number;
-  net_value_inr?: number;
-  net_value_ci_inr?: [number, number];
+  rework_inr?: number | null;
+  rework_samples?: number;
+  net_value_inr?: number | null;
+  net_value_ci_inr?: [number, number] | null;
   net_value_samples?: number;
   upstream_spend_basis?: "recorded" | "imputed" | "unmeasured";
 }

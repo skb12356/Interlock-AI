@@ -467,7 +467,10 @@ class Ledger:
             for row in spend_by_component
             if row["component"] in {"observer", "verifier", "judge", "repair", "reroute"}
         )
-        routing_savings = max(0.0, baseline_strong - upstream_spend)
+        # Keep routing value signed. Clipping a more-expensive route to zero made the
+        # point estimate disagree with request-level contributions and could place a
+        # one-sample estimate outside its own confidence interval.
+        routing_savings = baseline_strong - upstream_spend
         regret_values = [float(row["inr_saved_if_switched"] or 0.0) for row in shadow_rows]
         regret = sum(v for v in regret_values if v > 0.0)
         rework_by_kind = [
@@ -480,6 +483,7 @@ class Ledger:
         ]
         rework_total = sum(row["inr"] for row in rework_by_kind)
         net_value = routing_savings - rework_total - verification_spend - regret
+        measurements_complete = bool(request_rows and shadow_rows and rework_rows)
 
         # Request-level contributions make uncertainty visible. Regret and rework are
         # allocated evenly because their current aggregate rows lack a request join.
@@ -501,7 +505,11 @@ class Ledger:
         if contributions:
             shared_adjustment = (-rework_total - regret) / len(contributions)
             contributions = [value + shared_adjustment for value in contributions]
-        net_ci = bootstrap_ci(contributions, seed=20260829) if contributions else None
+        net_ci = (
+            bootstrap_ci(contributions, seed=20260829)
+            if contributions and measurements_complete
+            else None
+        )
 
         notes: list[str] = []
         if not request_rows:
@@ -530,11 +538,12 @@ class Ledger:
                 round(verification_spend / upstream_spend, 6) if upstream_spend > 0 else None
             ),
             "routing_savings_inr": round(routing_savings, 4),
-            "regret_inr": round(regret, 4),
+            "regret_inr": round(regret, 4) if shadow_rows else None,
             "regret_samples": len(regret_values),
-            "rework_inr": round(rework_total, 4),
+            "rework_inr": round(rework_total, 4) if rework_rows else None,
+            "rework_samples": sum(row["count"] for row in rework_by_kind),
             "rework_by_kind": rework_by_kind,
-            "net_value_inr": round(net_value, 4) if contributions else None,
+            "net_value_inr": round(net_value, 4) if measurements_complete else None,
             "net_value_ci_inr": (
                 [round(net_ci[0], 4), round(net_ci[1], 4)] if net_ci is not None else None
             ),

@@ -51,7 +51,10 @@ class ConsoleHub:
     """Non-blocking fan-out with a bounded, secret-free replay buffer."""
 
     stream_id: str = field(default_factory=lambda: uuid.uuid4().hex)
-    _clients: set[WebSocket] = field(default_factory=set, init=False)
+    _clients: dict[WebSocket, asyncio.Queue[dict[str, Any]]] = field(
+        default_factory=dict, init=False
+    )
+    _workers: dict[WebSocket, asyncio.Task[None]] = field(default_factory=dict, init=False)
     _recent: deque[dict[str, Any]] = field(
         default_factory=lambda: deque(maxlen=REPLAY_BUFFER), init=False
     )
@@ -59,13 +62,17 @@ class ConsoleHub:
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
-        self._clients.add(websocket)
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=REPLAY_BUFFER * 2)
         for event in self.recent():
-            with contextlib.suppress(Exception):
-                await websocket.send_json(event)
+            queue.put_nowait(event)
+        self._clients[websocket] = queue
+        self._workers[websocket] = asyncio.create_task(self._deliver(websocket, queue))
 
     def disconnect(self, websocket: WebSocket) -> None:
-        self._clients.discard(websocket)
+        self._clients.pop(websocket, None)
+        worker = self._workers.pop(websocket, None)
+        if worker is not None and not worker.done():
+            worker.cancel()
 
     def publish(
         self,
@@ -87,9 +94,16 @@ class ConsoleHub:
         if request_id is not None:
             event["request_id"] = request_id
         self._recent.append(event)
-        if self._clients:
-            with contextlib.suppress(RuntimeError):
-                asyncio.get_running_loop().create_task(self._broadcast(event))
+        for websocket, queue in list(self._clients.items()):
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+                # A client that cannot keep up must reconnect and recover from the
+                # bounded replay buffer; silently dropping one envelope would make its
+                # sequence cursor look complete when it is not.
+                self.disconnect(websocket)
+                with contextlib.suppress(RuntimeError):
+                    asyncio.get_running_loop().create_task(websocket.close(code=1013))
         return event
 
     def recent(self, *, after: int = 0, stream_id: str | None = None) -> list[dict[str, Any]]:
@@ -107,19 +121,47 @@ class ConsoleHub:
             "events": self.recent(after=after, stream_id=stream_id),
         }
 
-    async def _broadcast(self, event: dict[str, Any]) -> None:
-        dead: list[WebSocket] = []
-        for client in list(self._clients):
-            try:
-                await client.send_json(event)
-            except Exception:
-                dead.append(client)
-        for client in dead:
-            self._clients.discard(client)
+    async def _deliver(
+        self,
+        websocket: WebSocket,
+        queue: asyncio.Queue[dict[str, Any]],
+    ) -> None:
+        """Serialize replay and live delivery for one client."""
+        try:
+            while True:
+                await websocket.send_json(await queue.get())
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self._clients.pop(websocket, None)
+            self._workers.pop(websocket, None)
 
     @property
     def client_count(self) -> int:
         return len(self._clients)
+
+
+def _economics_capability(economics: dict[str, Any]) -> dict[str, Any]:
+    if int(economics.get("requests", 0)) == 0:
+        return {"available": False, "reason": "no request-level net-value samples are available"}
+    missing: list[str] = []
+    if economics.get("regret_inr") is None:
+        missing.append("regret")
+    if economics.get("rework_inr") is None:
+        missing.append("rework")
+    complete = (
+        int(economics.get("net_value_samples", 0)) > 0
+        and economics.get("net_value_inr") is not None
+        and not missing
+    )
+    if complete:
+        return {"available": True}
+    if missing:
+        return {
+            "available": False,
+            "reason": f"{' and '.join(missing)} measurements are unavailable",
+        }
+    return {"available": False, "reason": "no request-level net-value samples are available"}
 
 
 class ConsoleSource(Protocol):
@@ -166,7 +208,7 @@ class LiveConsoleSource:
         }
         ledger_stats = self.app.state.ledger.stats()
         economics = self.app.state.ledger.economics_snapshot()
-        economics_available = int(economics.get("net_value_samples", 0)) > 0
+        economics_capability = _economics_capability(economics)
         publishers_integrated = bool(
             getattr(self.app.state, "console_publishers_integrated", False)
         )
@@ -190,12 +232,7 @@ class LiveConsoleSource:
                 "holds": {"available": True, "approval_requires_token": True},
                 "artifacts": artifact_status,
                 "economics": {
-                    "available": economics_available,
-                    **(
-                        {}
-                        if economics_available
-                        else {"reason": "no request-level net-value samples are available"}
-                    ),
+                    **economics_capability,
                 },
                 "lane_c": {"available": True},
             },
@@ -282,19 +319,14 @@ class LiveConsoleSource:
             "p95": overheads[p95_index] if overheads else None,
         }
         economics = self.app.state.ledger.economics_snapshot()
-        economics_available = int(economics.get("net_value_samples", 0)) > 0
+        economics_capability = _economics_capability(economics)
         return {
             "request_count": request_count,
             "spend_inr": spend,
             "action_counts": action_counts,
             "overhead_ms": overhead_summary,
             "economics": {
-                "available": economics_available,
-                **(
-                    {}
-                    if economics_available
-                    else {"reason": "no request-level net-value samples are available"}
-                ),
+                **economics_capability,
                 **economics,
             },
         }

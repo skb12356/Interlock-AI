@@ -195,7 +195,7 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
 
         <article className="evidence-card economics-card">
           <header><span className="section-label">Live economics</span></header>
-          {economics?.available && economics.net_value_inr !== undefined ? (
+          {economics?.available && typeof economics.net_value_inr === "number" ? (
             <>
               <div className="economics-hero">
                 <div>
@@ -208,7 +208,7 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
                   </small>
                 </div>
                 <dl>
-                  <div><dt>Routing savings</dt><dd>{money.format(economics.routing_savings_inr ?? 0)}</dd></div>
+                  <div><dt>Routing value</dt><dd>{money.format(economics.routing_savings_inr ?? 0)}</dd></div>
                   <div><dt>Measured regret</dt><dd>{money.format(economics.regret_inr ?? 0)}</dd></div>
                   <div><dt>Attributed rework</dt><dd>{money.format(economics.rework_inr ?? 0)}</dd></div>
                 </dl>

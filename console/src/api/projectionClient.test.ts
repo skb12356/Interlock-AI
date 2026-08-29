@@ -111,6 +111,28 @@ describe("ProjectionConnection", () => {
     connection.stop();
   });
 
+  it("reports unknown projection events instead of silently discarding them", () => {
+    const socket = new FakeSocket();
+    const onDiagnostic = vi.fn();
+    const connection = new ProjectionConnection({
+      onEnvelope: vi.fn(),
+      onDiagnostic,
+      fetcher: vi.fn<typeof fetch>(),
+      createSocket: () => socket,
+    });
+
+    connection.start();
+    socket.onmessage?.(new MessageEvent("message", {
+      data: JSON.stringify({ ...envelope("epoch", 1), event: "interlock.future" }),
+    }));
+
+    expect(onDiagnostic).toHaveBeenCalledWith(
+      "Projection received unsupported event interlock.future",
+    );
+    expect(connection.cursor).toEqual({ streamId: null, lastSeq: 0 });
+    connection.stop();
+  });
+
   it("ignores errors from a socket that was deliberately stopped", () => {
     const socket = new FakeSocket();
     const onDiagnostic = vi.fn();
@@ -172,6 +194,31 @@ describe("ProjectionConnection", () => {
     socket.onopen?.();
     await vi.waitFor(() => expect(onDiagnostic).toHaveBeenCalledWith("Recent projection response was malformed"));
     expect(connection.cursor).toEqual({ streamId: null, lastSeq: 0 });
+    connection.stop();
+  });
+
+  it("reports unknown events returned by recent recovery", async () => {
+    const socket = new FakeSocket();
+    const onDiagnostic = vi.fn();
+    const onEnvelope = vi.fn();
+    const futureEvent = { ...envelope("epoch", 1), event: "interlock.future" };
+    const connection = new ProjectionConnection({
+      onEnvelope,
+      onDiagnostic,
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(JSON.stringify({ stream_id: "epoch", latest_seq: 1, events: [futureEvent] }), { status: 200 }),
+      ),
+      createSocket: () => socket,
+    });
+
+    connection.start();
+    socket.onopen?.();
+    await vi.waitFor(() => expect(onDiagnostic).toHaveBeenCalledWith(
+      "Recent projection contained unsupported event interlock.future",
+    ));
+
+    expect(onEnvelope).not.toHaveBeenCalled();
+    expect(connection.cursor).toEqual({ streamId: "epoch", lastSeq: 1 });
     connection.stop();
   });
 

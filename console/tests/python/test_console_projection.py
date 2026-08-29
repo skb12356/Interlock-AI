@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 from pathlib import Path
@@ -59,6 +60,44 @@ def test_hub_sequences_events_and_redacts_resume_tokens_before_buffering() -> No
     assert first["stream_id"] == "stream-test"
     assert first["request_id"] == "req_1"
     assert "secret" not in json.dumps(hub.recent())
+
+
+@pytest.mark.asyncio
+async def test_hub_delivers_live_events_in_sequence_to_a_slow_client() -> None:
+    """A slow send must not let a later console event overtake the first one."""
+
+    class SlowWebSocket:
+        def __init__(self) -> None:
+            self.first_started = asyncio.Event()
+            self.release_first = asyncio.Event()
+            self.sequences: list[int] = []
+
+        async def accept(self) -> None:
+            return None
+
+        async def send_json(self, event: dict[str, Any]) -> None:
+            if event["seq"] == 1:
+                self.first_started.set()
+                await self.release_first.wait()
+            self.sequences.append(event["seq"])
+
+    hub = ConsoleHub(stream_id="stream-test")
+    websocket = SlowWebSocket()
+    await hub.connect(websocket)  # type: ignore[arg-type]
+
+    hub.publish("interlock.stakes", {"impact_inr": 100})
+    await websocket.first_started.wait()
+    hub.publish("interlock.decision", {"decision_id": "dec_1"})
+    await asyncio.sleep(0)
+    websocket.release_first.set()
+
+    for _ in range(10):
+        if websocket.sequences == [1, 2]:
+            break
+        await asyncio.sleep(0)
+    hub.disconnect(websocket)  # type: ignore[arg-type]
+
+    assert websocket.sequences == [1, 2]
 
 
 def test_recent_cursor_and_websocket_replay_use_the_same_envelope() -> None:
@@ -258,6 +297,28 @@ def test_live_source_marks_empty_economics_unavailable(tmp_path: Path) -> None:
     economics = source.ledger_summary()["economics"]
     assert economics["available"] is False
     assert economics["net_value_inr"] is None
+
+
+def test_live_source_marks_partial_economics_unavailable(tmp_path: Path) -> None:
+    source = live_source(tmp_path)
+    source.app.state.ledger.economics_snapshot = lambda: {
+        "requests": 2,
+        "routing_savings_inr": 4.0,
+        "regret_inr": None,
+        "regret_samples": 0,
+        "rework_inr": None,
+        "rework_samples": 0,
+        "net_value_inr": None,
+        "net_value_ci_inr": None,
+        "net_value_samples": 0,
+        "upstream_spend_basis": "recorded",
+    }
+
+    status = source.status()["capabilities"]["economics"]
+    assert status["available"] is False
+    assert "regret" in status["reason"]
+    assert "rework" in status["reason"]
+    assert source.ledger_summary()["economics"]["available"] is False
 
 
 def test_live_source_serves_only_allowlisted_json_artifacts(tmp_path: Path) -> None:

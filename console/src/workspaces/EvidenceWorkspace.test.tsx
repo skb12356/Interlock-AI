@@ -133,6 +133,37 @@ describe("EvidenceWorkspace", () => {
     expect(screen.getByText(/below 20.00 alert threshold/i)).toBeInTheDocument();
   });
 
+  it("does not render missing regret or rework measurements as zero", () => {
+    const partialLedger = {
+      ...ledger,
+      economics: {
+        available: false,
+        reason: "regret and rework measurements are unavailable",
+        routing_savings_inr: 20,
+        regret_inr: null,
+        rework_inr: null,
+        net_value_inr: null,
+        net_value_ci_inr: null,
+        net_value_samples: 0,
+        upstream_spend_basis: "recorded",
+      },
+    } as unknown as LedgerSummary;
+
+    render(
+      <EvidenceWorkspace
+        bundle={bundle}
+        status={status}
+        ledger={partialLedger}
+        loading={false}
+        error={null}
+      />,
+    );
+
+    expect(screen.getByText("regret and rework measurements are unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("Measured regret")).not.toBeInTheDocument();
+    expect(screen.queryByText("Attributed rework")).not.toBeInTheDocument();
+  });
+
   it("does not invent an alert threshold when Lane C has no observations", () => {
     const noObservations = {
       ...bundle,

@@ -1,5 +1,12 @@
 import type { ConsoleEnvelope } from "../domain/contracts";
 
+const knownProjectionEvents = new Set([
+  "interlock.stakes",
+  "interlock.signal",
+  "interlock.decision",
+  "interlock.hold",
+]);
+
 interface ProjectionCursor {
   streamId: string | null;
   lastSeq: number;
@@ -129,6 +136,10 @@ export class ProjectionConnection {
         this.options.onDiagnostic?.("Projection received an invalid envelope");
         return;
       }
+      if (!knownProjectionEvents.has(value.event)) {
+        this.options.onDiagnostic?.(`Projection received unsupported event ${value.event}`);
+        return;
+      }
       if (this.recoveringGeneration === generation) this.pendingEnvelopes.push(value);
       else this.accept(value);
     } catch {
@@ -161,8 +172,13 @@ export class ProjectionConnection {
         throw new Error("Recent projection response was malformed");
       }
       for (const event of payload.events) {
-        if (isEnvelope(event)) this.accept(event);
-        else this.options.onDiagnostic?.("Recent projection contained an invalid envelope");
+        if (!isEnvelope(event)) {
+          this.options.onDiagnostic?.("Recent projection contained an invalid envelope");
+        } else if (!knownProjectionEvents.has(event.event)) {
+          this.options.onDiagnostic?.(`Recent projection contained unsupported event ${event.event}`);
+        } else {
+          this.accept(event);
+        }
       }
       if (this.currentCursor.streamId !== payload.stream_id || payload.latest_seq > this.currentCursor.lastSeq) {
         this.currentCursor = { streamId: payload.stream_id, lastSeq: payload.latest_seq };

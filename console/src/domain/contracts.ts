@@ -126,3 +126,22 @@ export interface HoldProjection extends HoldEvent {
   sla_deadline_ts: number | null;
   expired: boolean;
 }
+
+export interface RetrievedFragment {
+  doc_id: string;
+  text: string;
+  provenance: "retrieved_untrusted" | "retrieved_verified";
+  domain: string;
+  score: number;
+}
+
+export interface UploadedDocument {
+  upload_id: string;
+  filename: string;
+  content_type: string;
+  fragments: RetrievedFragment[];
+  security: {
+    provenance: "retrieved_untrusted";
+    requires_explicit_interlock_context: true;
+  };
+}

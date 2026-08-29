@@ -26,6 +26,11 @@ interface LiveWorkspaceProps {
   prompt: string;
   scenario: "clean" | "scene1" | "held" | "blocked";
   busy: boolean;
+  upload?: { filename: string; fragmentCount: number } | null;
+  uploadBusy?: boolean;
+  uploadError?: string | null;
+  onUpload?: (file: File) => void;
+  onClearUpload?: () => void;
   onPromptChange: (value: string) => void;
   onScenarioChange: (value: "clean" | "scene1" | "held" | "blocked") => void;
   onSubmit: () => void;
@@ -48,6 +53,11 @@ export function LiveWorkspace({
   prompt,
   scenario,
   busy,
+  upload = null,
+  uploadBusy = false,
+  uploadError = null,
+  onUpload,
+  onClearUpload,
   onPromptChange,
   onScenarioChange,
   onSubmit,
@@ -144,6 +154,33 @@ export function LiveWorkspace({
             <option value="held">Untrusted claim · L4 hold</option>
             <option value="blocked">Canary leak · L5 block</option>
           </select>
+          <div className="document-attachment">
+            <label className="attachment-action" htmlFor="customer-document">
+              {uploadBusy ? "Reading document…" : "Attach customer document"}
+            </label>
+            <input
+              id="customer-document"
+              type="file"
+              accept=".txt,.md,.json,.pdf,text/plain,application/pdf,application/json"
+              disabled={busy || uploadBusy}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onUpload?.(file);
+                event.target.value = "";
+              }}
+            />
+            {upload && (
+              <div className="attached-document">
+                <span>
+                  <strong>{upload.filename}</strong>
+                  {upload.fragmentCount} untrusted context fragment
+                  {upload.fragmentCount === 1 ? "" : "s"}
+                </span>
+                <button type="button" onClick={onClearUpload} disabled={busy}>Remove</button>
+              </div>
+            )}
+            {uploadError && <p className="attachment-error" role="alert">{uploadError}</p>}
+          </div>
           <label htmlFor="prompt">Customer message</label>
           <textarea
             id="prompt"

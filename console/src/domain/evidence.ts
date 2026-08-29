@@ -54,8 +54,48 @@ export interface ConsoleStatus {
   replay: boolean;
   capabilities: {
     economics: { available: boolean; reason?: string };
+    lane_c?: { available: boolean; reason?: string };
     artifacts?: Record<string, boolean>;
   };
+}
+
+export interface EconomicsProjection {
+  available: boolean;
+  reason?: string;
+  routing_savings_inr?: number;
+  regret_inr?: number;
+  regret_samples?: number;
+  rework_inr?: number;
+  net_value_inr?: number;
+  net_value_ci_inr?: [number, number];
+  net_value_samples?: number;
+}
+
+export interface LaneCAxis {
+  n: number;
+  disparate: number;
+  rate: number;
+}
+
+export interface LaneCProjection {
+  n_pairs: number;
+  by_axis: Record<string, LaneCAxis>;
+  e_value: {
+    n?: number;
+    e_value?: number;
+    running_max_e?: number;
+    alert_threshold?: number;
+    alerted?: boolean;
+    always_valid_p?: number;
+  };
+  series: {
+    t?: number[];
+    e_value?: number[];
+    running_max_e?: number[];
+    p_value?: number[];
+    alert_line?: number[];
+  };
+  notes: string[];
 }
 
 export interface LedgerSummary {
@@ -63,7 +103,7 @@ export interface LedgerSummary {
   spend_inr: number;
   action_counts: Record<string, number>;
   overhead_ms: { mean: number | null; p95: number | null };
-  economics: { available: boolean; reason: string };
+  economics: EconomicsProjection;
 }
 
 export interface EvidenceBundle {
@@ -71,4 +111,5 @@ export interface EvidenceBundle {
   conformal: ConformalReport | null;
   evaluation: EvaluationReport | null;
   latency: ActionLatency[] | null;
+  laneC: LaneCProjection | null;
 }

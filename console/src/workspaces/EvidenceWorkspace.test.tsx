@@ -32,6 +32,7 @@ const bundle: EvidenceBundle = {
   latency: [
     { action: "L2_repair", model: "qwen3:8b", provider: "ollama", runs: 3, samples_ms: [13704, 14250, 13640], median_ms: 13704, max_ms: 14250 },
   ],
+  laneC: null,
 };
 
 const status: ConsoleStatus = {
@@ -68,7 +69,7 @@ describe("EvidenceWorkspace", () => {
     expect(screen.getByText("₹2.00 spend")).toBeInTheDocument();
     expect(screen.getByText("13,704 ms")).toBeInTheDocument();
     expect(screen.getByText("Lane C economics have not been produced")).toBeInTheDocument();
-    expect(screen.getByText("Unavailable", { exact: true })).toBeInTheDocument();
+    expect(screen.getAllByText("Unavailable", { exact: true })).toHaveLength(2);
     expect(screen.getByText("L0 pass")).toBeInTheDocument();
     expect(screen.getByText("8 decisions")).toBeInTheDocument();
   });
@@ -76,7 +77,7 @@ describe("EvidenceWorkspace", () => {
   it("labels missing committed evidence as unavailable", () => {
     render(
       <EvidenceWorkspace
-        bundle={{ calibration: null, conformal: null, evaluation: null, latency: null }}
+        bundle={{ calibration: null, conformal: null, evaluation: null, latency: null, laneC: null }}
         status={status}
         ledger={ledger}
         loading={false}
@@ -85,5 +86,45 @@ describe("EvidenceWorkspace", () => {
     );
 
     expect(screen.getAllByText("Unavailable").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("renders live net value with its interval and Lane C observations", () => {
+    const liveLedger = {
+      ...ledger,
+      economics: {
+        available: true,
+        routing_savings_inr: 20,
+        regret_inr: 2,
+        rework_inr: 1,
+        net_value_inr: 17,
+        net_value_ci_inr: [12, 21],
+        net_value_samples: 8,
+      },
+    } as unknown as LedgerSummary;
+    const liveBundle = {
+      ...bundle,
+      laneC: {
+        n_pairs: 12,
+        by_axis: { language: { n: 12, disparate: 1, rate: 1 / 12 } },
+        e_value: {
+          n: 12,
+          e_value: 1.4,
+          running_max_e: 1.5,
+          alert_threshold: 20,
+          alerted: false,
+          always_valid_p: 2 / 3,
+        },
+        series: { t: [1, 2], e_value: [1, 1.4], running_max_e: [1, 1.5], p_value: [1, 2 / 3], alert_line: [20, 20] },
+        notes: ["observational projection"],
+      },
+    } as unknown as EvidenceBundle;
+
+    render(<EvidenceWorkspace bundle={liveBundle} status={status} ledger={liveLedger} loading={false} error={null} />);
+
+    expect(screen.getByText("₹17.00")).toBeInTheDocument();
+    expect(screen.getByText("₹12.00–₹21.00 95% CI")).toBeInTheDocument();
+    expect(screen.getByText("12 observed pairs")).toBeInTheDocument();
+    expect(screen.getByText("8.3% disparity rate")).toBeInTheDocument();
+    expect(screen.getByText(/below 20.00 alert threshold/i)).toBeInTheDocument();
   });
 });

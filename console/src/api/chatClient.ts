@@ -1,10 +1,12 @@
-import type { DecisionDetail, ParsedFrame } from "../domain/contracts";
+import type { DecisionDetail, ParsedFrame, RetrievedFragment } from "../domain/contracts";
 import { SseParser } from "../stream/sse";
 import { getDecisionDetail } from "./consoleClient";
 
 export interface ChatRequest {
   prompt: string;
   scenario: "clean" | "scene1" | "held" | "blocked";
+  replay?: boolean;
+  fragments?: RetrievedFragment[];
   signal?: AbortSignal;
 }
 
@@ -28,7 +30,8 @@ export async function streamChat(
       model: "interlock",
       messages: [{ role: "user", content: request.prompt }],
       stream: true,
-      scenario: request.scenario,
+      ...(request.replay === false ? {} : { scenario: request.scenario }),
+      ...(request.fragments?.length ? { interlock: { retrieved: request.fragments } } : {}),
     }),
     signal: request.signal,
   });

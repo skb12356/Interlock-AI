@@ -173,4 +173,32 @@ describe("LiveWorkspace", () => {
     await user.click(within(timeline).getByRole("button", { name: "Sentence 1" }));
     expect(screen.getByText("L2 repair", { selector: ".action-stamp" })).toBeInTheDocument();
   });
+
+  it("attaches a document as visibly untrusted context for the next request", async () => {
+    const user = userEvent.setup();
+    const onUpload = vi.fn();
+    render(
+      <LiveWorkspace
+        trace={null}
+        prompt="Review this claim"
+        scenario="held"
+        busy={false}
+        upload={{ filename: "claim.txt", fragmentCount: 1 }}
+        uploadBusy={false}
+        uploadError={null}
+        onUpload={onUpload}
+        onClearUpload={vi.fn()}
+        onPromptChange={vi.fn()}
+        onScenarioChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("claim.txt")).toBeInTheDocument();
+    expect(screen.getByText(/untrusted context/i)).toBeInTheDocument();
+    const input = screen.getByLabelText("Attach customer document");
+    const file = new File(["claim"], "new-claim.txt", { type: "text/plain" });
+    await user.upload(input, file);
+    expect(onUpload).toHaveBeenCalledWith(file);
+  });
 });

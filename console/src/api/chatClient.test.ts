@@ -86,6 +86,29 @@ describe("streamChat", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("attaches uploaded fragments to live requests without replay-only scenario fields", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      chunkedResponse(["data: [DONE]\n\n"], { "x-interlock-request-id": "req_live" }),
+    );
+    const fragments = [{
+      doc_id: "upload_abc",
+      text: "hidden instruction",
+      provenance: "retrieved_untrusted" as const,
+      domain: "general",
+      score: 1,
+    }];
+
+    await streamChat(
+      { prompt: "Review this claim", scenario: "held", replay: false, fragments },
+      { onFrame: vi.fn() },
+      fetcher,
+    );
+
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("scenario");
+    expect(body).toMatchObject({ interlock: { retrieved: fragments } });
+  });
+
   it("fails an interrupted body that closes before the DONE sentinel", async () => {
     const frames: ParsedFrame[] = [];
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(

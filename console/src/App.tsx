@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { streamChat } from "./api/chatClient";
 import { ProjectionConnection } from "./api/projectionClient";
+import { uploadDocument } from "./api/uploadClient";
 import {
   ConsoleApiError,
   getDecisionDetail,
@@ -11,7 +12,7 @@ import {
   getStatus,
   resolveHold,
 } from "./api/consoleClient";
-import type { HoldProjection } from "./domain/contracts";
+import type { HoldProjection, UploadedDocument } from "./domain/contracts";
 import type { ConsoleStatus, EvidenceBundle, LedgerSummary } from "./domain/evidence";
 import { ResumeTokenVault } from "./security/resumeTokens";
 import { consoleReducer, initialConsoleState } from "./state/consoleStore";
@@ -40,6 +41,7 @@ const emptyEvidence: EvidenceBundle = {
   conformal: null,
   evaluation: null,
   latency: null,
+  laneC: null,
 };
 
 export function App() {
@@ -58,6 +60,9 @@ export function App() {
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [uploaded, setUploaded] = useState<UploadedDocument | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [projectionStatus, setProjectionStatus] = useState<"connecting" | "connected" | "reconnecting" | "unavailable">("connecting");
   const vault = useRef(new ResumeTokenVault());
   const activeController = useRef<AbortController | null>(null);
@@ -185,7 +190,13 @@ export function App() {
     let requestId: string | null = null;
     try {
       await streamChat(
-        { prompt, scenario, signal: controller.signal },
+        {
+          prompt,
+          scenario,
+          replay: consoleStatus?.source !== "live",
+          fragments: uploaded?.fragments,
+          signal: controller.signal,
+        },
         {
           onRequestId: (id) => {
             requestId = id;
@@ -199,6 +210,7 @@ export function App() {
           onDiagnostic: (message) => dispatch({ type: "diagnostic.received", code: "projection", message }),
         },
       );
+      setUploaded(null);
     } catch (error) {
       vault.current.clear();
       if (error instanceof DOMException && error.name === "AbortError") return;
@@ -208,6 +220,20 @@ export function App() {
     } finally {
       if (activeController.current === controller) activeController.current = null;
       setBusy(false);
+    }
+  };
+
+  const handleUpload = async (file: File) => {
+    setUploadBusy(true);
+    setUploadError(null);
+    try {
+      setUploaded(await uploadDocument(file));
+      setScenario("held");
+      setPrompt("Review this customer document and summarize the claim status.");
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "The document could not be attached");
+    } finally {
+      setUploadBusy(false);
     }
   };
 
@@ -280,6 +306,14 @@ export function App() {
             prompt={prompt}
             scenario={scenario}
             busy={busy}
+            upload={uploaded ? { filename: uploaded.filename, fragmentCount: uploaded.fragments.length } : null}
+            uploadBusy={uploadBusy}
+            uploadError={uploadError}
+            onUpload={(file) => void handleUpload(file)}
+            onClearUpload={() => {
+              setUploaded(null);
+              setUploadError(null);
+            }}
             onPromptChange={setPrompt}
             onScenarioChange={chooseScenario}
             onSubmit={() => void submitChat()}

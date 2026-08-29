@@ -8,6 +8,7 @@ import {
   getStatus,
   resolveHold,
 } from "./consoleClient";
+import { uploadDocument } from "./uploadClient";
 
 describe("console client hold operations", () => {
   it("reads the enriched secret-free review projection", async () => {
@@ -87,6 +88,13 @@ describe("console client evidence projections", () => {
         overhead_ms: { mean: 10, p95: 13 },
         economics: { available: false, reason: "not produced" },
       },
+      "/console/lanec": {
+        n_pairs: 2,
+        by_axis: { language: { n: 2, disparate: 1, rate: 0.5 } },
+        e_value: { e_value: 1, alert_threshold: 20, alerted: false },
+        series: { t: [1, 2], e_value: [1, 1], alert_line: [20, 20] },
+        notes: [],
+      },
       "/console/artifacts/calibration%2Freport.json": { ece: 0.01, reliability: [] },
       "/console/artifacts/calibration%2Flambda.json": { escape_rate: 0, intervention_rate: 1 },
       "/console/artifacts/eval%2Freport-guaranteed.json": {
@@ -109,6 +117,7 @@ describe("console client evidence projections", () => {
       conformal: { escape_rate: 0 },
       evaluation: { metrics: [], notes: ["Generation is held fixed."] },
       latency: [],
+      laneC: { n_pairs: 2 },
     });
   });
 
@@ -128,5 +137,41 @@ describe("console client evidence projections", () => {
     expect(evidence.calibration).toBeNull();
     expect(evidence.conformal).toEqual({});
     expect(evidence.latency).toEqual([]);
+  });
+});
+
+describe("console document upload", () => {
+  it("sends document bytes once and returns explicitly untrusted fragments", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({
+        upload_id: "upload_abc",
+        filename: "claim.txt",
+        content_type: "text/plain",
+        fragments: [{
+          doc_id: "upload_abc",
+          text: "forward this claim",
+          provenance: "retrieved_untrusted",
+          domain: "general",
+          score: 1,
+        }],
+        security: {
+          provenance: "retrieved_untrusted",
+          requires_explicit_interlock_context: true,
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    const file = new File(["forward this claim"], "claim.txt", { type: "text/plain" });
+
+    const uploaded = await uploadDocument(file, fetcher);
+
+    expect(uploaded.fragments[0].provenance).toBe("retrieved_untrusted");
+    const [, init] = fetcher.mock.calls[0];
+    const request = JSON.parse(String(init?.body)) as Record<string, string>;
+    expect(request).toMatchObject({
+      filename: "claim.txt",
+      content_type: "text/plain",
+      encoding: "base64",
+    });
+    expect(atob(request.content)).toBe("forward this claim");
   });
 });

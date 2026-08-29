@@ -124,6 +124,15 @@ h2 { margin: 0; font: 600 24px/1.05 Charter, Georgia, serif; letter-spacing: -0.
 .composer label { color: var(--ledger-soft); font: 700 9px "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; }
 .composer label[for="prompt"] { grid-column: 1 / -1; margin-top: 5px; }
 .composer select { grid-column: 1 / -1; }
+.document-attachment { grid-column: 1 / -1; display: grid; gap: 8px; }
+.document-attachment > input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.attachment-action { display: inline-flex; width: fit-content; padding: 8px 10px; border: 1px solid var(--bank-blue); color: var(--bank-blue) !important; cursor: pointer; }
+.attachment-action:hover { color: var(--paper) !important; background: var(--bank-blue); }
+.attached-document { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border-left: 3px solid var(--signal); background: rgba(196, 122, 40, 0.08); }
+.attached-document span { color: var(--ledger-soft); font-size: 10px; }
+.attached-document strong { display: block; color: var(--ledger); font-size: 11px; }
+.attached-document button { border: 0; color: var(--stop); background: transparent; cursor: pointer; font-size: 10px; font-weight: 800; }
+.attachment-error { margin: 0; color: var(--stop); font-size: 10px; }
 .composer textarea { grid-column: 1 / -1; resize: vertical; }
 .composer select, .composer textarea { width: 100%; border: 1px solid var(--rule); border-radius: 0; padding: 10px 11px; color: var(--ledger); background: white; }
 .primary-action { grid-column: 1 / -1; min-height: 43px; border: 0; color: var(--paper); background: var(--ledger); cursor: pointer; font-weight: 800; }
@@ -262,7 +271,21 @@ h2 { margin: 0; font: 600 24px/1.05 Charter, Georgia, serif; letter-spacing: -0.
 .latency-values { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .latency-values span { padding: 8px 10px; border-left: 3px solid var(--bank-blue); background: white; color: var(--ledger-soft); font-size: 9px; }
 .latency-values strong { display: block; color: var(--ledger); font: 800 12px "SFMono-Regular", Consolas, monospace; }
-.economics-card { grid-column: 1 / -1; background: repeating-linear-gradient(-45deg, var(--paper) 0 10px, #edf2ef 10px 20px); }
+.economics-card, .lane-c-card { background: #edf2ef; }
+.economics-hero { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr); gap: 22px; }
+.economics-hero > div > span, .lane-c-summary span { display: block; color: var(--ledger-soft); font: 700 8px "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.economics-hero > div > strong { display: block; margin-top: 7px; font: 600 40px Charter, Georgia, serif; }
+.economics-hero > div > small { display: block; margin-top: 5px; color: var(--bank-blue); font: 800 10px "SFMono-Regular", Consolas, monospace; }
+.economics-hero dl { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border: 1px solid var(--rule); }
+.economics-hero dl div { padding: 12px; border-right: 1px dashed var(--rule); }
+.economics-hero dl div:last-child { border-right: 0; }
+.economics-hero dt { color: var(--ledger-soft); font-size: 9px; }
+.economics-hero dd { margin: 6px 0 0; font: 800 12px "SFMono-Regular", Consolas, monospace; }
+.lane-c-summary { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 12px; border: 1px solid var(--rule); }
+.lane-c-summary div { padding: 11px; border-right: 1px dashed var(--rule); }
+.lane-c-summary div:last-child { border-right: 0; }
+.lane-c-summary strong { display: block; margin-top: 5px; font-size: 11px; }
+.evidence-note { margin: 10px 0 0; color: var(--ledger-soft); font-size: 10px; line-height: 1.5; }
 .evidence-unavailable { display: grid; gap: 7px; align-content: center; min-height: 80px; color: var(--ledger-soft); }
 .evidence-unavailable strong { color: var(--stop); font: 600 24px Charter, Georgia, serif; }
 .evidence-unavailable span { font-size: 11px; }
@@ -296,7 +319,8 @@ h2 { margin: 0; font: 600 24px/1.05 Charter, Georgia, serif; letter-spacing: -0.
   .ledger-strip > div:nth-child(2) { border-right: 0; }
   .ledger-strip > div:nth-child(-n+2) { border-bottom: 1px dashed var(--rule); }
   .evidence-grid { grid-template-columns: 1fr; }
-  .economics-card { grid-column: auto; }
+  .economics-hero, .economics-hero dl, .lane-c-summary { grid-template-columns: 1fr; }
+  .economics-hero dl div, .lane-c-summary div { border-right: 0; border-bottom: 1px dashed var(--rule); }
   .metric-row { grid-template-columns: 1fr auto; }
   .metric-row > div:nth-child(2) { grid-row: 2; }
   .metric-row b { grid-column: 2; grid-row: 1 / span 2; }

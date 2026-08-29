@@ -6,6 +6,7 @@ import type {
   ConsoleStatus,
   EvaluationReport,
   EvidenceBundle,
+  LaneCProjection,
   LedgerSummary,
 } from "../domain/evidence";
 
@@ -73,17 +74,24 @@ async function getArtifact<T>(name: string, fetcher: typeof fetch): Promise<T | 
   return (await response.json()) as T;
 }
 
+async function getOptionalProjection<T>(path: string, fetcher: typeof fetch): Promise<T | null> {
+  const response = await fetcher(path);
+  if (!response.ok) return null;
+  return (await response.json()) as T;
+}
+
 export async function getEvidenceBundle(fetcher: typeof fetch = fetch): Promise<EvidenceBundle> {
-  const [calibration, conformal, evaluationArtifact, latency] = await Promise.all([
+  const [calibration, conformal, evaluationArtifact, latency, laneC] = await Promise.all([
     getArtifact<CalibrationReport>("calibration/report.json", fetcher),
     getArtifact<ConformalReport>("calibration/lambda.json", fetcher),
     getArtifact<EvaluationReport | { metrics: EvaluationReport }>("eval/report-guaranteed.json", fetcher),
     getArtifact<ActionLatency[]>("action_latency.json", fetcher),
+    getOptionalProjection<LaneCProjection>("/console/lanec", fetcher),
   ]);
   const evaluation = evaluationArtifact && !("notes" in evaluationArtifact)
     ? evaluationArtifact.metrics
     : evaluationArtifact;
-  return { calibration, conformal, evaluation, latency };
+  return { calibration, conformal, evaluation, latency, laneC };
 }
 
 export async function resolveHold(

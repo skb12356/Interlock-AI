@@ -65,6 +65,17 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
     median: item.median_ms,
     max: item.max_ms,
   })) ?? [];
+  const laneSeries = (bundle.laneC?.series.t ?? []).map((point, index) => ({
+    observation: point,
+    eValue: bundle.laneC?.series.e_value?.[index] ?? 1,
+    threshold: bundle.laneC?.series.alert_line?.[index] ?? null,
+  }));
+  const laneCounts = Object.values(bundle.laneC?.by_axis ?? {}).reduce(
+    (total, axis) => ({ n: total.n + axis.n, disparate: total.disparate + axis.disparate }),
+    { n: 0, disparate: 0 },
+  );
+  const disparityRate = laneCounts.n ? laneCounts.disparate / laneCounts.n : 0;
+  const economics = ledger?.economics;
 
   if (loading) {
     return <div className="empty-state evidence-loading"><strong>Reading committed evidence</strong><span>Intervals stay attached to their measurements.</span></div>;
@@ -179,8 +190,60 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
         </article>
 
         <article className="evidence-card economics-card">
-          <header><span className="section-label">Lane C economics</span></header>
-          <Unavailable detail={ledger?.economics.reason ?? status?.capabilities.economics.reason ?? "Regret, rework, and net-value projections have not been produced"} />
+          <header><span className="section-label">Live economics</span></header>
+          {economics?.available && economics.net_value_inr !== undefined ? (
+            <>
+              <div className="economics-hero">
+                <div>
+                  <span>Net value</span>
+                  <strong>{money.format(economics.net_value_inr)}</strong>
+                  <small>
+                    {economics.net_value_ci_inr
+                      ? `${money.format(economics.net_value_ci_inr[0])}–${money.format(economics.net_value_ci_inr[1])} 95% CI`
+                      : "Interval unavailable"}
+                  </small>
+                </div>
+                <dl>
+                  <div><dt>Routing savings</dt><dd>{money.format(economics.routing_savings_inr ?? 0)}</dd></div>
+                  <div><dt>Measured regret</dt><dd>{money.format(economics.regret_inr ?? 0)}</dd></div>
+                  <div><dt>Attributed rework</dt><dd>{money.format(economics.rework_inr ?? 0)}</dd></div>
+                </dl>
+              </div>
+              <p className="evidence-note">{integer.format(economics.net_value_samples ?? 0)} measured net-value samples; interval stays attached to the estimate.</p>
+            </>
+          ) : (
+            <Unavailable detail={economics?.reason ?? status?.capabilities.economics.reason ?? "Regret, rework, and net-value projections have not been produced"} />
+          )}
+        </article>
+
+        <article className="evidence-card lane-c-card">
+          <header><span className="section-label">Lane C monitoring</span></header>
+          {bundle.laneC ? (
+            <>
+              <div className="lane-c-summary">
+                <div><span>Coverage</span><strong>{integer.format(bundle.laneC.n_pairs)} observed pairs</strong></div>
+                <div><span>Observed disparity</span><strong>{percentage(disparityRate)} disparity rate</strong></div>
+                <div><span>Anytime-valid state</span><strong>{bundle.laneC.e_value.alerted ? "Alerted" : `Below ${(bundle.laneC.e_value.alert_threshold ?? 0).toFixed(2)} alert threshold`}</strong></div>
+              </div>
+              {laneSeries.length > 0 && (
+                <div className="chart-frame" aria-label="Lane C anytime-valid e-value chart">
+                  <ResponsiveContainer width="100%" height={190}>
+                    <LineChart data={laneSeries} margin={{ top: 10, right: 12, bottom: 4, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(23,54,56,.16)" />
+                      <XAxis dataKey="observation" tick={{ fontSize: 9 }} />
+                      <YAxis tick={{ fontSize: 9 }} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="eValue" stroke="#276079" strokeWidth={2} dot={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="threshold" stroke="#a43f42" strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {bundle.laneC.notes.length > 0 && <p className="evidence-note">{bundle.laneC.notes.join(" · ")}</p>}
+            </>
+          ) : (
+            <Unavailable detail={status?.capabilities.lane_c?.reason ?? "Lane C observations are unavailable"} />
+          )}
         </article>
       </div>
     </section>

@@ -7,6 +7,7 @@ Prerequisites:
 - Python 3.12 and `uv`
 - Local OpenAI-compatible upstream, defaulting to Ollama at `http://127.0.0.1:11434/v1`
 - A built corpus index at `data/corpus.db`; rebuild with `uv run python scripts/build_index.py` if missing
+- For arbitrary PDF text-layer extraction, the locked `pypdf` dependency is installed by the project environment. OCR, encrypted PDFs, and exact layout reconstruction remain unsupported.
 
 Start the stack:
 

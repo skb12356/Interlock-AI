@@ -301,7 +301,10 @@ function renderLedger(report, live) {
   const falseInterventions = byName["False interventions"];
   el("net-value").textContent = live?.net_value_inr !== undefined ? money(live.net_value_inr) : (net ? pct(net.value) : "unmeasured");
   el("net-value").className = "pill " + ((live?.net_value_inr || 0) >= 0 ? "good" : "bad");
+  const netCi = live?.net_value_ci_inr;
+  const netCiText = Array.isArray(netCi) ? `${money(netCi[0])} to ${money(netCi[1])}` : "n/a";
   el("ledger").innerHTML = [
+    metricHtml("Net Value", live ? money(live.net_value_inr) : "n/a", `95% CI ${netCiText}`),
     metricHtml("Verification Cost", live?.verification_cost_ratio !== null && live?.verification_cost_ratio !== undefined ? pct(live.verification_cost_ratio) : (verification ? pct(verification.value) : "n/a"), "<= 5%"),
     metricHtml("Net Spend", net ? pct(net.value) : "n/a", "~ -30%"),
     metricHtml("False Interventions", falseInterventions ? pct(falseInterventions.value) : "n/a", "<= 2%"),
@@ -309,7 +312,7 @@ function renderLedger(report, live) {
     metricHtml("Rework", live ? money(live.rework_inr) : "n/a", "confidence weighted"),
     metricHtml("Routing Savings", live ? money(live.routing_savings_inr) : "n/a", `${live?.requests || 0} requests`),
   ].join("");
-  drawNetChart(metrics);
+  drawNetChart(metrics, live);
 }
 
 function renderLaneC(data) {
@@ -378,11 +381,36 @@ function drawSensitivity(data) {
   drawLine(el("sensitivity-chart"), "F-019 Disruptive", values, "#b42318");
 }
 
-function drawNetChart(metrics) {
+function drawNetChart(metrics, live) {
   const values = metrics
     .filter((m) => ["Verification cost", "Net spend change", "False interventions"].includes(m.name.trim()))
     .map((m) => Math.abs(Number(m.value || 0)));
-  drawLine(el("net-chart"), "Evaluation Targets", values, "#2563eb");
+  if (live && Array.isArray(live.net_value_ci_inr)) {
+    drawBand(el("net-chart"), "Net Value (95% CI)", [Number(live.net_value_inr || 0)], [live.net_value_ci_inr], "#2563eb");
+  } else {
+    drawLine(el("net-chart"), "Evaluation Targets", values, "#2563eb");
+  }
+}
+
+function drawBand(canvas, title, values, intervals, color) {
+  const ctx = clearCanvas(canvas, title);
+  if (!values.length) return;
+  const all = intervals.flat().map(Number).concat(values);
+  const max = Math.max(...all, 1);
+  const min = Math.min(...all, 0);
+  const h = canvas.height - 80;
+  const y = (value) => canvas.height - 30 - ((value - min) / Math.max(0.0001, max - min)) * h;
+  const x = (i) => 40 + (values.length === 1 ? (canvas.width - 70) / 2 : (i / (values.length - 1)) * (canvas.width - 70));
+  ctx.fillStyle = `${color}33`;
+  ctx.beginPath();
+  intervals.forEach((interval, i) => { const point = [x(i), y(Number(interval[1]))]; i ? ctx.lineTo(...point) : ctx.moveTo(...point); });
+  intervals.slice().reverse().forEach((interval, reverseIndex) => { const i = intervals.length - reverseIndex - 1; ctx.lineTo(x(i), y(Number(interval[0]))); });
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  values.forEach((value, i) => { const point = [x(i), y(value)]; i ? ctx.lineTo(...point) : ctx.moveTo(...point); });
+  ctx.stroke();
 }
 
 function wire() {

@@ -376,6 +376,8 @@ async def test_economics_snapshot_exposes_net_value(ledger: Ledger) -> None:
     assert snapshot["regret_inr"] == 0.4
     assert snapshot["rework_inr"] == 2.0
     assert "net_value_inr" in snapshot
+    assert len(snapshot["net_value_ci_inr"]) == 2
+    assert snapshot["net_value_samples"] == 1
 
 
 async def test_lane_c_snapshot_computes_e_value_series(ledger: Ledger) -> None:

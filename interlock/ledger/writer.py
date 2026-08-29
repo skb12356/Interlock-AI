@@ -291,6 +291,7 @@ class Ledger:
         must not learn SQLite, and a missing measurement must remain visibly missing.
         """
         from interlock.ledger.pricing import PriceBook
+        from interlock.ledger.regret import bootstrap_ci
 
         connection = self._require_connection()
         book = PriceBook.default()
@@ -299,6 +300,12 @@ class Ledger:
             "SELECT request_id, model_served, prompt_tokens, completion_tokens, cache_hit "
             "FROM requests ORDER BY ts"
         ).fetchall()
+        request_spend = connection.execute(
+            "SELECT request_id, SUM(CASE WHEN component = 'upstream' THEN inr ELSE 0 END) AS upstream, "
+            "SUM(CASE WHEN component != 'upstream' THEN inr ELSE 0 END) AS verification "
+            "FROM spend GROUP BY request_id"
+        ).fetchall()
+        spend_by_request = {row["request_id"]: row for row in request_spend}
         spend_rows = connection.execute(
             "SELECT component, model, SUM(tokens) AS tokens, SUM(inr) AS inr "
             "FROM spend GROUP BY component, model"
@@ -357,6 +364,24 @@ class Ledger:
         rework_total = sum(row["inr"] for row in rework_by_kind)
         net_value = routing_savings + rework_total - verification_spend - regret
 
+        # Request-level contributions make uncertainty visible. Regret and rework are
+        # allocated evenly because their current aggregate rows lack a request join.
+        contributions: list[float] = []
+        for row in request_rows:
+            prompt = int(row["prompt_tokens"] or 0)
+            completion = int(row["completion_tokens"] or 0)
+            baseline = book.cost_inr("qwen3:8b", prompt_tokens=prompt, completion_tokens=completion)
+            spend = spend_by_request.get(row["request_id"])
+            actual = float(spend["upstream"] or 0.0) if spend else book.cost_inr(
+                row["model_served"], prompt_tokens=prompt, completion_tokens=completion
+            )
+            checking = float(spend["verification"] or 0.0) if spend else 0.0
+            contributions.append(baseline - actual - checking)
+        if contributions:
+            shared_adjustment = (rework_total - regret) / len(contributions)
+            contributions = [value + shared_adjustment for value in contributions]
+        net_ci = bootstrap_ci(contributions, seed=20260829) if contributions else (0.0, 0.0)
+
         notes: list[str] = []
         if not request_rows:
             notes.append("no requests recorded yet; live economics are unmeasured")
@@ -383,6 +408,8 @@ class Ledger:
             "rework_inr": round(rework_total, 4),
             "rework_by_kind": rework_by_kind,
             "net_value_inr": round(net_value, 4),
+            "net_value_ci_inr": [round(net_ci[0], 4), round(net_ci[1], 4)],
+            "net_value_samples": len(contributions),
             "spend_by_component": spend_by_component,
             "price_book": book.report(),
             "notes": notes,

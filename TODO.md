@@ -224,7 +224,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[x]` Ledger shows a net number with a confidence interval — live `/admin/economics` exposes `net_value_inr`, `net_value_ci_inr`, and sample count; the console renders the interval band.
 - `[ ]` Fairness run produces an e-value chart
 - `[ ]` All four scenes run without a human touching a terminal mid-scene
-- `[ ]` Evidence pack downloads and opens
+- `[x]` Evidence pack downloads and opens — `GET /admin/evidence/{request_id}.zip` exports the recorded, redacted request pack; contract-tested by opening the ZIP and checking its manifest.
 - `[x]` Calibration set and eval set provably disjoint — *D4-B6: by document, stratified by domain, zero shared, asserted end-to-end*
 
 ---

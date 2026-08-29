@@ -249,36 +249,42 @@ class Ledger:
         to provide (F6/F7).
         """
         connection = self._require_connection()
-        await asyncio.to_thread(
-            connection.execute,
-            "INSERT OR REPLACE INTO holds(hold_id, request_id, kind, payload_json,"
-            " flagged_span, evidence_json, state, resume_token, reason, created_ts,"
-            " sla_deadline_ts) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (
-                hold_id,
-                request_id,
-                kind,
-                json.dumps(payload or {}),
-                flagged_span,
-                json.dumps(evidence or []),
-                "pending",
-                resume_token,
-                reason,
-                wall_time(),
-                sla_deadline_ts,
-            ),
-        )
+        if self._write_lock is None:
+            raise RuntimeError("ledger write lock is not initialized")
+        async with self._write_lock:
+            await asyncio.to_thread(
+                connection.execute,
+                "INSERT OR REPLACE INTO holds(hold_id, request_id, kind, payload_json,"
+                " flagged_span, evidence_json, state, resume_token, reason, created_ts,"
+                " sla_deadline_ts) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    hold_id,
+                    request_id,
+                    kind,
+                    json.dumps(payload or {}),
+                    flagged_span,
+                    json.dumps(evidence or []),
+                    "pending",
+                    resume_token,
+                    reason,
+                    wall_time(),
+                    sla_deadline_ts,
+                ),
+            )
 
     async def resolve_hold(self, hold_id: str, *, state: str, resolved_by: str) -> bool:
         """Approve or reject a hold. Awaited for the same reason as `persist_hold`."""
         connection = self._require_connection()
-        cursor = await asyncio.to_thread(
-            connection.execute,
-            "UPDATE holds SET state=?, resolved_by=?, resolved_ts=?"
-            " WHERE hold_id=? AND state='pending'",
-            (state, resolved_by, wall_time(), hold_id),
-        )
-        return bool(cursor.rowcount)
+        if self._write_lock is None:
+            raise RuntimeError("ledger write lock is not initialized")
+        async with self._write_lock:
+            cursor = await asyncio.to_thread(
+                connection.execute,
+                "UPDATE holds SET state=?, resolved_by=?, resolved_ts=?"
+                " WHERE hold_id=? AND state='pending'",
+                (state, resolved_by, wall_time(), hold_id),
+            )
+            return bool(cursor.rowcount)
 
     async def persist_shadow_run(
         self,

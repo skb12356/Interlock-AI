@@ -75,8 +75,10 @@ Write-Host ("  risk engine: {0}" -f $RiskEngine) -ForegroundColor DarkGray
 
 $previousRiskEngine = $env:INTERLOCK_RISK_ENGINE
 $previousObserverUrl = $env:INTERLOCK_OBSERVER_URL
+$previousGatewayUrl = $env:INTERLOCK_GATEWAY_URL
 $env:INTERLOCK_RISK_ENGINE = $RiskEngine
 $env:INTERLOCK_OBSERVER_URL = "http://127.0.0.1:$ObserverPort"
+$env:INTERLOCK_GATEWAY_URL = "http://127.0.0.1:$GatewayPort"
 
 $started = @()
 try {
@@ -97,6 +99,7 @@ try {
 finally {
     if ($null -eq $previousRiskEngine) { Remove-Item Env:\INTERLOCK_RISK_ENGINE -ErrorAction SilentlyContinue } else { $env:INTERLOCK_RISK_ENGINE = $previousRiskEngine }
     if ($null -eq $previousObserverUrl) { Remove-Item Env:\INTERLOCK_OBSERVER_URL -ErrorAction SilentlyContinue } else { $env:INTERLOCK_OBSERVER_URL = $previousObserverUrl }
+    if ($null -eq $previousGatewayUrl) { Remove-Item Env:\INTERLOCK_GATEWAY_URL -ErrorAction SilentlyContinue } else { $env:INTERLOCK_GATEWAY_URL = $previousGatewayUrl }
 }
 
 # Poll until healthy. A cold start must reach healthy inside the timeout, which is the
@@ -127,7 +130,7 @@ if (-not $allHealthy) {
 
 Write-Host ''
 Write-Host 'Point any OpenAI-compatible client at the gateway:' -ForegroundColor Cyan
-Write-Host '    client = OpenAI(base_url="http://localhost:8080/v1", api_key="local")'
+Write-Host ("    client = OpenAI(base_url=`"http://localhost:{0}/v1`", api_key=`"local`")" -f $GatewayPort)
 Write-Host ''
 Write-Host ("Open the console at: http://127.0.0.1:{0}" -f $ConsolePort) -ForegroundColor Cyan
 Write-Host ''

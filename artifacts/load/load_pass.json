@@ -1,0 +1,41 @@
+{
+  "gateway": "http://127.0.0.1:8080",
+  "requests": 4023,
+  "concurrency": 20,
+  "successes": 4023,
+  "failures": 0,
+  "client_elapsed_ms": {
+    "p50": 1522.68,
+    "p95": 1678.66,
+    "max": 2080.79,
+    "mean": 1495.49
+  },
+  "gateway_latency_report": {
+    "n": 2000,
+    "budget_ms": 120.0,
+    "overhead_p50_ms": 343.0,
+    "overhead_p95_ms": 531.0,
+    "overhead_max_ms": 672.0,
+    "within_budget": false,
+    "ttft_p50_ms": 234.0,
+    "ttft_p95_ms": 469.0,
+    "buffered": {
+      "n": 0,
+      "p95_ms": 0.0
+    },
+    "unbuffered": {
+      "n": 2000,
+      "p95_ms": 531.0
+    },
+    "by_lane_p95_ms": {
+      "lane_a": 422.0
+    },
+    "unattributed_mean_ms": 123.26,
+    "notes": [
+      "123.3 ms of mean overhead is unattributed to any lane -- something is spending time nobody instrumented",
+      "p95 overhead 531 ms exceeds the 120 ms budget"
+    ],
+    "caveat": "Lane B runs concurrently with generation; only the portion the commit gate actually waited on ('gate_hold') is counted, because the rest is not time the customer spent waiting."
+  },
+  "captured_ts": 1787969853.253636
+}

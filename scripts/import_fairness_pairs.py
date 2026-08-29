@@ -64,7 +64,11 @@ async def main() -> int:
     await ledger.start()
     try:
         for item in observations:
-            await ledger.persist_fairness_pair(**item)
+            # Fairness reports may carry analysis-only fields such as ``disparate``
+            # and ``axis``. Persist only the frozen ledger contract.
+            await ledger.persist_fairness_pair(
+                **{key: item[key] for key in REQUIRED}
+            )
     finally:
         await ledger.stop()
     print(json.dumps({"imported": len(observations), "db": str(args.db)}))

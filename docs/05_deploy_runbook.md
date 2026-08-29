@@ -35,6 +35,12 @@ the gateway's `/admin/latency` histogram to an evidence artifact):
 uv run python scripts/load_pass.py --duration-seconds 300 --concurrency 20
 ```
 
+Run the local security/privacy sweep:
+
+```powershell
+uv run python scripts/security_sweep.py
+```
+
 Stop:
 
 ```powershell

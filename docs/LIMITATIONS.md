@@ -71,6 +71,13 @@ deterministic local upstream fixture. It completed 4,023 requests with zero fail
 but gateway overhead p95 was 531 ms against the 120 ms budget. Mean unattributed
 overhead was 123.3 ms. These are measured findings, not production capacity claims.
 
+## Security Scope
+
+The committed security sweep proves local application controls only: prompt-storage
+defaults, tenant canary isolation, evidence redaction, policy validation, and secret-file
+exclusion. It is not a network penetration test, dependency audit, or container-image
+scan.
+
 ## Upload Extraction
 
 The upload contract accepts text and PDF bytes and preserves the result as

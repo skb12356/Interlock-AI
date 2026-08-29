@@ -69,7 +69,7 @@ export function LiveWorkspace({
     ? selectedSentenceIdx
     : latestSentenceIdx;
   const sentence = effectiveSentenceIdx === null ? null : trace?.sentences[effectiveSentenceIdx] ?? null;
-  const decision = sentence?.decisions.at(-1) ?? null;
+  const decision = sentence?.decisions.at(-1) ?? trace?.systemDecisions.at(-1) ?? null;
   const detail = decision ? sentence?.decisionDetails[decision.decision_id] ?? null : null;
 
   useEffect(() => {
@@ -278,7 +278,7 @@ export function LiveWorkspace({
                 </div>
                 {detail.why.length > 0 && <p className="why-line">Why: {detail.why.join(" · ")}</p>}
               </section>
-            ) : decision ? (
+            ) : decision && decision.sentence_idx >= 0 ? (
               <p className="projection-wait">The complete loss table is being committed to the ledger.</p>
             ) : null}
 

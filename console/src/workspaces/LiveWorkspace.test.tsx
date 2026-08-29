@@ -127,6 +127,37 @@ describe("LiveWorkspace", () => {
     expect(screen.getByText("Hard rule: canary_leak")).toBeInTheDocument();
   });
 
+  it("explains a request-level L5 block that fired before any sentence existed", () => {
+    const blocked = trace();
+    blocked.assistantText = "";
+    blocked.sentenceOrder = [];
+    blocked.sentences = {};
+    blocked.systemDecisions = [{
+      decision_id: "dec_preflight",
+      sentence_idx: -1,
+      action: "L5_block",
+      chosen_loss: 0,
+      hard_rule: "cross_tenant_context",
+    }];
+
+    render(
+      <LiveWorkspace
+        trace={blocked}
+        prompt=""
+        scenario="blocked"
+        busy={false}
+        onPromptChange={vi.fn()}
+        onScenarioChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Blocked before release")).toBeInTheDocument();
+    expect(screen.getByText("L5 block", { selector: ".action-stamp" })).toBeInTheDocument();
+    expect(screen.getByText("Hard rule: cross_tenant_context")).toBeInTheDocument();
+    expect(screen.queryByText(/loss table is being committed/i)).not.toBeInTheDocument();
+  });
+
   it("keeps degraded checking visible at request level", () => {
     const degraded = trace();
     degraded.degraded = true;

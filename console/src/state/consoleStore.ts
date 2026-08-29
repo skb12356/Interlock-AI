@@ -144,7 +144,7 @@ function applyFrame(state: ConsoleState, requestId: string, frame: ParsedFrame):
 
   return {
     ...state,
-    activeRequestId: state.activeRequestId ?? requestId,
+    activeRequestId: requestId,
     requests: { ...state.requests, [requestId]: nextTrace },
     diagnostics,
   };

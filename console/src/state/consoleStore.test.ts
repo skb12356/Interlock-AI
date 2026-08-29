@@ -156,6 +156,34 @@ describe("consoleReducer", () => {
     expect(state.requests.req_b.stakes?.impact_inr).toBe(900);
   });
 
+  it("selects the newest request observed through the live projection", () => {
+    const envelope = (seq: number, requestId: string): ConsoleEnvelope => ({
+      stream_id: "epoch-a",
+      seq,
+      event: "interlock.stakes",
+      data: {
+        impact_inr: seq * 100,
+        reversibility: "reversible",
+        domain: "general",
+        mode: "buffered",
+      },
+      ts: seq,
+      request_id: requestId,
+      replayed: false,
+    });
+    let state = consoleReducer(initialConsoleState, {
+      type: "projection.received",
+      envelope: envelope(1, "req_old"),
+    });
+
+    state = consoleReducer(state, {
+      type: "projection.received",
+      envelope: envelope(2, "req_new"),
+    });
+
+    expect(state.activeRequestId).toBe("req_new");
+  });
+
   it("records malformed projected events without adding unsafe domain state", () => {
     const state = consoleReducer(initialConsoleState, {
       type: "projection.received",

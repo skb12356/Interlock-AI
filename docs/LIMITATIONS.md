@@ -93,6 +93,6 @@ warm-up, batching, and deployment hardware are addressed.
 ## Upload Extraction
 
 The upload contract accepts text and PDF bytes and preserves the result as
-`retrieved_untrusted`. The minimal clean-checkout runtime extracts printable PDF strings
-without a heavyweight parser; this covers the included white-text fixture but does not
-claim arbitrary-PDF layout, OCR, or encrypted-document support.
+`retrieved_untrusted`. Text-layer PDFs use the locked `pypdf` parser, with a conservative
+printable-byte fallback for malformed fixture inputs. This still does not claim arbitrary
+layout fidelity, OCR, or encrypted-document support.

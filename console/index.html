@@ -33,6 +33,8 @@
           </div>
           <div id="transcript" class="transcript" aria-live="polite"></div>
           <form id="prompt-form" class="composer">
+            <input id="upload-file" type="file" accept=".pdf,.txt,text/plain,application/pdf" aria-label="Upload document" />
+            <small id="upload-status" aria-live="polite"></small>
             <textarea id="prompt" rows="3">When prepaying my floating-rate home loan, what penalty applies?</textarea>
             <button type="submit">Run</button>
           </form>

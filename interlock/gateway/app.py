@@ -21,9 +21,11 @@ Two properties this file exists to protect:
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -227,6 +229,62 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Pending review cards. Read straight from the durable table, which is what
         makes them survive a restart (F6/F7)."""
         return {"holds": app.state.tool_interlock.pending_cards()}
+
+    @app.post("/v1/uploads")
+    async def upload_document(request: Request) -> Any:
+        """Turn an uploaded document into explicitly untrusted context.
+
+        The upload service deliberately returns fragments instead of silently adding
+        them to a global index. The caller must attach the returned fragments to the
+        next completion, which keeps tenant and conversation boundaries explicit.
+        JSON/base64 avoids making ``python-multipart`` a gateway boot dependency.
+        """
+        try:
+            payload = await request.json()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return _error_response("invalid JSON body", status=400, code="invalid_request_error")
+        if not isinstance(payload, dict):
+            return _error_response("upload must be a JSON object", status=400, code="invalid_request_error")
+        filename = str(payload.get("filename") or "upload.bin").strip()[:200]
+        content_type = str(payload.get("content_type") or "text/plain").lower()
+        raw_content = payload.get("content")
+        if not isinstance(raw_content, str) or not raw_content.strip():
+            return _error_response("content is required", status=400, code="invalid_request_error")
+        try:
+            if payload.get("encoding") == "base64":
+                content = base64.b64decode(raw_content, validate=True).decode("utf-8", "replace")
+            else:
+                content = raw_content
+        except (ValueError, UnicodeError):
+            return _error_response("content is not valid base64 UTF-8", status=400, code="invalid_request_error")
+        if len(content.encode("utf-8")) > 2_000_000:
+            return _error_response("upload exceeds the 2 MB limit", status=413, code="payload_too_large")
+        if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
+            # Keep visible and hidden PDF text in the fragment. A parser-backed PDF
+            # service can replace this extraction later without changing the contract.
+            content = "\n".join(re.findall(r"[ -~]{3,}", content))
+        if not content.strip():
+            return _error_response("upload contains no extractable text", status=422, code="empty_upload")
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+        upload_id = f"upload_{digest}"
+        return {
+            "upload_id": upload_id,
+            "filename": filename,
+            "content_type": content_type,
+            "fragments": [
+                {
+                    "doc_id": upload_id,
+                    "text": content,
+                    "provenance": "retrieved_untrusted",
+                    "domain": "general",
+                    "score": 1.0,
+                }
+            ],
+            "security": {
+                "provenance": "retrieved_untrusted",
+                "requires_explicit_interlock_context": True,
+            },
+        }
 
     @app.post("/v1/holds/{hold_id}/approve")
     async def approve_hold(hold_id: str, request: Request) -> Any:

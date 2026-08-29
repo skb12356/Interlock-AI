@@ -6,6 +6,7 @@ const state = {
   assistantText: "",
   currentHoldTokens: new Map(),
   ws: null,
+  uploadedFragments: [],
 };
 
 const el = (id) => document.getElementById(id);
@@ -192,6 +193,7 @@ async function runScenario(event) {
       stream: true,
       scenario: state.scenario,
       messages: [{ role: "user", content: prompt }],
+      interlock: { retrieved: state.uploadedFragments },
     }),
   });
 
@@ -207,6 +209,25 @@ async function runScenario(event) {
     parts.forEach((frame) => consumeFrame(frame, assistant));
   }
   await loadHolds();
+}
+
+async function uploadDocument(file) {
+  const status = el("upload-status");
+  if (!file) return;
+  status.textContent = "Uploading...";
+  const response = await fetch(gateway("/v1/uploads"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ filename: file.name, content_type: file.type, content: await file.text() }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    state.uploadedFragments = [];
+    status.textContent = data.error?.message || "Upload rejected";
+    return;
+  }
+  state.uploadedFragments = data.fragments || [];
+  status.textContent = `${data.filename}: untrusted context attached`;
 }
 
 function consumeFrame(frame, assistant) {
@@ -366,6 +387,7 @@ function wire() {
   el("refresh").addEventListener("click", refresh);
   el("reload-holds").addEventListener("click", loadHolds);
   el("prompt-form").addEventListener("submit", runScenario);
+  el("upload-file").addEventListener("change", (event) => uploadDocument(event.target.files[0]));
   document.querySelectorAll("[data-scenario]").forEach((button) => {
     button.addEventListener("click", () => {
       document.querySelectorAll("[data-scenario]").forEach((b) => b.classList.remove("active"));

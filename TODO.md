@@ -1,5 +1,15 @@
 # Interlock V2 — Master Implementation TODO
 
+## Current State Corrections (2026-08-29)
+
+- Scene 2 now uses locked `pypdf` text-layer extraction with a conservative fallback;
+  OCR, encrypted PDFs, and full layout fidelity remain unsupported.
+- `scripts/measure_efficacy.py` now validates human-reviewed forced-action outcomes and
+  computes Wilson intervals, but the policy matrix still requires real post-action data.
+- `pytest -m chaos` now covers observer degradation, breaker shallow mode, and malformed
+  policy refusal; upstream 429 and watchdog behavior remain covered by the contract and
+  property suites.
+
 **Source of truth:** `Implementation/Implementation01.md` (5-day plan) · `Implementation02.md` (system design) · `Implementation03.md` (frozen contracts) · `Implementation04.md` (ADR-001…009) · `CLAUDE.md` (engineering principles) · `Interlock-v2.pdf` (design intent, target numbers).
 
 **North-star metric:** Pre-Action Catch Rate ≥ 90%. **Six targets, measured not aspirational:** catch ≥ 90% · added p95 ≤ 120 ms (TTFT unchanged) · verification cost ≤ 5% of model spend · net spend ≈ −30% · ungrounded escapes ≤ 1% (conformal, 90% confidence) · false interventions ≤ 2%.

@@ -22,6 +22,7 @@ dependencies = [
     "scikit-learn>=1.5",
     "duckdb>=1.1",
     "pysbd>=0.3.4",
+    "pypdf>=5.0",
     "pyahocorasick>=2.1",
 ]
 

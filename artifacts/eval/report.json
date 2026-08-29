@@ -3,7 +3,7 @@
   "conformal_filter": false,
   "n_cases": 200,
   "n_defective": 43,
-  "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+  "policy_version": "banking-v3@sha256:0aeb8a4b17fe218c",
   "metrics": {
     "metrics": [
       {
@@ -22,7 +22,7 @@
       },
       {
         "name": "Added p95 latency",
-        "value": 15.0,
+        "value": 16.0,
         "unit": "ms",
         "target": "<= 120 ms",
         "met": true,

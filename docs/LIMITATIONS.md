@@ -27,6 +27,10 @@ forced-action outcomes with confidence intervals. The ledger can expose real reg
 rework when those rows exist, and the runbook records when those values are unmeasured.
 Do not present assumed repair efficacy as a measured production result.
 
+The repository includes `scripts/measure_efficacy.py` to import reviewed post-action
+outcomes. It intentionally rejects using the 300 pre-action labels as efficacy data and
+does not write a policy update automatically.
+
 ## Observer
 
 The observer probe is an optional in-process signal. On a clean CPU-only checkout the
@@ -54,7 +58,7 @@ Lane C projections are live and exposed, but the current rehearsal database cont
 fairness pairs. The endpoint correctly reports that no bet has been placed when there
 are too few observations. A fairness claim needs real counterfactual pairs in the ledger,
 not just endpoint availability. Completed offline observations can be imported with
-`uv run python scripts/import_fairness_pairs.py pairs.jsonl`; incomplete or self-pairs
+`uv run python scripts/import_fairness_pairs.py artifacts/eval/fairness_run.json --allow-offline`; the importer also accepts JSONL. The explicit flag is required for an artifact marked offline. Incomplete or self-pairs
 are rejected and writes use the ledger lock.
 
 ## Rehearsal Environment
@@ -64,9 +68,31 @@ rehearsal was run through the real gateway and console against a deterministic l
 OpenAI-compatible fixture upstream. That validates gateway streaming, ConsoleHub
 publishing, holds and metrics endpoints; it is not a live-model quality rehearsal.
 
+## Load Result
+
+The five-minute load pass used 20 concurrent workers against the real gateway and a
+deterministic local upstream fixture. It completed 4,023 requests with zero failures,
+but gateway overhead p95 was 531 ms against the 120 ms budget. Mean unattributed
+overhead was 123.3 ms. These are measured findings, not production capacity claims.
+
+## Security Scope
+
+The committed security sweep proves local application controls only: prompt-storage
+defaults, tenant canary isolation, evidence redaction, policy validation, and secret-file
+exclusion. It is not a network penetration test, dependency audit, or container-image
+scan.
+
+## Observer Performance
+
+A standalone real-observer smoke call on this machine returned a valid non-degraded
+probe signal. The cold inference took 17,966 ms; three subsequent warm calls measured
+43.80, 40.97, and 39.83 ms, with the service reporting a warm p95 of 37.06 ms. This
+still misses the intended 25 ms warm-p95 target; no sub-25-ms claim is made until model
+warm-up, batching, and deployment hardware are addressed.
+
 ## Upload Extraction
 
 The upload contract accepts text and PDF bytes and preserves the result as
-`retrieved_untrusted`. The minimal clean-checkout runtime extracts printable PDF strings
-without a heavyweight parser; this covers the included white-text fixture but does not
-claim arbitrary-PDF layout, OCR, or encrypted-document support.
+`retrieved_untrusted`. Text-layer PDFs use the locked `pypdf` parser, with a conservative
+printable-byte fallback for malformed fixture inputs. This still does not claim arbitrary
+layout fidelity, OCR, or encrypted-document support.

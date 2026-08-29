@@ -429,6 +429,7 @@ async def test_repair_without_a_repairer_falls_back_to_releasing() -> None:
 # =========================================================================== #
 
 
+@pytest.mark.chaos
 async def test_a_hanging_engine_does_not_hang_the_stream() -> None:
     """8 s in production; short here. Holding a sentence because our own checker
     stalled is the worst possible outcome -- it looks exactly like a freeze."""

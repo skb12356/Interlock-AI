@@ -1,5 +1,18 @@
 # Interlock V2 — Master Implementation TODO
 
+## Current State Corrections (2026-08-29)
+
+- Scene 2 now uses locked `pypdf` text-layer extraction with a conservative fallback;
+  OCR, encrypted PDFs, and full layout fidelity remain unsupported.
+- `scripts/measure_efficacy.py` now validates human-reviewed forced-action outcomes and
+  computes Wilson intervals, but the policy matrix still requires real post-action data.
+- `pytest -m chaos` now covers observer degradation, breaker shallow mode, and malformed
+  policy refusal; upstream 429 and watchdog behavior remain covered by the contract and
+  property suites.
+- `scripts/build_pitch_pack.py` now generates `artifacts/eval/pitch_pack.json` from the
+  regenerated seed reports and the versioned policy, including measured metrics,
+  evidence references, and policy-derived stakes cases.
+
 **Source of truth:** `Implementation/Implementation01.md` (5-day plan) · `Implementation02.md` (system design) · `Implementation03.md` (frozen contracts) · `Implementation04.md` (ADR-001…009) · `CLAUDE.md` (engineering principles) · `Interlock-v2.pdf` (design intent, target numbers).
 
 **North-star metric:** Pre-Action Catch Rate ≥ 90%. **Six targets, measured not aspirational:** catch ≥ 90% · added p95 ≤ 120 ms (TTFT unchanged) · verification cost ≤ 5% of model spend · net spend ≈ −30% · ungrounded escapes ≤ 1% (conformal, 90% confidence) · false interventions ≤ 2%.
@@ -120,7 +133,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[x]` Demo app answers through the gateway, streaming, with a trace row — *verified by gateway contract tests and rehearsal.*
 - `[x]` `X-Interlock-Force: ungrounded@2` → stub L2 decision in the trace — *stub retained behind `INTERLOCK_RISK_ENGINE=stub`; the real engine ignores the header by design*
 - `[x]` Contracts committed and untouched since the freeze — *158 contract tests green; Contract 1 took two ADDITIVE optional fields under its own change rule*
-- `[ ]` Semantic-entropy label job running
+- `[ ]` Semantic-entropy label job running — **OPEN**: requires an affordable/responding Ollama run; no scores are fabricated.
 
 ---
 
@@ -160,7 +173,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 ### Day 2 exit criteria
 - `[x]` Gate property test passes; a real stream can be held, repaired and released — *28 property tests green; verified live against Ollama*
-- `[ ]` Observer returns real probe scores under 25 ms p95 warm, with KV caching proven by a log line
+- `[ ]` Observer returns real probe scores under 25 ms p95 warm, with KV caching proven by a log line — *real probe signal and separated warm timing verified; warm p95 measured 37.06 ms after a 17,966 ms cold start, so criterion remains open.*
 - `[x]` `reliability.png` + `lambda.json` committed with a certified (α=0.01, δ=0.10) — *certified at threshold 0.0150 on n=840; **the 100% intervention rate must be quoted with it***
 - `[x]` Accuracy-by-layer curve exists — *`artifacts/probes/curve.json`; peaks mid-stack at layer 3, one-standard-error selection*
 - `[ ]` Governor degrades when the observer is killed
@@ -175,9 +188,9 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[x]` **D3-A1 — `interlock_tools/provenance.py`** — *done 2026-08-25. Two-tier attribution per ADR-007. **Matching is on token boundaries, not raw substring** -- a test caught `{"currency": "en"}` matching "prepaym**en**t", which traced every call to every document and made tier 1 meaningless. Tier 2 over-taints deliberately and says so in the rationale, so an operator can tell a traced freeze from a precautionary one. Taint carries across turns and is per-request.* — original scope: — the taint lattice `system < user < retrieved_verified < retrieved_untrusted < tool_external`; label every fragment at ingestion; propagate across turns; `influencing_taint(tool_call)` = **tier 1** exact / ≥ 0.9-token-overlap argument match, **tier 2** conservative max over untrusted fragments retrieved this turn (ADR-007).
 - `[x]` **D3-A2 — `interlock_tools/reversibility.py` + `holds.py`** — *done 2026-08-25. Taint x reversibility matrix from the policy; the monetary cap is a separate axis on purpose. Durable holds committed before the caller is told, **kill-and-restart test passes**. Resume tokens gate approval only (constant-time compare); rejection needs no token. Expiry sweeper marks expired, never approved. Tool calls stream one CALL behind and are replayed assembled once cleared -- the client never sees a frozen call. `POST /v1/holds/{id}/approve|reject` wired.* — original scope: — policy lookup, the taint × reversibility matrix, **durable** pending holds with resume tokens, `POST /v1/holds/{id}/approve|reject`, expiry sweeper.
   - *Test:* **kill-and-restart — the hold survives.** This is the demo/product boundary.
-- `[~]` **D3-A3 — Scene 2 wiring** — *partial 2026-08-29. The console uploads text or PDF bytes through `/v1/uploads`, returns an explicitly `retrieved_untrusted` fragment, and attaches it to the next completion; the existing tool interlock freezes `send_email` and raises a review card. The clean-checkout runtime deliberately has no PDF parser dependency, so production deployments must replace the conservative printable-text extractor with a parser-backed worker before claiming arbitrary-PDF coverage.*
+- `[~]` **D3-A3 — Scene 2 wiring** — *partial 2026-08-29. The console uploads text or PDF bytes through `/v1/uploads`, uses locked `pypdf` text-layer extraction with a conservative fallback, returns an explicitly `retrieved_untrusted` fragment, and attaches it to the next completion; the existing tool interlock freezes `send_email` and raises a review card. OCR, encrypted PDFs, and full layout fidelity remain unsupported.*
 - `[x]` **D3-A4 — `gateway/router.py` + `cache.py`** — *done 2026-08-29. Router: stakes dominates and cannot be overridden downward; difficulty decides within that. **Labelled `difficulty_heuristic-v1`, NOT `router_mf`** -- a trained matrix factorisation is not what this build has. Cache enforces all four conditions conjunctively, including the context hash over doc_id AND text, which is what stops a superseded clause being served forever. Live streaming now looks up verified clean answers before upstream selection, serves cache hits with `x-interlock-cache: hit`, publishes `dec_cache_hit` into ConsoleHub, and stores only non-degraded all-`L0_pass` answers. **Three routing bugs found and fixed, all of which sent 100% of traffic to the strong tier**: retrieval-never-ran read as maximally hard; document count measuring the retriever's k; and a score-spread term reading RRF's fusion constant rather than retrieval quality.* — original scope: — RouteLLM `mf` controller; **the threshold is a function of `Stakes`** (Contribution 1 — must be visible in the trace as `route_reason` plus the shared stakes id). The cache serves **only when** cosine ≥ 0.95 **and** the retrieval-context hash matches **and** stakes ≤ threshold **and** the cached answer previously passed verification.
-- `[~]` **D3-A5 — Agent loop breaker** — *scored in the eval harness (3-strike digest repeat, saved tokens credited to the ledger's spend), not yet wired into the live gateway agent path.* — original scope: — n-gram repeat on `(tool, args_digest)`, 3-strike rule + context-growth slope check; cut the loop, log the saved spend.
+- `[x]` **D3-A5 — Agent loop breaker** — *live gateway path now tracks session-scoped `(tool, args_digest)` repeats, cuts on the third strike, emits an `agent_loop` decision, and bounds history to 1,000 sessions; contract-tested through streaming.* — original scope: — n-gram repeat on `(tool, args_digest)`, 3-strike rule + context-growth slope check; cut the loop, log the saved spend.
 - `[x]` **D3-A6 — Latency instrumentation** — *done 2026-08-26. Per-lane attribution at `/admin/latency`. **Lane B is deliberately NOT a lane**: it runs concurrently with generation, so only `gate_hold` -- the part the commit gate actually waited on -- is latency the customer experienced. Counting Lane B's wall-clock would make a correctly-designed system look slow. Buffered and unbuffered reported separately (pooling produces a p95 describing neither); unattributed overhead is reported rather than folded into the nearest lane; a percentile from under 20 samples refuses to call itself a p95. A test caught the `window` parameter being configurable in name only.* — `overhead_ms` per request, split by lane, exported as a histogram. *The Day-5 p95 must be measured, not estimated.*
 
 ## D3-B — The risk engine, for real
@@ -222,8 +235,8 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 ### Day 4 exit criteria
 - `[x]` Ledger shows a net number with a confidence interval — live `/admin/economics` exposes `net_value_inr`, `net_value_ci_inr`, and sample count; the console renders the interval band.
-- `[ ]` Fairness run produces an e-value chart
-- `[ ]` All four scenes run without a human touching a terminal mid-scene
+- `[x]` Fairness run produces an e-value chart — *offline five-pair twin run committed as `artifacts/eval/fairness_run.json` and `.html`; the report remains below the 10-pair warm-up and does not claim a live fairness result.*
+- `[x]` All four scenes run without a human touching a terminal mid-scene — *`scripts/rehearse_gateway.py --strict-actions` completed all four scenarios against the real gateway and console.*
 - `[x]` Evidence pack downloads and opens — `GET /admin/evidence/{request_id}.zip` exports the recorded, redacted request pack; contract-tested by opening the ZIP and checking its manifest.
 - `[x]` Calibration set and eval set provably disjoint — *D4-B6: by document, stratified by domain, zero shared, asserted end-to-end*
 
@@ -233,22 +246,22 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 > **Goal:** six measured numbers, live on a URL, and the pitch run four times.
 
-- `[ ]` **D5-J1 — FEATURE FREEZE.** No new features after this hour. Write it where you can see it.
-- `[~]` **D5-B1 — The measurement run** — *partial 2026-08-29. `scripts/build_eval_report.py` runs the full 200-case off-vs-on evaluation across three seeds and writes `artifacts/eval/report.html` plus per-seed JSON with Wilson intervals. The three reported misses remain reproducible: verification cost 5.20/5.51/5.35%, net spend -18.96/-16.73/-16.59%, false interventions 85.35/91.08/90.45%.*
+- `[x]` **D5-J1 — FEATURE FREEZE.** Release scope frozen 2026-08-29; remaining work is validation, evidence, and explicitly documented limitations.
+- `[x]` **D5-B1 — The measurement run** — *completed 2026-08-29. `scripts/build_eval_report.py` runs the full 200-case off-vs-on evaluation across three seeds and writes `artifacts/eval/report.html` plus per-seed JSON with Wilson intervals. The three reported misses remain reproducible: verification cost 5.20/5.51/5.35%, net spend -18.96/-16.73/-16.59%, false interventions 85.35/91.08/90.45%.*
   - **If the Pre-Action Catch Rate is below 90%, do not tune the eval. Report what you got and explain the failure modes.** A panel trusts a measured 84% far more than a suspicious 97%.
 - `[ ]` **D5-A1 — Chaos pass** — kill the observer mid-stream (must degrade, not 500), an upstream 429 storm, SQLite lock contention, a malformed policy at boot (**refuse to start; the previous version stays live**), an 8 s watchdog fire.
-- `[ ]` **D5-A2 — Load pass** — 20 concurrent streams × 5 minutes → capture the **p95 overhead histogram**. This number goes on the slide.
-- `[ ]` **D5-A3 — Security sweep** — API keys never logged; prompts hashed unless `INTERLOCK_STORE_PROMPTS=1`; canary registry per tenant; no secrets in the image.
+- `[x]` **D5-A2 — Load pass** — *completed 2026-08-29 against the real gateway with the deterministic upstream fixture: 4,023 requests, 20-way concurrency, zero failures; measured gateway overhead p95 531 ms against the 120 ms budget, with 123.3 ms mean unattributed overhead. Artifact: `artifacts/load/load_pass.json`.*
+- `[x]` **D5-A3 — Security sweep** — *local sweep passed for prompt-hashing defaults, tenant canary isolation, evidence redaction, policy validation, and secret-file exclusion; artifact: `artifacts/security/security_sweep.json`. This is not an external penetration test.*
 - `[~]` **D5-A4 — Deploy** — *partial 2026-08-29. `docs/05_deploy_runbook.md` exists; `scripts/up.ps1` now supervises gateway, observer and console, passes the observer URL to the gateway, and supports explicit `-RiskEngine real|stub` for production vs deterministic rehearsal. The CPU profile was tested in-place, not from a clean checkout.*
-- `[ ]` **D5-B2 — Evidence pack for the pitch** — the mechanism table with **our measured numbers beside the published ones**; the six-metric scorecard; the three-case stakes table regenerated from the real policy files.
+- `[x]` **D5-B2 — Evidence pack for the pitch** — *completed 2026-08-29. `scripts/build_pitch_pack.py` generates `artifacts/eval/pitch_pack.json` from current policy and regenerated seed reports, including measured metrics, mechanism references, and policy-derived stakes cases.*
 - `[x]` **D5-B3 — `docs/LIMITATIONS.md`** — *done 2026-08-29. Covers the three missed metrics, F-019 impact-model decision, assumed efficacy, optional observer, provenance over-blocking, single-vertical scope, empty Lane C live sample set, and the deterministic-upstream rehearsal caveat.*
 - `[ ]` **D5-J2 — Rehearse** — four run-throughs, 8 minutes each. Drill the two questions that decide the round: *"you need model internals but claim model-agnosticism"* and *"latency, honestly."* **Record one run as the backup video. Never demo live without a fallback.**
 
 ### Day 5 exit criteria
-- `[ ]` Six metrics measured, with intervals, in `report.html`
-- `[ ]` p95 overhead histogram captured under load
+- `[x]` Six metrics measured, with intervals, in `report.html` — *the scorecard records misses as well as passes.*
+- `[x]` p95 overhead histogram captured under load — *the measured report is committed in `artifacts/load/load_pass.json`; it is over budget and remains a release finding.*
 - `[ ]` Clean-checkout deploy verified on both profiles
-- `[ ]` `LIMITATIONS.md` written
+- `[x]` `LIMITATIONS.md` written — completed 2026-08-29 at `docs/LIMITATIONS.md`.
 - `[ ]` Backup video recorded
 
 ---

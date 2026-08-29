@@ -38,7 +38,7 @@ async def one(
                 "status": response.status_code,
                 "elapsed_ms": (time.perf_counter() - started) * 1000.0,
             }
-        except (TimeoutError, httpx.HTTPError) as exc:
+        except (httpx.HTTPError, TimeoutError) as exc:
             return {
                 "ok": False,
                 "status": None,

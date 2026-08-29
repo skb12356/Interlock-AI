@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 5 in-place operational rehearsal complete; console served with gateway and observer",
+  "current_phase": "Day 5 release validation complete locally; remaining gates are external-evidence and performance constrained",
   "last_completed_task": "Person 1: ConsoleHub publishing, response-hold resume token, production console supervision, live economics/Lane C endpoints, semantic cache wiring, observer context cache stats, 300 manual anchor labels, artifact refresh, deterministic four-scene gateway rehearsal, untrusted upload path, and three-seed HTML evaluation scorecard",
-  "next_task": "F-019 remains the release policy decision. Then run the same rehearsal against a responding live Ollama/upstream, complete measured efficacy, chaos/load/security passes, and clean-checkout deploy verification.",
+  "next_task": "Obtain reviewed forced-action outcomes, resolve F-019 policy/metric decision, run a responding live-model rehearsal, and complete clean-checkout/performance validation.",
   "system_status": "Amber -- backend and console wiring are now live and rehearsed in-place with a deterministic upstream; regenerated metrics still miss verification cost, net spend and false interventions, and Ollama did not respond locally for a live-model rehearsal",
   "verification": {
     "ruff": "clean on touched Python files; prior checkpoint had clean across interlock/, tests/, scripts/",
     "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
-    "pytest": "885 passed in 66.90s (fast suite; slow model-weight tests still marked separately)",
+    "pytest": "906 passed in 113.86s (slow model-weight tests remain separately marked)",
     "make_eval": "regenerated 2026-08-29; verification cost 5.20% MISS, net spend -18.96% MISS, false interventions 85.35% MISS; policy hash current",
     "sensitivity": "regenerated 2026-08-29; disruptive target achievable below a clean floor of 3e-05"
   },

@@ -459,6 +459,7 @@ def test_the_token_path_never_imports_sqlite3() -> None:
             assert "import sqlite3" not in source, f"{path} writes to SQLite directly"
 
 
+@pytest.mark.chaos
 async def test_concurrent_writers_do_not_lock(tmp_path: Path) -> None:
     """The failure the plan names as showing up under load."""
     instance = Ledger(db_path=tmp_path / "t.db")

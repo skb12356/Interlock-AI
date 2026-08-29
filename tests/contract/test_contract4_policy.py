@@ -48,6 +48,16 @@ def test_policy_version_changes_when_the_file_changes(tmp_path: Path) -> None:
     assert load_policy(a).policy_version != load_policy(b).policy_version
 
 
+def test_policy_version_is_stable_across_line_endings(tmp_path: Path) -> None:
+    content = POLICY_PATH.read_text(encoding="utf-8")
+    lf = tmp_path / "lf.yaml"
+    crlf = tmp_path / "crlf.yaml"
+    lf.write_bytes(content.encode("utf-8"))
+    crlf.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
+
+    assert load_policy(lf).policy_version == load_policy(crlf).policy_version
+
+
 def test_invalid_policy_is_refused(tmp_path: Path) -> None:
     """Refuse to start rather than run on a policy nobody validated."""
     bad = tmp_path / "bad.yaml"
@@ -56,6 +66,7 @@ def test_invalid_policy_is_refused(tmp_path: Path) -> None:
         load_policy(bad)
 
 
+@pytest.mark.chaos
 def test_malformed_yaml_is_refused(tmp_path: Path) -> None:
     bad = tmp_path / "bad.yaml"
     bad.write_text("version: [unclosed\n", encoding="utf-8")

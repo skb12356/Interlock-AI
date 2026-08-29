@@ -46,14 +46,12 @@ if (-not (Test-Path $consoleIndex)) {
     if ($LASTEXITCODE -ne 0) { throw "console build failed with exit code $LASTEXITCODE" }
 }
 
-# The real observer (D2-B4) is not built yet, so the mock stands in. It implements the
-# identical HTTP contract, which is the entire point of having frozen that contract.
+# The mock remains an explicit rehearsal/chaos option. Production uses the real
+# observer service, which owns the trained probe and optional claim verifier.
 $observerApp = if ($MockObserver) {
     'interlock.observer.mock_server:app'
-} elseif (Test-Path (Join-Path $repo 'interlock\observer\server.py')) {
-    'interlock.observer.server:app'
 } else {
-    'interlock.observer.mock_server:app'
+    'interlock.observer.server:app'
 }
 
 $services = @(

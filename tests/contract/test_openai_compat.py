@@ -309,6 +309,20 @@ def test_opted_out_clients_still_publish_to_console(client: TestClient) -> None:
     assert recent[0]["event"] == "interlock.stakes"
 
 
+def test_live_economics_and_lane_c_endpoints_expose_unmeasured_state(
+    client: TestClient,
+) -> None:
+    economics = client.get("/admin/economics")
+    lane_c = client.get("/admin/lanec")
+
+    assert economics.status_code == 200
+    assert {"net_value_inr", "regret_inr", "rework_inr", "notes"} <= economics.json().keys()
+    assert any("unmeasured" in note for note in economics.json()["notes"])
+    assert lane_c.status_code == 200
+    assert lane_c.json()["n_pairs"] == 0
+    assert any("no fairness pairs" in note for note in lane_c.json()["notes"])
+
+
 @respx.mock
 def test_opting_out_still_delivers_every_token(client: TestClient) -> None:
     """The escape hatch governs what the client sees, never what the gate does."""
@@ -409,6 +423,7 @@ def test_non_streaming_completion(client: TestClient) -> None:
 
 
 @respx.mock
+@pytest.mark.chaos
 def test_an_upstream_error_becomes_an_openai_shaped_error(client: TestClient) -> None:
     respx.post(UPSTREAM).mock(return_value=httpx.Response(429, json={"error": "slow down"}))
     response = client.post("/v1/chat/completions", json=_request(stream=False))

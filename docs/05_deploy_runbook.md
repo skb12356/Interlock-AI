@@ -8,6 +8,7 @@ Prerequisites:
 - Node.js 22 and npm for the first console build
 - Local OpenAI-compatible upstream, defaulting to Ollama at `http://127.0.0.1:11434/v1`
 - A built corpus index at `data/corpus.db`; rebuild with `uv run python scripts/build_index.py` if missing
+- For arbitrary PDF text-layer extraction, the locked `pypdf` dependency is installed by the project environment. OCR, encrypted PDFs, and exact layout reconstruction remain unsupported.
 
 Start the stack:
 
@@ -36,6 +37,42 @@ the gateway's `/admin/latency` histogram to an evidence artifact):
 uv run python scripts/load_pass.py --duration-seconds 300 --concurrency 20
 ```
 
+Run the local security/privacy sweep:
+
+```powershell
+uv run python scripts/security_sweep.py
+```
+
+Run the deployment failure-mode checks:
+
+```powershell
+uv run pytest -m chaos
+```
+
+These checks cover in-band observer degradation, breaker-driven shallow mode, and
+refusal to load malformed policy. Upstream 429 and watchdog behavior are covered by
+the contract/property suites.
+
+## Measured Efficacy Import
+
+The efficacy matrix requires human-reviewed outcomes after forcing an action. A
+pre-action defect label is not an efficacy observation. Create one JSONL row per
+forced action and reviewed result:
+
+```json
+{"item_id":"manual-anchor-001","action":"L2_repair","defect":"ungrounded","removed":true}
+```
+
+The importer validates IDs against the 300-item manual anchor set, rejects duplicate
+cells and invalid booleans, and writes Wilson intervals only for observed cells:
+
+```powershell
+uv run python scripts/measure_efficacy.py post_action_outcomes.jsonl
+```
+
+Review `artifacts/eval/efficacy.json` before updating the versioned policy. An empty
+or missing outcomes file is intentional until forced-action review has been performed.
+
 Stop:
 
 ```powershell
@@ -53,6 +90,12 @@ $env:INTERLOCK_OLLAMA_BASE_URL = "http://127.0.0.1:8099/v1"
 $env:INTERLOCK_DB_PATH = "data/rehearsal.db"
 .\scripts\up.ps1 -RiskEngine stub -MockObserver -TimeoutSeconds 120
 uv run python scripts/rehearse_gateway.py --strict-actions
+```
+
+For a repeatable rehearsal with automatic fixture and service cleanup:
+
+```powershell
+.\scripts\rehearse_all.ps1
 ```
 
 The rehearsal writes `artifacts/rehearsal/gateway_rehearsal.json` with raw resume tokens
@@ -73,7 +116,7 @@ Run the gateway and console as supervised processes behind a TLS reverse proxy:
 
 - `uv run uvicorn interlock.gateway.app:app --host 127.0.0.1 --port 8080`
 - `uv run uvicorn interlock.console.app:app --host 127.0.0.1 --port 5173`
-- observer on `127.0.0.1:8081`, using `interlock.observer.mock_server:app` for CPU-only rehearsals or `interlock.observer.server:app` when a real observer server is added
+- observer on `127.0.0.1:8081`, using `interlock.observer.server:app` in production or `interlock.observer.mock_server:app` only with `-MockObserver` for deterministic rehearsals
 - The console service serves the compiled React assets and proxies `/gateway/*` plus
   `/console/*` (including WebSocket upgrades) to the configured gateway. Route the browser
   origin to `:5173`; do not expose a second browser-facing gateway origin.

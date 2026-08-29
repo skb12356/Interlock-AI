@@ -257,7 +257,7 @@ def _coerce_efficacy(raw: Any) -> Any:
 
 
 def load_policy(path: str | Path) -> Policy:
-    """Load and validate a policy file, stamping it with the digest of its own bytes.
+    """Load and validate a policy file, stamping it with a stable content digest.
 
     Raises ``PolicyError`` on anything invalid — the caller decides whether that means
     "refuse to start" (boot) or "keep the previous version live" (hot reload).
@@ -268,8 +268,11 @@ def load_policy(path: str | Path) -> Policy:
     except OSError as exc:
         raise PolicyError(f"cannot read policy file {path}: {exc}") from exc
 
+    # Git checkouts may use CRLF on Windows and LF on Linux. Hash the canonical YAML
+    # bytes so a policy keeps one identity across deployment platforms.
+    canonical_bytes = raw_bytes.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
     try:
-        data = yaml.safe_load(raw_bytes.decode("utf-8"))
+        data = yaml.safe_load(canonical_bytes.decode("utf-8"))
     except yaml.YAMLError as exc:
         raise PolicyError(f"policy file {path} is not valid YAML: {exc}") from exc
 
@@ -280,7 +283,7 @@ def load_policy(path: str | Path) -> Policy:
     if "efficacy" in data:
         data["efficacy"] = _coerce_efficacy(data["efficacy"])
 
-    digest = hashlib.sha256(raw_bytes).hexdigest()
+    digest = hashlib.sha256(canonical_bytes).hexdigest()
     data["policy_version"] = f"{data.get('version', 'unknown')}@sha256:{digest[:16]}"
     data["source_path"] = str(path)
 

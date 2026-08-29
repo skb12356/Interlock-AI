@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import io
 import json
 import logging
 import random
@@ -105,6 +106,20 @@ def _stream_options(header_value: str | None) -> StreamOptions:
     return StreamOptions()
 
 
+def _extract_pdf_text(raw_bytes: bytes, fallback: str) -> str:
+    """Extract a PDF text layer, retaining the fixture fallback for malformed PDFs."""
+    try:
+        from pypdf import PdfReader
+
+        pages = PdfReader(io.BytesIO(raw_bytes)).pages
+        parsed = "\n".join(page.extract_text() or "" for page in pages)
+        if parsed.strip():
+            return parsed
+    except Exception:
+        _log.info("PDF parser could not extract text; using printable-byte fallback", exc_info=True)
+    return "\n".join(re.findall(r"[ -~]{3,}", fallback))
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
 
@@ -155,6 +170,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.console_hub = ConsoleHub()
         app.state.console_publishers_integrated = True
         app.state.rework_sessions = {}
+        app.state.agent_tool_history = {}
         app.state.shadow_tasks = set()
         app.state.shadow_rng = random.Random(20260829)
         app.state.latency = LatencyRecorder()
@@ -290,8 +306,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return _error_response("content is required", status=400, code="invalid_request_error")
         try:
             if payload.get("encoding") == "base64":
-                content = base64.b64decode(raw_content, validate=True).decode("utf-8", "replace")
+                raw_bytes = base64.b64decode(raw_content, validate=True)
+                content = raw_bytes.decode("utf-8", "replace")
             else:
+                raw_bytes = raw_content.encode("utf-8")
                 content = raw_content
         except (ValueError, UnicodeError):
             return _error_response(
@@ -302,9 +320,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "upload exceeds the 2 MB limit", status=413, code="payload_too_large"
             )
         if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
-            # Keep visible and hidden PDF text in the fragment. A parser-backed PDF
-            # service can replace this extraction later without changing the contract.
-            content = "\n".join(re.findall(r"[ -~]{3,}", content))
+            content = _extract_pdf_text(raw_bytes, content)
         if not content.strip():
             return _error_response(
                 "upload contains no extractable text", status=422, code="empty_upload"
@@ -846,7 +862,35 @@ async def _stream_response(
         # other leaves the client having executed half a plan, which is a state no
         # agent loop is written to recover from.
         released: list[dict[str, Any]] = []
+        loop_cut = False
+        tool_history = app.state.agent_tool_history.setdefault(session_id, {}) if session_id else {}
         for call in tool_calls.assemble():
+            if session_id:
+                digest = hashlib.sha256(
+                    json.dumps(
+                        {"tool": call.name, "arguments": call.arguments}, sort_keys=True
+                    ).encode("utf-8")
+                ).hexdigest()
+                tool_history[digest] = int(tool_history.get(digest, 0)) + 1
+                if tool_history[digest] >= 3:
+                    loop_cut = True
+                    finish_reason = "agent_loop_cut"
+                    loop_event = DecisionEvent(
+                        decision_id="dec_agent_loop",
+                        sentence_idx=-1,
+                        action="L5_block",
+                        chosen_loss=0.0,
+                        hard_rule="agent_loop",
+                        why=[
+                            f"agent loop breaker: repeated tool digest {tool_history[digest]} times; "
+                            f"tool call suppressed; estimated {app.state.policy.compute_tokens.get('L3_reroute', 0)} "
+                            "generation tokens avoided"
+                        ],
+                    )
+                    _publish_console(app, EVENT_DECISION, loop_event)
+                    if options.allows(EVENT_DECISION):
+                        yield format_event(EVENT_DECISION, loop_event)
+                    break
             decision, held = await interlock.check(call, lane.fragments, request_id=request_id)
             if held is not None:
                 finish_reason = "tool_call_held"
@@ -864,7 +908,7 @@ async def _stream_response(
                 break
             released.append(call.call_id)
 
-        if tool_calls.saw_any and finish_reason != "tool_call_held":
+        if tool_calls.saw_any and finish_reason != "tool_call_held" and not loop_cut:
             # Cleared. Replay the assembled calls as a single chunk -- the client sees
             # one complete tool_calls message instead of the fragments we absorbed.
             yield format_data(
@@ -957,6 +1001,9 @@ async def _stream_response(
             if len(app.state.rework_sessions) > 1000:
                 oldest = next(iter(app.state.rework_sessions))
                 del app.state.rework_sessions[oldest]
+            if len(app.state.agent_tool_history) > 1000:
+                oldest = next(iter(app.state.agent_tool_history))
+                del app.state.agent_tool_history[oldest]
         _schedule_shadow(
             app=app,
             body=original_body,

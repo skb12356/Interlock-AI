@@ -1,0 +1,17 @@
+{
+  "checks": {
+    "prompt_storage_defaults_off": true,
+    "tenant_canary_isolation": true,
+    "evidence_redaction": true,
+    "secret_files_untracked": true,
+    "policy_loads": true
+  },
+  "details": {
+    "prompt_storage_defaults_off": "INTERLOCK_STORE_PROMPTS defaults to false",
+    "tenant_canary_isolation": "canaries are owner-bound and not shared between tenants",
+    "evidence_redaction": "resume tokens and tenant canaries are absent from ZIP bytes",
+    "secret_files_untracked": "git does not track configured secret-file patterns",
+    "policy_loads": "versioned policy validates through the strict schema"
+  },
+  "passed": true
+}

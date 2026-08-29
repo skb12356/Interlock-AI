@@ -1,6 +1,6 @@
 {
   "seed": 20260827,
-  "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+  "policy_version": "banking-v3@sha256:0aeb8a4b17fe218c",
   "n_cases": 200,
   "metrics": [
     {

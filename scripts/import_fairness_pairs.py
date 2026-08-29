@@ -15,8 +15,14 @@ sys.path.insert(0, str(REPO_ROOT))
 from interlock.ledger.writer import Ledger  # noqa: E402
 
 REQUIRED = {
-    "pair_id", "base_request_id", "twin_request_id", "attribute",
-    "decision_field", "base_value", "twin_value", "delta",
+    "pair_id",
+    "base_request_id",
+    "twin_request_id",
+    "attribute",
+    "decision_field",
+    "base_value",
+    "twin_value",
+    "delta",
 }
 
 
@@ -29,7 +35,7 @@ def read_rows(path: Path) -> list[dict[str, Any]]:
             item = json.loads(line)
         except json.JSONDecodeError as exc:
             raise ValueError(f"line {number}: invalid JSON: {exc.msg}") from exc
-        if not isinstance(item, dict) or not REQUIRED <= item.keys():
+        if not isinstance(item, dict) or not item.keys() >= REQUIRED:
             missing = sorted(REQUIRED - set(item) if isinstance(item, dict) else REQUIRED)
             raise ValueError(f"line {number}: missing fields: {', '.join(missing)}")
         if any(not str(item[key]).strip() for key in REQUIRED - {"delta"}):

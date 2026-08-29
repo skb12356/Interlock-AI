@@ -68,9 +68,9 @@ from interlock.gateway.latency import LaneTimer, LatencyRecorder, LatencySample
 from interlock.gateway.providers import Provider, build_providers
 from interlock.interlock_tools.holds import ToolInterlock, new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
+from interlock.ledger.evidence import build_evidence_pack
 from interlock.ledger.pricing import PriceBook
 from interlock.ledger.rework import ReworkLedger, SessionTurn
-from interlock.ledger.evidence import build_evidence_pack
 from interlock.ledger.writer import Ledger, RequestBatch, SpanEntry
 from interlock.retrieval.embedder import embed_query, load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever
@@ -153,6 +153,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # stream never has to edit this file, which is the only place the two work
         # streams would otherwise collide. See coordination/ALLOTED_WORK.md.
         app.state.console_hub = ConsoleHub()
+        app.state.console_publishers_integrated = True
         app.state.rework_sessions = {}
         app.state.shadow_tasks = set()
         app.state.shadow_rng = random.Random(20260829)
@@ -279,7 +280,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except (json.JSONDecodeError, UnicodeDecodeError):
             return _error_response("invalid JSON body", status=400, code="invalid_request_error")
         if not isinstance(payload, dict):
-            return _error_response("upload must be a JSON object", status=400, code="invalid_request_error")
+            return _error_response(
+                "upload must be a JSON object", status=400, code="invalid_request_error"
+            )
         filename = str(payload.get("filename") or "upload.bin").strip()[:200]
         content_type = str(payload.get("content_type") or "text/plain").lower()
         raw_content = payload.get("content")
@@ -291,15 +294,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             else:
                 content = raw_content
         except (ValueError, UnicodeError):
-            return _error_response("content is not valid base64 UTF-8", status=400, code="invalid_request_error")
+            return _error_response(
+                "content is not valid base64 UTF-8", status=400, code="invalid_request_error"
+            )
         if len(content.encode("utf-8")) > 2_000_000:
-            return _error_response("upload exceeds the 2 MB limit", status=413, code="payload_too_large")
+            return _error_response(
+                "upload exceeds the 2 MB limit", status=413, code="payload_too_large"
+            )
         if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
             # Keep visible and hidden PDF text in the fragment. A parser-backed PDF
             # service can replace this extraction later without changing the contract.
             content = "\n".join(re.findall(r"[ -~]{3,}", content))
         if not content.strip():
-            return _error_response("upload contains no extractable text", status=422, code="empty_upload")
+            return _error_response(
+                "upload contains no extractable text", status=422, code="empty_upload"
+            )
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
         upload_id = f"upload_{digest}"
         return {
@@ -409,6 +418,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 similarity=cache_lookup.similarity,
                 options=_stream_options(x_interlock_events),
                 started_ms=started_ms,
+                session_id=session_id,
+                previous_turn=previous_turn,
+                explicit_regenerate=explicit_regenerate,
             )
             return StreamingResponse(
                 generator,
@@ -549,6 +561,9 @@ async def _cached_stream_response(
     similarity: float,
     options: StreamOptions,
     started_ms: float,
+    session_id: str,
+    previous_turn: dict[str, Any] | None,
+    explicit_regenerate: bool,
 ) -> AsyncIterator[str]:
     """Serve a safe cache hit while preserving the observable contract."""
     settings: Settings = app.state.settings
@@ -579,8 +594,8 @@ async def _cached_stream_response(
         ],
     )
 
-    _publish_console(app, EVENT_STAKES, stakes_event)
-    _publish_console(app, EVENT_DECISION, decision_event)
+    _publish_console(app, EVENT_STAKES, stakes_event, request_id=request_id)
+    _publish_console(app, EVENT_DECISION, decision_event, request_id=request_id)
     if options.allows(EVENT_STAKES):
         yield format_event(EVENT_STAKES, stakes_event)
     if options.allows(EVENT_DECISION):
@@ -600,6 +615,33 @@ async def _cached_stream_response(
             tier=lane.tier,
         )
     )
+    prompt_tokens = max(1, len(_flatten_prompt(body)) // 4)
+    completion_tokens = max(1, len(entry.answer) // 4)
+    rework_edges = _live_rework_edges(
+        session_id=session_id,
+        previous_turn=previous_turn,
+        request_id=request_id,
+        question=_last_user_message(body),
+        model=entry.model,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        explicit_regenerate=explicit_regenerate,
+    )
+    if session_id:
+        app.state.rework_sessions[session_id] = {
+            "request_id": request_id,
+            "session_id": session_id,
+            "question": _last_user_message(body),
+            "ts": wall_time(),
+            "cost_inr": PriceBook.default().cost_inr(
+                entry.model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            ),
+        }
+        if len(app.state.rework_sessions) > 1000:
+            oldest = next(iter(app.state.rework_sessions))
+            del app.state.rework_sessions[oldest]
     ledger.record(
         _batch_from(
             request_id,
@@ -609,9 +651,11 @@ async def _cached_stream_response(
             body,
             model_served=entry.model,
             overhead_ms=monotonic_ms() - started_ms,
-            completion_tokens=max(1, len(entry.answer) // 4),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
             finish_reason="cache_hit",
             cache_hit=True,
+            rework_edges=rework_edges,
         )
     )
 
@@ -680,7 +724,7 @@ async def _stream_response(
         route_reason=lane.route_reason,
         model_served=model,
     )
-    _publish_console(app, EVENT_STAKES, stakes_event)
+    _publish_console(app, EVENT_STAKES, stakes_event, request_id=request_id)
     if options.allows(EVENT_STAKES):
         yield format_event(EVENT_STAKES, stakes_event)
 
@@ -733,6 +777,7 @@ async def _stream_response(
                             model,
                             lane,
                             app=app,
+                            request_id=request_id,
                         ):
                             yield frame
                     break
@@ -771,7 +816,7 @@ async def _stream_response(
                             "after the selected model failed before emitting tokens"
                         ],
                     )
-                    _publish_console(app, EVENT_DECISION, fallback_event)
+                    _publish_console(app, EVENT_DECISION, fallback_event, request_id=request_id)
                     if options.allows(EVENT_DECISION):
                         yield format_event(EVENT_DECISION, fallback_event)
                     continue
@@ -783,7 +828,15 @@ async def _stream_response(
 
         # Drain the gate: the last buffered sentence is still holding, and abandoning it
         # would silently truncate the answer.
-        for frame in _render(await gate.finish(), options, chunk_id, model, lane, app=app):
+        for frame in _render(
+            await gate.finish(),
+            options,
+            chunk_id,
+            model,
+            lane,
+            app=app,
+            request_id=request_id,
+        ):
             yield frame
 
         # ---- the tool-call interlock -------------------------------------- #
@@ -802,8 +855,9 @@ async def _stream_response(
                     kind="tool_call",
                     reason=decision.reason,
                     tool=call.name,
+                    resume_token=held.resume_token,
                 )
-                _publish_console(app, EVENT_HOLD, hold_event)
+                _publish_console(app, EVENT_HOLD, hold_event, request_id=request_id)
                 if options.allows(EVENT_HOLD):
                     yield format_event(EVENT_HOLD, hold_event)
                 released = []
@@ -859,7 +913,7 @@ async def _stream_response(
                     sentence_idx=None,
                     resume_token=resume_token,
                 )
-                _publish_console(app, EVENT_HOLD, hold_event)
+                _publish_console(app, EVENT_HOLD, hold_event, request_id=request_id)
                 if options.allows(EVENT_HOLD):
                     yield format_event(EVENT_HOLD, hold_event)
 
@@ -873,7 +927,7 @@ async def _stream_response(
                 chosen_loss=0.0,
                 degraded=True,
             )
-            _publish_console(app, EVENT_DECISION, degraded_event)
+            _publish_console(app, EVENT_DECISION, degraded_event, request_id=request_id)
             if options.allows(EVENT_DECISION):
                 yield format_event(EVENT_DECISION, degraded_event)
 
@@ -976,6 +1030,7 @@ def _render(
     lane: PreflightResult,
     *,
     app: FastAPI | None = None,
+    request_id: str | None = None,
 ) -> list[str]:
     """Turn the gate's emissions into SSE frames.
 
@@ -1002,7 +1057,7 @@ def _render(
                 for signal in decision.signals
             ]
             for signal_event in signal_events:
-                _publish_console(app, EVENT_SIGNAL, signal_event)
+                _publish_console(app, EVENT_SIGNAL, signal_event, request_id=request_id)
                 if options.allows(EVENT_SIGNAL):
                     frames.append(format_event(EVENT_SIGNAL, signal_event))
             decision_event = DecisionEvent(
@@ -1021,13 +1076,19 @@ def _render(
                 probs={str(k): float(v) for k, v in decision.probs.items()},
                 why=list(decision.why),
             )
-            _publish_console(app, EVENT_DECISION, decision_event)
+            _publish_console(app, EVENT_DECISION, decision_event, request_id=request_id)
             if options.allows(EVENT_DECISION):
                 frames.append(format_event(EVENT_DECISION, decision_event))
     return frames
 
 
-def _publish_console(app: FastAPI | None, event_name: str, payload: Any) -> None:
+def _publish_console(
+    app: FastAPI | None,
+    event_name: str,
+    payload: Any,
+    *,
+    request_id: str | None = None,
+) -> None:
     """Best-effort fanout to the live console.
 
     This path must never become a dependency of the stream. Serialization errors,
@@ -1041,7 +1102,7 @@ def _publish_console(app: FastAPI | None, event_name: str, payload: Any) -> None
         return
     try:
         body = payload.model_dump(mode="json") if hasattr(payload, "model_dump") else dict(payload)
-        hub.publish(event_name, body)
+        hub.publish(event_name, body, request_id=request_id)
     except Exception:
         _log.debug("console publish failed for %s", event_name, exc_info=True)
 
@@ -1141,7 +1202,11 @@ def _stream_capacity_fallback(
     if fallback is None:
         return None
     fallback_provider, fallback_model = fallback
-    return fallback_provider, fallback_model, {**original_body, "model": fallback_model, "stream": True}
+    return (
+        fallback_provider,
+        fallback_model,
+        {**original_body, "model": fallback_model, "stream": True},
+    )
 
 
 def _capacity_fallback_target(
@@ -1279,10 +1344,14 @@ async def _run_shadow(
         )
         prompt_tokens = max(1, len(_flatten_prompt(body)) // 4)
         served_cost = PriceBook.default().cost_inr(
-            served_model, prompt_tokens=prompt_tokens, completion_tokens=max(1, len(served_answer) // 4)
+            served_model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=max(1, len(served_answer) // 4),
         )
         cheap_cost = PriceBook.default().cost_inr(
-            cheap_tier.model, prompt_tokens=prompt_tokens, completion_tokens=max(1, len(cheap_answer) // 4)
+            cheap_tier.model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=max(1, len(cheap_answer) // 4),
         )
         sufficed = decision.action == "L0_pass"
         await app.state.ledger.persist_shadow_run(

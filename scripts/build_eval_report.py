@@ -76,7 +76,13 @@ def render(reports: list[dict], destination: Path) -> None:
                     body += f" [{metric['ci'][0] * 100:.1f}, {metric['ci'][1] * 100:.1f}]"
             else:
                 body = f"{value:.2f} {metric['unit']}"
-            flag = "PASS" if metric.get("met") is True else "MISS" if metric.get("met") is False else ""
+            flag = (
+                "PASS"
+                if metric.get("met") is True
+                else "MISS"
+                if metric.get("met") is False
+                else ""
+            )
             cells.append(f"<td>{html.escape(body)} {flag}</td>")
         rows.append(f"<tr><th>{html.escape(name)}</th>{''.join(cells)}</tr>")
     policy = html.escape(reports[0]["policy_version"])
@@ -84,7 +90,7 @@ def render(reports: list[dict], destination: Path) -> None:
 <meta charset='utf-8'><title>Interlock evaluation matrix</title>
 <style>body{{font:15px system-ui;margin:2rem;color:#17202a}}table{{border-collapse:collapse}}th,td{{border:1px solid #ccd3da;padding:.55rem;text-align:left}}th{{background:#eef2f5}}small{{color:#58636e}}</style>
 <h1>Interlock seeded evaluation</h1><p>Policy: <code>{policy}</code></p>
-<table><thead><tr><th>Metric</th>{''.join(f'<th>Seed {r["seed"]}</th>' for r in reports)}</tr></thead><tbody>{''.join(rows)}</tbody></table>
+<table><thead><tr><th>Metric</th>{"".join(f"<th>Seed {r['seed']}</th>" for r in reports)}</tr></thead><tbody>{"".join(rows)}</tbody></table>
 <p><small>Rate intervals are 95% Wilson intervals. Model spend and latency remain modelled/measured as described in LIMITATIONS.md.</small></p>
 """
     destination.write_text(page, encoding="utf-8")
@@ -95,9 +101,7 @@ async def main() -> None:
     parser.add_argument("--seeds", nargs="+", type=int, default=[20260826, 20260827, 20260828])
     parser.add_argument("--output", type=Path, default=REPO_ROOT / "artifacts" / "eval")
     args = parser.parse_args()
-    reports = [
-        await run(seed, args.output / f"report-seed-{seed}.json") for seed in args.seeds
-    ]
+    reports = [await run(seed, args.output / f"report-seed-{seed}.json") for seed in args.seeds]
     render(reports, args.output / "report.html")
     print(f"wrote {args.output / 'report.html'}")
 

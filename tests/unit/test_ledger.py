@@ -416,9 +416,11 @@ async def test_lane_c_pair_writer_persists_observation(ledger: Ledger) -> None:
         twin_value="L4_hold",
         delta=1.0,
     )
-    row = ledger._require_connection().execute(
-        "SELECT attribute, base_value, twin_value, delta FROM fairness_pairs"
-    ).fetchone()
+    row = (
+        ledger._require_connection()
+        .execute("SELECT attribute, base_value, twin_value, delta FROM fairness_pairs")
+        .fetchone()
+    )
     assert tuple(row) == ("gender", "L0_pass", "L4_hold", 1.0)
 
 

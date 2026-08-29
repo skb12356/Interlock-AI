@@ -10,7 +10,6 @@ import argparse
 import asyncio
 import json
 import statistics
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -39,7 +38,7 @@ async def one(
                 "status": response.status_code,
                 "elapsed_ms": (time.perf_counter() - started) * 1000.0,
             }
-        except (httpx.HTTPError, asyncio.TimeoutError) as exc:
+        except (TimeoutError, httpx.HTTPError) as exc:
             return {
                 "ok": False,
                 "status": None,
@@ -77,9 +76,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
             results = [item for batch in batches for item in batch]
         else:
             total = max(args.requests, args.concurrency)
-            results = await asyncio.gather(
-                *(one(client, url, semaphore, i) for i in range(total))
-            )
+            results = await asyncio.gather(*(one(client, url, semaphore, i) for i in range(total)))
         health = await client.get(f"{args.gateway.rstrip('/')}/admin/latency", timeout=10.0)
     elapsed = [float(item["elapsed_ms"]) for item in results]
     successes = sum(bool(item["ok"]) for item in results)
@@ -106,7 +103,9 @@ def main() -> int:
     parser.add_argument("--requests", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=20)
     parser.add_argument("--duration-seconds", type=float, default=0.0)
-    parser.add_argument("--json", type=Path, default=REPO_ROOT / "artifacts" / "load" / "load_pass.json")
+    parser.add_argument(
+        "--json", type=Path, default=REPO_ROOT / "artifacts" / "load" / "load_pass.json"
+    )
     args = parser.parse_args()
     if args.requests < 1 or args.concurrency < 1 or args.duration_seconds < 0:
         parser.error("--requests and --concurrency must be positive; duration cannot be negative")

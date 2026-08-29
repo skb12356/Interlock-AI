@@ -151,7 +151,14 @@ def test_a_poisoned_document_freezes_the_email(client: TestClient) -> None:
     assert holds, "no hold event was emitted"
     assert holds[0]["kind"] == "tool_call"
     assert holds[0]["tool"] == "send_email"
+    assert holds[0]["resume_token"]
     assert "untrusted" in holds[0]["reason"]
+    projected = client.app.state.console_hub.recent()
+    assert projected
+    assert {event["request_id"] for event in projected} == {
+        response.headers["x-interlock-request-id"]
+    }
+    assert "resume_token" not in json.dumps(projected)
 
 
 @respx.mock

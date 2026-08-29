@@ -306,6 +306,15 @@ class ReplayConsoleSource:
             },
         }
 
+    def lane_c(self) -> dict[str, Any]:
+        return {
+            "n_pairs": 0,
+            "by_axis": {},
+            "e_value": {},
+            "series": [],
+            "notes": ["Replay does not fabricate Lane C observations"],
+        }
+
     def artifact(self, name: str) -> Any:
         return LiveConsoleSource(self.app, artifacts_root=ARTIFACTS).artifact(name)
 

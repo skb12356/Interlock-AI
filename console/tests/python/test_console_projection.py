@@ -26,6 +26,9 @@ class StaticSource:
     def ledger_summary(self) -> dict[str, Any]:
         return {"request_count": 0, "economics": {"available": False}}
 
+    def lane_c(self) -> dict[str, Any]:
+        return {"n_pairs": 0, "by_axis": {}, "series": []}
+
     def artifact(self, name: str) -> Any:
         return {"name": name}
 
@@ -105,6 +108,25 @@ class FakeLedger:
     def stats(self) -> dict[str, Any]:
         return {"written": 2, "dropped": 0}
 
+    def economics_snapshot(self) -> dict[str, Any]:
+        return {
+            "requests": 2,
+            "regret_inr": 1.5,
+            "rework_inr": 0.5,
+            "net_value_inr": 12.0,
+            "net_value_ci_inr": [9.0, 15.0],
+            "net_value_samples": 2,
+        }
+
+    def lane_c_snapshot(self) -> dict[str, Any]:
+        return {
+            "n_pairs": 3,
+            "by_axis": {"language": {"n": 3, "disparate": 1, "rate": 1 / 3}},
+            "e_value": {"e_value": 1.25, "threshold": 20.0},
+            "series": [{"index": 1, "e_value": 1.25}],
+            "notes": ["observational projection"],
+        }
+
 
 def live_source(tmp_path: Path) -> LiveConsoleSource:
     connection = sqlite3.connect(":memory:")
@@ -172,7 +194,11 @@ def live_source(tmp_path: Path) -> LiveConsoleSource:
             "sla_deadline_ts": 20.0,
         }
     ]
-    app = SimpleNamespace(state=SimpleNamespace(ledger=FakeLedger(connection, holds)))
+    app = SimpleNamespace(
+        state=SimpleNamespace(
+            ledger=FakeLedger(connection, holds), console_publishers_integrated=True
+        )
+    )
     return LiveConsoleSource(app, artifacts_root=tmp_path)
 
 
@@ -180,8 +206,9 @@ def test_live_source_returns_complete_decisions_holds_and_ledger_summary(tmp_pat
     source = live_source(tmp_path)
 
     status = source.status()
-    assert status["capabilities"]["recent_events"]["available"] is False
-    assert "Person 1" in status["capabilities"]["recent_events"]["reason"]
+    assert status["capabilities"]["recent_events"]["available"] is True
+    assert status["capabilities"]["economics"]["available"] is True
+    assert status["capabilities"]["lane_c"]["available"] is True
 
     decision = source.decision("dec_1")
     assert decision["request_id"] == "req_1"
@@ -199,17 +226,41 @@ def test_live_source_returns_complete_decisions_holds_and_ledger_summary(tmp_pat
     assert summary["spend_inr"] == 2.0
     assert summary["overhead_ms"] == {"mean": 20.0, "p95": 30.0}
     assert summary["action_counts"] == {"L2_repair": 1}
-    assert summary["economics"]["available"] is False
+    assert summary["economics"] == {
+        "available": True,
+        "requests": 2,
+        "regret_inr": 1.5,
+        "rework_inr": 0.5,
+        "net_value_inr": 12.0,
+        "net_value_ci_inr": [9.0, 15.0],
+        "net_value_samples": 2,
+    }
+
+    lane_c = source.lane_c()
+    assert lane_c["n_pairs"] == 3
+    assert lane_c["by_axis"]["language"]["rate"] == pytest.approx(1 / 3)
 
 
 def test_live_source_serves_only_allowlisted_json_artifacts(tmp_path: Path) -> None:
     source = live_source(tmp_path)
     (tmp_path / "calibration").mkdir()
+    (tmp_path / "eval").mkdir()
     (tmp_path / "calibration" / "report.json").write_text('{"ece":0.1}', encoding="utf-8")
+    (tmp_path / "eval" / "sensitivity.json").write_text(
+        '{"detectors":[{"recall":0.9}]}', encoding="utf-8"
+    )
     (tmp_path / "secret.json").write_text('{"secret":true}', encoding="utf-8")
 
     assert source.artifact("calibration/report.json") == {"ece": 0.1}
+    assert source.artifact("eval/sensitivity.json") == {"detectors": [{"recall": 0.9}]}
 
     for name in ("secret.json", "../secret.json", "calibration/report.png"):
         with pytest.raises(HTTPException):
             source.artifact(name)
+
+
+def test_lane_c_route_uses_the_projection_source() -> None:
+    response = TestClient(projection_app()).get("/console/lanec")
+
+    assert response.status_code == 200
+    assert response.json() == {"n_pairs": 0, "by_axis": {}, "series": []}

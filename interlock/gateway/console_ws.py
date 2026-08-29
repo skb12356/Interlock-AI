@@ -31,6 +31,8 @@ ALLOWED_ARTIFACTS = frozenset(
         "calibration/lambda.json",
         "eval/report.json",
         "eval/report-guaranteed.json",
+        "eval/sensitivity.json",
+        "probes/curve.json",
     }
 )
 
@@ -119,6 +121,7 @@ class ConsoleHub:
     def client_count(self) -> int:
         return len(self._clients)
 
+
 class ConsoleSource(Protocol):
     def status(self) -> dict[str, Any]: ...
 
@@ -127,6 +130,8 @@ class ConsoleSource(Protocol):
     def holds(self) -> list[dict[str, Any]]: ...
 
     def ledger_summary(self) -> dict[str, Any]: ...
+
+    def lane_c(self) -> dict[str, Any]: ...
 
     def artifact(self, name: str) -> Any: ...
 
@@ -183,9 +188,9 @@ class LiveConsoleSource:
                 "holds": {"available": True, "approval_requires_token": True},
                 "artifacts": artifact_status,
                 "economics": {
-                    "available": False,
-                    "reason": "Lane C regret, rework, net-value, and confidence intervals are not produced yet",
+                    "available": True,
                 },
+                "lane_c": {"available": True},
             },
         }
 
@@ -275,10 +280,13 @@ class LiveConsoleSource:
             "action_counts": action_counts,
             "overhead_ms": overhead_summary,
             "economics": {
-                "available": False,
-                "reason": "Lane C economics have not been produced",
+                "available": True,
+                **self.app.state.ledger.economics_snapshot(),
             },
         }
+
+    def lane_c(self) -> dict[str, Any]:
+        return cast(dict[str, Any], self.app.state.ledger.lane_c_snapshot())
 
     def artifact(self, name: str) -> Any:
         if name not in ALLOWED_ARTIFACTS:
@@ -348,6 +356,11 @@ async def console_holds(request: Request) -> dict[str, Any]:
 @router.get("/ledger/summary")
 async def ledger_summary(request: Request) -> dict[str, Any]:
     return _source(request).ledger_summary()
+
+
+@router.get("/lanec")
+async def lane_c(request: Request) -> dict[str, Any]:
+    return _source(request).lane_c()
 
 
 @router.get("/artifacts/{name:path}")

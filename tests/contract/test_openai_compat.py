@@ -14,8 +14,8 @@ from __future__ import annotations
 import json
 import time
 import zipfile
-from io import BytesIO
 from collections.abc import Iterator
+from io import BytesIO
 from pathlib import Path
 
 import httpx
@@ -87,9 +87,7 @@ def forcing_client(tmp_path: Path) -> Iterator[TestClient]:
 
 @pytest.fixture
 def shadow_client(tmp_path: Path) -> Iterator[TestClient]:
-    settings = Settings(
-        db_path=tmp_path / "shadow.db", risk_engine="stub", shadow_sample_rate=1.0
-    )
+    settings = Settings(db_path=tmp_path / "shadow.db", risk_engine="stub", shadow_sample_rate=1.0)
     with TestClient(create_app(settings)) as test_client:
         yield test_client
 
@@ -305,9 +303,7 @@ def test_a_client_can_opt_out_of_named_events(client: TestClient) -> None:
 def test_opted_out_clients_still_publish_to_console(client: TestClient) -> None:
     _, raws = load_fixture("short_answer")
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
-    client.post(
-        "/v1/chat/completions", json=_request(), headers={"X-Interlock-Events": "off"}
-    )
+    client.post("/v1/chat/completions", json=_request(), headers={"X-Interlock-Events": "off"})
     recent = client.get("/console/recent").json()["events"]
     assert recent
     assert recent[0]["event"] == "interlock.stakes"
@@ -664,17 +660,23 @@ def test_response_hold_stream_event_includes_the_resume_token(
 ) -> None:
     _, raws = load_fixture("prepayment_penalty")
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
-    text = forcing_client.post(
+    response = forcing_client.post(
         "/v1/chat/completions",
         json=_high_stakes_request(),
         headers={"X-Interlock-Force": "unsafe_action@0"},
-    ).text
-    _, events = parse_stream(text)
+    )
+    _, events = parse_stream(response.text)
     holds = [payload for name, payload in events if name == "interlock.hold"]
     assert holds
     assert holds[0]["kind"] == "response"
     assert holds[0]["resume_token"]
     assert "resume_token" not in forcing_client.get("/v1/holds").text
+    projected = forcing_client.app.state.console_hub.recent()
+    assert projected
+    assert {event["request_id"] for event in projected} == {
+        response.headers["x-interlock-request-id"]
+    }
+    assert "resume_token" not in json.dumps(projected)
 
 
 @respx.mock
@@ -746,10 +748,13 @@ def test_non_streaming_session_regenerate_is_written_as_rework(client: TestClien
     ]
     request = {**_request(stream=False), "session_id": "session-non-stream"}
     assert client.post("/v1/chat/completions", json=request).status_code == 200
-    assert client.post(
-        "/v1/chat/completions",
-        json={**request, "interlock": {"session_id": "session-non-stream", "regenerate": True}},
-    ).status_code == 200
+    assert (
+        client.post(
+            "/v1/chat/completions",
+            json={**request, "interlock": {"session_id": "session-non-stream", "regenerate": True}},
+        ).status_code
+        == 200
+    )
     rows = _wait_for_rows(client, "SELECT kind FROM rework_edges")
     assert [row["kind"] for row in rows] == ["regenerate"]
 

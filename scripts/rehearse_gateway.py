@@ -168,16 +168,22 @@ def assert_scenario(result: dict[str, Any], scenario: Scenario, *, strict_action
 
     decisions = [event["data"] for event in events if event["event"] == "interlock.decision"]
     holds = [event["data"] for event in events if event["event"] == "interlock.hold"]
-    if strict_actions and scenario.expect_action and not any(
-        decision.get("action") == scenario.expect_action for decision in decisions
+    if (
+        strict_actions
+        and scenario.expect_action
+        and not any(decision.get("action") == scenario.expect_action for decision in decisions)
     ):
         raise AssertionError(f"{scenario.name}: expected decision {scenario.expect_action}")
-    if strict_actions and scenario.expect_non_pass and not any(
-        decision.get("action") != "L0_pass" for decision in decisions
+    if (
+        strict_actions
+        and scenario.expect_non_pass
+        and not any(decision.get("action") != "L0_pass" for decision in decisions)
     ):
         raise AssertionError(f"{scenario.name}: expected a non-pass decision")
-    if strict_actions and scenario.expect_hold and not any(
-        hold.get("kind") == scenario.expect_hold for hold in holds
+    if (
+        strict_actions
+        and scenario.expect_hold
+        and not any(hold.get("kind") == scenario.expect_hold for hold in holds)
     ):
         raise AssertionError(f"{scenario.name}: expected {scenario.expect_hold} hold")
     if scenario.expect_hold == "response":
@@ -240,7 +246,9 @@ def main() -> int:
 
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     path = ARTIFACT_DIR / "gateway_rehearsal.json"
-    path.write_text(json.dumps(redacted(transcript), indent=2, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(redacted(transcript), indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     print(f"wrote {path.relative_to(REPO_ROOT)}")
     return 0
 

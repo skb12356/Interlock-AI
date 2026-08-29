@@ -372,10 +372,8 @@ class Ledger:
                 for column in json_columns:
                     value = row.get(column)
                     if isinstance(value, str):
-                        try:
+                        with contextlib.suppress(json.JSONDecodeError):
                             row[column] = json.loads(value)
-                        except json.JSONDecodeError:
-                            pass
                     if column.endswith("_json") and column in row:
                         row[column.removesuffix("_json")] = row[column]
             return output
@@ -383,11 +381,21 @@ class Ledger:
         request = fetch("SELECT * FROM requests WHERE request_id=?", (request_id,))
         return {
             "request": request[0] if request else {},
-            "decisions": fetch_json("SELECT * FROM decisions WHERE request_id=? ORDER BY ts", ("loss_table_json", "probs_json", "why_json")),
-            "signals": fetch("SELECT * FROM signals WHERE request_id=? ORDER BY seq", (request_id,)),
+            "decisions": fetch_json(
+                "SELECT * FROM decisions WHERE request_id=? ORDER BY ts",
+                ("loss_table_json", "probs_json", "why_json"),
+            ),
+            "signals": fetch(
+                "SELECT * FROM signals WHERE request_id=? ORDER BY seq", (request_id,)
+            ),
             "spend": fetch("SELECT * FROM spend WHERE request_id=? ORDER BY ts", (request_id,)),
-            "tool_calls": fetch_json("SELECT * FROM tool_calls WHERE request_id=? ORDER BY ts", ("args_json",)),
-            "holds": fetch_json("SELECT * FROM holds WHERE request_id=? ORDER BY created_ts", ("payload_json", "evidence_json")),
+            "tool_calls": fetch_json(
+                "SELECT * FROM tool_calls WHERE request_id=? ORDER BY ts", ("args_json",)
+            ),
+            "holds": fetch_json(
+                "SELECT * FROM holds WHERE request_id=? ORDER BY created_ts",
+                ("payload_json", "evidence_json"),
+            ),
         }
 
     def economics_snapshot(self) -> dict[str, Any]:
@@ -478,8 +486,12 @@ class Ledger:
             completion = int(row["completion_tokens"] or 0)
             baseline = book.cost_inr("qwen3:8b", prompt_tokens=prompt, completion_tokens=completion)
             spend = spend_by_request.get(row["request_id"])
-            actual = float(spend["upstream"] or 0.0) if spend else book.cost_inr(
-                row["model_served"], prompt_tokens=prompt, completion_tokens=completion
+            actual = (
+                float(spend["upstream"] or 0.0)
+                if spend
+                else book.cost_inr(
+                    row["model_served"], prompt_tokens=prompt, completion_tokens=completion
+                )
             )
             checking = float(spend["verification"] or 0.0) if spend else 0.0
             contributions.append(baseline - actual - checking)

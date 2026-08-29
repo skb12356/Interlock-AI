@@ -68,9 +68,9 @@ from interlock.gateway.latency import LaneTimer, LatencyRecorder, LatencySample
 from interlock.gateway.providers import Provider, build_providers
 from interlock.interlock_tools.holds import ToolInterlock, new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
+from interlock.ledger.evidence import build_evidence_pack
 from interlock.ledger.pricing import PriceBook
 from interlock.ledger.rework import ReworkLedger, SessionTurn
-from interlock.ledger.evidence import build_evidence_pack
 from interlock.ledger.writer import Ledger, RequestBatch, SpanEntry
 from interlock.retrieval.embedder import embed_query, load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever

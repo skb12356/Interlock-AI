@@ -113,7 +113,6 @@ def create_observer() -> FastAPI:
 
     @service.get("/health", response_model=ObserverHealth)
     async def health() -> ObserverHealth:
-        probe_health = runtime.probe.health()
         verifier_health = runtime.verifier.health() if runtime.verifier is not None else {}
         return ObserverHealth(
             model=str(

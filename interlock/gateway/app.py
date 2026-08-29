@@ -154,6 +154,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # streams would otherwise collide. See coordination/ALLOTED_WORK.md.
         app.state.console_hub = ConsoleHub()
         app.state.rework_sessions = {}
+        app.state.agent_tool_history = {}
         app.state.shadow_tasks = set()
         app.state.shadow_rng = random.Random(20260829)
         app.state.latency = LatencyRecorder()
@@ -793,7 +794,36 @@ async def _stream_response(
         # other leaves the client having executed half a plan, which is a state no
         # agent loop is written to recover from.
         released: list[dict[str, Any]] = []
+        loop_cut = False
+        tool_history = (
+            app.state.agent_tool_history.setdefault(session_id, {}) if session_id else {}
+        )
         for call in tool_calls.assemble():
+            if session_id:
+                digest = hashlib.sha256(
+                    json.dumps(
+                        {"tool": call.name, "arguments": call.arguments}, sort_keys=True
+                    ).encode("utf-8")
+                ).hexdigest()
+                tool_history[digest] = int(tool_history.get(digest, 0)) + 1
+                if tool_history[digest] >= 3:
+                    loop_cut = True
+                    finish_reason = "agent_loop_cut"
+                    loop_event = DecisionEvent(
+                        decision_id="dec_agent_loop",
+                        sentence_idx=-1,
+                        action="L5_block",
+                        chosen_loss=0.0,
+                        hard_rule="agent_loop",
+                        why=[
+                            f"agent loop breaker: repeated tool digest {tool_history[digest]} times; "
+                            "tool call suppressed"
+                        ],
+                    )
+                    _publish_console(app, EVENT_DECISION, loop_event)
+                    if options.allows(EVENT_DECISION):
+                        yield format_event(EVENT_DECISION, loop_event)
+                    break
             decision, held = await interlock.check(call, lane.fragments, request_id=request_id)
             if held is not None:
                 finish_reason = "tool_call_held"
@@ -810,7 +840,7 @@ async def _stream_response(
                 break
             released.append(call.call_id)
 
-        if tool_calls.saw_any and finish_reason != "tool_call_held":
+        if tool_calls.saw_any and finish_reason != "tool_call_held" and not loop_cut:
             # Cleared. Replay the assembled calls as a single chunk -- the client sees
             # one complete tool_calls message instead of the fragments we absorbed.
             yield format_data(
@@ -903,6 +933,9 @@ async def _stream_response(
             if len(app.state.rework_sessions) > 1000:
                 oldest = next(iter(app.state.rework_sessions))
                 del app.state.rework_sessions[oldest]
+            if len(app.state.agent_tool_history) > 1000:
+                oldest = next(iter(app.state.agent_tool_history))
+                del app.state.agent_tool_history[oldest]
         _schedule_shadow(
             app=app,
             body=original_body,

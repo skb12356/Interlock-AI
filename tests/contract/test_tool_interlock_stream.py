@@ -229,6 +229,23 @@ def test_a_reversible_lookup_is_not_frozen_by_untrusted_context(client: TestClie
     assert "tool_calls" in body
 
 
+@respx.mock
+def test_repeated_tool_calls_are_cut_after_three_session_strikes(client: TestClient) -> None:
+    respx.post(UPSTREAM).mock(
+        return_value=httpx.Response(
+            200,
+            content=_tool_call_stream(name="lookup_balance", arguments='{"account": "90210"}'),
+        )
+    )
+    request = _request([CLEAN_CONTEXT], session_id="agent-loop-1")
+    first = client.post("/v1/chat/completions", json=request).text
+    second = client.post("/v1/chat/completions", json=request).text
+    third = client.post("/v1/chat/completions", json=request).text
+    assert "tool_calls" in first and "tool_calls" in second
+    assert "agent_loop" in third
+    assert '"tool_calls"' not in third
+
+
 # --------------------------------------------------------------------------- #
 # Approve / reject over HTTP
 # --------------------------------------------------------------------------- #

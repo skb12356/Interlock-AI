@@ -157,6 +157,7 @@ class RequestBatch:
     decisions: list[Decision] = field(default_factory=list)
     spend: list[SpendEntry] = field(default_factory=list)
     spans: list[SpanEntry] = field(default_factory=list)
+    rework_edges: list[dict[str, Any]] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -599,6 +600,20 @@ class Ledger:
                         span.duration_ms,
                         span.status,
                         json.dumps(span.attributes, sort_keys=True),
+                    ),
+                )
+
+            for edge in batch.rework_edges:
+                connection.execute(
+                    "INSERT OR REPLACE INTO rework_edges(child_request_id, parent_request_id, "
+                    "kind, confidence, inr_charged, ts) VALUES (?,?,?,?,?,?)",
+                    (
+                        edge["child_request_id"],
+                        edge["parent_request_id"],
+                        edge["kind"],
+                        edge["confidence"],
+                        edge["inr_charged"],
+                        edge["ts"],
                     ),
                 )
 

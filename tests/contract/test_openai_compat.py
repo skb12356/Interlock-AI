@@ -684,6 +684,29 @@ def test_capacity_fallback_is_recorded_as_degraded(client: TestClient) -> None:
     assert rows[0]["model_served"] == "qwen3:4b"
 
 
+@respx.mock
+def test_live_session_retry_is_written_as_confidence_weighted_rework(
+    client: TestClient,
+) -> None:
+    _, raws = load_fixture("short_answer")
+    route = respx.post(UPSTREAM)
+    route.side_effect = [
+        httpx.Response(200, content=sse_bytes(raws)),
+        httpx.Response(200, content=sse_bytes(raws)),
+    ]
+    request = _request(session_id="session-retry")
+    client.post("/v1/chat/completions", json=request)
+    client.post(
+        "/v1/chat/completions",
+        json={**request, "interlock": {"session_id": "session-retry", "regenerate": True}},
+    )
+    rows = _wait_for_rows(client, "SELECT kind, confidence, inr_charged FROM rework_edges")
+    assert len(rows) == 1
+    assert rows[0]["kind"] == "regenerate"
+    assert 0.0 < rows[0]["confidence"] <= 1.0
+    assert rows[0]["inr_charged"] > 0.0
+
+
 def test_upload_contract_marks_pdf_text_as_untrusted(client: TestClient) -> None:
     response = client.post(
         "/v1/uploads",

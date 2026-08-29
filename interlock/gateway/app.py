@@ -35,7 +35,7 @@ import httpx
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from interlock.core.clock import monotonic_ms
+from interlock.core.clock import monotonic_ms, wall_time
 from interlock.core.errors import ProviderError, UpstreamError
 from interlock.core.ids import new_hold_id, new_request_id, new_trace_id
 from interlock.core.policy import load_policy
@@ -65,6 +65,8 @@ from interlock.gateway.latency import LaneTimer, LatencyRecorder, LatencySample
 from interlock.gateway.providers import Provider, build_providers
 from interlock.interlock_tools.holds import ToolInterlock, new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
+from interlock.ledger.pricing import PriceBook
+from interlock.ledger.rework import ReworkLedger, SessionTurn
 from interlock.ledger.writer import Ledger, RequestBatch, SpanEntry
 from interlock.retrieval.embedder import embed_query, load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever
@@ -147,6 +149,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # stream never has to edit this file, which is the only place the two work
         # streams would otherwise collide. See coordination/ALLOTED_WORK.md.
         app.state.console_hub = ConsoleHub()
+        app.state.rework_sessions = {}
         app.state.latency = LatencyRecorder()
         app.state.lane_a = LaneA(
             policy=policy,
@@ -323,6 +326,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ledger: Ledger = app.state.ledger
         request_id = new_request_id()
         trace_id = new_trace_id()
+        interlock_meta = body.get("interlock") if isinstance(body.get("interlock"), dict) else {}
+        session_id = str(body.get("session_id") or interlock_meta.get("session_id") or "").strip()
+        explicit_regenerate = bool(interlock_meta.get("regenerate"))
+        previous_turn = app.state.rework_sessions.get(session_id) if session_id else None
         app.state.risk_engine.arm(request_id, x_interlock_force)
 
         # ---- Lane A: the only synchronous work before the model is called ----
@@ -439,6 +446,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             options=_stream_options(x_interlock_events),
             started_ms=started_ms,
             original_body=body,
+            session_id=session_id,
+            previous_turn=previous_turn,
+            explicit_regenerate=explicit_regenerate,
         )
         return StreamingResponse(
             generator,
@@ -544,6 +554,9 @@ async def _stream_response(
     options: StreamOptions,
     started_ms: float,
     original_body: dict[str, Any],
+    session_id: str,
+    previous_turn: dict[str, Any] | None,
+    explicit_regenerate: bool,
 ) -> AsyncIterator[str]:
     """Frame the upstream stream through the commit gate.
 
@@ -793,6 +806,29 @@ async def _stream_response(
         yield format_done()
         completed = True
     finally:
+        rework_edges = _live_rework_edges(
+            session_id=session_id,
+            previous_turn=previous_turn,
+            request_id=request_id,
+            question=_last_user_message(original_body),
+            model=model,
+            prompt_tokens=max(1, len(_flatten_prompt(original_body)) // 4),
+            completion_tokens=max(1, completion_chars // 4) if completion_chars else 0,
+            explicit_regenerate=explicit_regenerate,
+        )
+        if session_id:
+            app.state.rework_sessions[session_id] = {
+                "request_id": request_id,
+                "session_id": session_id,
+                "question": _last_user_message(original_body),
+                "ts": wall_time(),
+                "cost_inr": _request_cost(
+                    model, max(1, len(_flatten_prompt(original_body)) // 4), completion_chars
+                ),
+            }
+            if len(app.state.rework_sessions) > 1000:
+                oldest = next(iter(app.state.rework_sessions))
+                del app.state.rework_sessions[oldest]
         _store_cache(
             app=app,
             question=_last_user_message(original_body),
@@ -817,6 +853,7 @@ async def _stream_response(
                 completion_tokens=max(1, completion_chars // 4) if completion_chars else 0,
                 finish_reason=finish_reason or ("stop" if completed else "client_disconnect"),
                 decisions=gate.decisions,
+                rework_edges=rework_edges,
                 degraded=lane.degraded or capacity_fallback,
             )
         )
@@ -1088,6 +1125,40 @@ def _last_user_message(body: dict[str, Any]) -> str:
         if message.get("role") == "user":
             return str(message.get("content") or "")
     return ""
+
+
+def _request_cost(model: str, prompt_tokens: int, completion_chars: int) -> float:
+    """Modelled live cost used only for rework attribution."""
+    return PriceBook.default().cost_inr(
+        model, prompt_tokens=prompt_tokens, completion_tokens=max(1, completion_chars // 4)
+    )
+
+
+def _live_rework_edges(
+    *,
+    session_id: str,
+    previous_turn: dict[str, Any] | None,
+    request_id: str,
+    question: str,
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    explicit_regenerate: bool,
+) -> list[dict[str, Any]]:
+    if not session_id or previous_turn is None:
+        return []
+    current = SessionTurn(
+        request_id=request_id,
+        session_id=session_id,
+        question=question,
+        ts=wall_time(),
+        cost_inr=PriceBook.default().cost_inr(
+            model, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+        ),
+        explicit_regenerate=explicit_regenerate,
+    )
+    previous = SessionTurn(**previous_turn)
+    return [edge.as_row() for edge in ReworkLedger().attribute([previous, current])]
 
 
 def _batch_from(

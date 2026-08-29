@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-08-29T02:11:20Z",
+  "started_at": "2026-08-29T03:08:08Z",
   "gateway": "http://127.0.0.1:8080",
   "console": "http://127.0.0.1:5173",
   "strict_actions": true,
@@ -7,7 +7,7 @@
     {
       "scenario": "clean",
       "status_code": 200,
-      "request_id": "req_01M15MJA5YS2M92JZQK761Z203",
+      "request_id": "req_01M15QTB6Q8SMVRMCMPGB2TAJ5",
       "data_payloads": [
         "{\"impact_inr\":50.0,\"reversibility\":\"reversible\",\"domain\":\"branch_info\",\"mode\":\"unbuffered\",\"stakes_id\":\"stk_01REPLAY0000000000CLEAN\",\"route_reason\":\"stakes_low\",\"model_served\":\"qwen3:4b\"}",
         "{\"sentence_idx\":0,\"name\":\"grounding.unsupported_content\",\"prob\":0.02}",
@@ -28,7 +28,7 @@
         "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\" AM\"},\"finish_reason\":null}]}",
         "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\".\"},\"finish_reason\":null}]}",
         "{\"id\":\"chatcmpl-767\",\"object\":\"chat.completion.chunk\",\"created\":1787664161,\"model\":\"qwen3:4b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":\"stop\"}]}",
-        "{\"decision_id\":\"dec_01REPLAY000000000CLEAN\",\"sentence_idx\":0,\"action\":\"L0_pass\",\"chosen_loss\":1.3,\"runner_up\":\"L1_annotate\",\"margin\":3.91,\"counterfactual\":null,\"hard_rule\":null,\"degraded\":false,\"loss_table\":[{\"action\":\"L0_pass\",\"residual_harm\":0.94,\"nuisance\":0.23,\"compute\":0.03,\"latency\":0.1,\"total\":1.3,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L1_annotate\",\"residual_harm\":2.29,\"nuisance\":0.57,\"compute\":0.06,\"latency\":0.25,\"total\":3.18,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L2_repair\",\"residual_harm\":2.81,\"nuisance\":0.7,\"compute\":0.08,\"latency\":0.31,\"total\":3.9,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L3_reroute\",\"residual_harm\":2.2,\"nuisance\":0.55,\"compute\":0.06,\"latency\":0.24,\"total\":3.06,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L4_hold\",\"residual_harm\":1.55,\"nuisance\":0.39,\"compute\":0.04,\"latency\":0.17,\"total\":2.15,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L5_block\",\"residual_harm\":3.1,\"nuisance\":0.78,\"compute\":0.09,\"latency\":0.34,\"total\":4.31,\"available\":true,\"unavailable_reason\":null}]}",
+        "{\"decision_id\":\"dec_01REPLAY000000000CLEAN\",\"sentence_idx\":0,\"action\":\"L0_pass\",\"chosen_loss\":1.3,\"runner_up\":\"L1_annotate\",\"margin\":3.91,\"counterfactual\":null,\"hard_rule\":null,\"degraded\":false,\"loss_table\":[{\"action\":\"L0_pass\",\"residual_harm\":0.94,\"nuisance\":0.23,\"compute\":0.03,\"latency\":0.1,\"total\":1.3,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L1_annotate\",\"residual_harm\":2.25,\"nuisance\":0.56,\"compute\":0.06,\"latency\":0.25,\"total\":3.12,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L2_repair\",\"residual_harm\":3.28,\"nuisance\":0.82,\"compute\":0.09,\"latency\":0.36,\"total\":4.56,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L3_reroute\",\"residual_harm\":2.63,\"nuisance\":0.66,\"compute\":0.07,\"latency\":0.29,\"total\":3.65,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L4_hold\",\"residual_harm\":3.68,\"nuisance\":0.92,\"compute\":0.1,\"latency\":0.41,\"total\":5.11,\"available\":true,\"unavailable_reason\":null},{\"action\":\"L5_block\",\"residual_harm\":1.52,\"nuisance\":0.38,\"compute\":0.04,\"latency\":0.17,\"total\":2.11,\"available\":true,\"unavailable_reason\":null}]}",
         "[DONE]"
       ],
       "events": [
@@ -39,7 +39,7 @@
             "reversibility": "reversible",
             "domain": "branch_info",
             "mode": "unbuffered",
-            "stakes_id": "stk_01M15MJA5ZM296DJ8M6K6E8M6X",
+            "stakes_id": "stk_01M15QTB6RJ7CBVDFX359NHQNT",
             "route_reason": "stakes_low",
             "model_served": "qwen3:4b"
           }
@@ -47,7 +47,7 @@
         {
           "event": "interlock.decision",
           "data": {
-            "decision_id": "dec_01M15MJB1ZAHAENDW6QXR75GFD",
+            "decision_id": "dec_01M15QTC3A3J083AV7JNBTC0X9",
             "sentence_idx": 0,
             "action": "L0_pass",
             "chosen_loss": 0.0,
@@ -131,7 +131,7 @@
     {
       "scenario": "scene1",
       "status_code": 200,
-      "request_id": "req_01M15MJB26C3AZ013PXH8CKFHA",
+      "request_id": "req_01M15QTC3GRA94M4WMZJ7MW7NP",
       "data_payloads": [
         "[DONE]"
       ],
@@ -143,7 +143,7 @@
             "reversibility": "costly",
             "domain": "loan_terms",
             "mode": "buffered",
-            "stakes_id": "stk_01M15MJB27B0NJ1885VCG192KF",
+            "stakes_id": "stk_01M15QTC3JAEMGFJX3R7FW21AJ",
             "route_reason": "stakes_high",
             "model_served": "qwen3:8b"
           }
@@ -151,7 +151,7 @@
         {
           "event": "interlock.decision",
           "data": {
-            "decision_id": "dec_01M15MJCEC1KK0WG3W1F7MBXEJ",
+            "decision_id": "dec_01M15QTDG5G9K2Q46FSVQPDE8C",
             "sentence_idx": 0,
             "action": "L5_block",
             "chosen_loss": 370.0,
@@ -239,11 +239,11 @@
     {
       "scenario": "held",
       "status_code": 200,
-      "request_id": "req_01M15MJCXJVT8BR88E52HXJ9EH",
+      "request_id": "req_01M15QTDZC6KKCHMVJ90BGQTKA",
       "data_payloads": [
-        "{\"id\":\"chatcmpl-req_01M15MJCXJVT8BR88E52HXJ9EH\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"2. You may need to submit a prepayment request form and provide proof of funds. \"},\"finish_reason\":null}]}",
-        "{\"id\":\"chatcmpl-req_01M15MJCXJVT8BR88E52HXJ9EH\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"3. The lender will review your application and confirm the remaining loan balance. \"},\"finish_reason\":null}]}",
-        "{\"id\":\"chatcmpl-req_01M15MJCXJVT8BR88E52HXJ9EH\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"4. Once approved, the prepayment amount is transferred to the lender, reducing your loan balance. \"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-req_01M15QTDZC6KKCHMVJ90BGQTKA\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"2. You may need to submit a prepayment request form and provide proof of funds. \"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-req_01M15QTDZC6KKCHMVJ90BGQTKA\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"3. The lender will review your application and confirm the remaining loan balance. \"},\"finish_reason\":null}]}",
+        "{\"id\":\"chatcmpl-req_01M15QTDZC6KKCHMVJ90BGQTKA\",\"object\":\"chat.completion.chunk\",\"model\":\"qwen3:8b\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"4. Once approved, the prepayment amount is transferred to the lender, reducing your loan balance. \"},\"finish_reason\":null}]}",
         "[DONE]"
       ],
       "events": [
@@ -254,7 +254,7 @@
             "reversibility": "costly",
             "domain": "claims",
             "mode": "buffered",
-            "stakes_id": "stk_01M15MJCXMT0VQHYR81YV53251",
+            "stakes_id": "stk_01M15QTDZD1REKSWX8APRJ22F6",
             "route_reason": "preflight_flag",
             "model_served": "qwen3:8b"
           }
@@ -262,7 +262,7 @@
         {
           "event": "interlock.decision",
           "data": {
-            "decision_id": "dec_01M15MJE3CD8PD1YANM9F7XC5R",
+            "decision_id": "dec_01M15QTF6BAJF996NEX2B79K5W",
             "sentence_idx": 0,
             "action": "L4_hold",
             "chosen_loss": 1148.0000000000007,
@@ -345,7 +345,7 @@
         {
           "event": "interlock.decision",
           "data": {
-            "decision_id": "dec_01M15MJEZ94NS30CY6Y61YZQVA",
+            "decision_id": "dec_01M15QTG1Z1XFS4YMQ5KJCFEAA",
             "sentence_idx": 1,
             "action": "L0_pass",
             "chosen_loss": 0.0,
@@ -427,7 +427,7 @@
         {
           "event": "interlock.decision",
           "data": {
-            "decision_id": "dec_01M15MJFNX2VKTJVZCMTZ3YP96",
+            "decision_id": "dec_01M15QTGSF0PRW1RDNN1JGCQXQ",
             "sentence_idx": 2,
             "action": "L0_pass",
             "chosen_loss": 0.0,
@@ -509,7 +509,7 @@
         {
           "event": "interlock.decision",
           "data": {
-            "decision_id": "dec_01M15MJGMX979SVTQNDT21T98V",
+            "decision_id": "dec_01M15QTHRA7QFPNW0FZEYGSXKM",
             "sentence_idx": 3,
             "action": "L0_pass",
             "chosen_loss": 0.0,
@@ -591,7 +591,7 @@
         {
           "event": "interlock.hold",
           "data": {
-            "hold_id": "hld_01M15MJGQSXF0N7G7V9YSWD2C0",
+            "hold_id": "hld_01M15QTHV6JJR8JDHKJF1MPPX6",
             "kind": "response",
             "reason": "untrusted_irreversible_tool",
             "tool": null,
@@ -604,7 +604,7 @@
     {
       "scenario": "blocked",
       "status_code": 200,
-      "request_id": "req_01M15MJGR065B6RD2RQJ19DWXG",
+      "request_id": "req_01M15QTHVD9STDEQ5FN41HVYV9",
       "data_payloads": [
         "[DONE]"
       ],
@@ -616,7 +616,7 @@
             "reversibility": "costly",
             "domain": "claims",
             "mode": "buffered",
-            "stakes_id": "stk_01M15MJGRAR758AGRQ36T2H9CA",
+            "stakes_id": "stk_01M15QTHVTWY6P2DE4H6PD7J92",
             "route_reason": "stakes_high",
             "model_served": "qwen3:8b"
           }
@@ -624,7 +624,7 @@
         {
           "event": "interlock.decision",
           "data": {
-            "decision_id": "dec_01M15MJHN8FACR0BXZQ66472YK",
+            "decision_id": "dec_01M15QTJR3J8Z0NMNDSTPZXSM6",
             "sentence_idx": 0,
             "action": "L5_block",
             "chosen_loss": 370.0,
@@ -710,11 +710,11 @@
   "gateway_health": {
     "ok": true,
     "service": "gateway",
-    "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+    "policy_version": "banking-v3@sha256:0aeb8a4b17fe218c",
     "risk_engine": {
       "engine": "stub",
       "ok": true,
-      "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+      "policy_version": "banking-v3@sha256:0aeb8a4b17fe218c",
       "probe_version": "stub",
       "calib_version": "stub",
       "armed_requests": 0
@@ -770,7 +770,7 @@
           "reversibility": "reversible",
           "domain": "branch_info",
           "mode": "unbuffered",
-          "stakes_id": "stk_01M15MJA5ZM296DJ8M6K6E8M6X",
+          "stakes_id": "stk_01M15QTB6RJ7CBVDFX359NHQNT",
           "route_reason": "stakes_low",
           "model_served": "qwen3:4b"
         }
@@ -778,7 +778,7 @@
       {
         "event": "interlock.decision",
         "data": {
-          "decision_id": "dec_01M15MJB1ZAHAENDW6QXR75GFD",
+          "decision_id": "dec_01M15QTC3A3J083AV7JNBTC0X9",
           "sentence_idx": 0,
           "action": "L0_pass",
           "chosen_loss": 0.0,
@@ -864,7 +864,7 @@
           "reversibility": "costly",
           "domain": "loan_terms",
           "mode": "buffered",
-          "stakes_id": "stk_01M15MJB27B0NJ1885VCG192KF",
+          "stakes_id": "stk_01M15QTC3JAEMGFJX3R7FW21AJ",
           "route_reason": "stakes_high",
           "model_served": "qwen3:8b"
         }
@@ -872,7 +872,7 @@
       {
         "event": "interlock.decision",
         "data": {
-          "decision_id": "dec_01M15MJCEC1KK0WG3W1F7MBXEJ",
+          "decision_id": "dec_01M15QTDG5G9K2Q46FSVQPDE8C",
           "sentence_idx": 0,
           "action": "L5_block",
           "chosen_loss": 370.0,
@@ -962,7 +962,7 @@
           "reversibility": "costly",
           "domain": "claims",
           "mode": "buffered",
-          "stakes_id": "stk_01M15MJCXMT0VQHYR81YV53251",
+          "stakes_id": "stk_01M15QTDZD1REKSWX8APRJ22F6",
           "route_reason": "preflight_flag",
           "model_served": "qwen3:8b"
         }
@@ -970,7 +970,7 @@
       {
         "event": "interlock.decision",
         "data": {
-          "decision_id": "dec_01M15MJE3CD8PD1YANM9F7XC5R",
+          "decision_id": "dec_01M15QTF6BAJF996NEX2B79K5W",
           "sentence_idx": 0,
           "action": "L4_hold",
           "chosen_loss": 1148.0000000000007,
@@ -1053,7 +1053,7 @@
       {
         "event": "interlock.decision",
         "data": {
-          "decision_id": "dec_01M15MJEZ94NS30CY6Y61YZQVA",
+          "decision_id": "dec_01M15QTG1Z1XFS4YMQ5KJCFEAA",
           "sentence_idx": 1,
           "action": "L0_pass",
           "chosen_loss": 0.0,
@@ -1135,7 +1135,7 @@
       {
         "event": "interlock.decision",
         "data": {
-          "decision_id": "dec_01M15MJFNX2VKTJVZCMTZ3YP96",
+          "decision_id": "dec_01M15QTGSF0PRW1RDNN1JGCQXQ",
           "sentence_idx": 2,
           "action": "L0_pass",
           "chosen_loss": 0.0,
@@ -1217,7 +1217,7 @@
       {
         "event": "interlock.decision",
         "data": {
-          "decision_id": "dec_01M15MJGMX979SVTQNDT21T98V",
+          "decision_id": "dec_01M15QTHRA7QFPNW0FZEYGSXKM",
           "sentence_idx": 3,
           "action": "L0_pass",
           "chosen_loss": 0.0,
@@ -1299,7 +1299,7 @@
       {
         "event": "interlock.hold",
         "data": {
-          "hold_id": "hld_01M15MJGQSXF0N7G7V9YSWD2C0",
+          "hold_id": "hld_01M15QTHV6JJR8JDHKJF1MPPX6",
           "kind": "response",
           "reason": "untrusted_irreversible_tool",
           "tool": null,
@@ -1314,7 +1314,7 @@
           "reversibility": "costly",
           "domain": "claims",
           "mode": "buffered",
-          "stakes_id": "stk_01M15MJGRAR758AGRQ36T2H9CA",
+          "stakes_id": "stk_01M15QTHVTWY6P2DE4H6PD7J92",
           "route_reason": "stakes_high",
           "model_served": "qwen3:8b"
         }
@@ -1322,7 +1322,7 @@
       {
         "event": "interlock.decision",
         "data": {
-          "decision_id": "dec_01M15MJHN8FACR0BXZQ66472YK",
+          "decision_id": "dec_01M15QTJR3J8Z0NMNDSTPZXSM6",
           "sentence_idx": 0,
           "action": "L5_block",
           "chosen_loss": 370.0,
@@ -1415,26 +1415,36 @@
         "created_ts": 1787969487.609916,
         "sla_deadline_ts": null,
         "expired": false
+      },
+      {
+        "hold_id": "hld_01M15QTHV6JJR8JDHKJF1MPPX6",
+        "request_id": "req_01M15QTDZC6KKCHMVJ90BGQTKA",
+        "kind": "response",
+        "state": "pending",
+        "reason": "untrusted_irreversible_tool",
+        "created_ts": 1787972896.6146688,
+        "sla_deadline_ts": null,
+        "expired": false
       }
     ]
   },
   "economics": {
-    "requests": 4,
+    "requests": 8,
     "cache_hits": 0,
-    "upstream_spend_inr": 0.4816,
+    "upstream_spend_inr": 0.9632,
     "verification_spend_inr": 0,
     "verification_cost_ratio": 0.0,
-    "routing_savings_inr": 0.0224,
+    "routing_savings_inr": 0.0448,
     "regret_inr": 0,
     "regret_samples": 0,
     "rework_inr": 0,
     "rework_by_kind": [],
-    "net_value_inr": 0.0224,
+    "net_value_inr": 0.0448,
     "net_value_ci_inr": [
       0.0,
-      0.0168
+      0.014
     ],
-    "net_value_samples": 4,
+    "net_value_samples": 8,
     "spend_by_component": [],
     "price_book": {
       "priced_models": [

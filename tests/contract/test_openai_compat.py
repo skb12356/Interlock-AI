@@ -25,6 +25,8 @@ from fastapi.testclient import TestClient
 
 from interlock.gateway.app import create_app
 from interlock.gateway.config import Settings
+from interlock.risk.objective import HardRule
+from interlock.signals.base import DetectorOutcome
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "streams"
 UPSTREAM = "http://127.0.0.1:11434/v1/chat/completions"
@@ -129,6 +131,23 @@ def parse_stream(text: str) -> tuple[list[str], list[tuple[str, dict]]]:
         elif lines[0].startswith("data: "):
             data_payloads.append(lines[0][len("data: ") :])
     return data_payloads, events
+
+
+class PreflightBlockDetector:
+    """Deterministic detector used to exercise the pre-provider block contract."""
+
+    name = "preflight_block"
+
+    async def scan(self, _context: object) -> DetectorOutcome:
+        return DetectorOutcome(
+            hard_rules=[
+                HardRule(
+                    name="cross_tenant_context",
+                    action="L5_block",
+                    reason="retrieved context belongs to another tenant",
+                )
+            ]
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -622,6 +641,39 @@ def test_a_canary_defect_is_a_deterministic_block(forcing_client: TestClient) ->
     blocked = [p for n, p in events if n == "interlock.decision" and p["action"] == "L5_block"]
     assert blocked
     assert blocked[0]["hard_rule"] == "canary_leak"
+
+
+def test_a_preflight_block_is_request_scoped_and_visible_to_the_console(
+    client: TestClient,
+) -> None:
+    """A request blocked before provider selection must still explain itself live."""
+    client.app.state.lane_a.detectors = [PreflightBlockDetector()]
+
+    response = client.post("/v1/chat/completions", json=_request())
+
+    assert response.status_code == 403
+    request_id = response.headers["x-interlock-request-id"]
+    projected = client.app.state.console_hub.recent()
+    assert [event["event"] for event in projected] == [
+        "interlock.stakes",
+        "interlock.decision",
+    ]
+    assert {event["request_id"] for event in projected} == {request_id}
+    decision = projected[-1]["data"]
+    assert decision.pop("decision_id").startswith("dec_")
+    assert decision == {
+        "sentence_idx": -1,
+        "action": "L5_block",
+        "chosen_loss": 0.0,
+        "runner_up": None,
+        "margin": 0.0,
+        "counterfactual": None,
+        "hard_rule": "cross_tenant_context",
+        "degraded": False,
+        "loss_table": [],
+        "probs": {},
+        "why": ["retrieved context belongs to another tenant"],
+    }
 
 
 @respx.mock

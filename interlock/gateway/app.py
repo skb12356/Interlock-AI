@@ -40,7 +40,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from interlock.core.clock import monotonic_ms, wall_time
 from interlock.core.errors import ProviderError, UpstreamError
-from interlock.core.ids import new_hold_id, new_request_id, new_trace_id
+from interlock.core.ids import new_decision_id, new_hold_id, new_request_id, new_trace_id
 from interlock.core.policy import load_policy
 from interlock.core.sse import (
     EVENT_DECISION,
@@ -403,6 +403,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # ---- Deterministic pre-block, before any provider sees the prompt ----
         if lane.hard_rules:
             rule = lane.hard_rules[0]
+            stakes_event = StakesEvent(
+                impact_inr=lane.stakes.impact_inr,
+                reversibility=lane.stakes.reversibility,
+                domain=lane.stakes.domain,
+                mode=lane.mode,
+                stakes_id=lane.stakes_id,
+                route_reason=lane.route_reason,
+            )
+            decision_event = DecisionEvent(
+                decision_id=new_decision_id(),
+                sentence_idx=-1,
+                action="L5_block",
+                chosen_loss=0.0,
+                hard_rule=rule.name,
+                degraded=lane.degraded,
+                why=[rule.reason],
+            )
+            _publish_console(app, EVENT_STAKES, stakes_event, request_id=request_id)
+            _publish_console(app, EVENT_DECISION, decision_event, request_id=request_id)
             ledger.record(
                 _batch_from(
                     request_id,
@@ -415,11 +434,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 )
             )
             app.state.risk_engine.disarm(request_id)
-            return _error_response(
+            response = _error_response(
                 f"blocked by a deterministic rule: {rule.reason}",
                 status=403,
                 code=rule.name,
             )
+            response.headers.update(
+                {
+                    "x-interlock-request-id": request_id,
+                    "x-interlock-trace-id": trace_id,
+                    "x-interlock-stakes-id": lane.stakes_id,
+                    "x-interlock-route-reason": lane.route_reason,
+                }
+            )
+            return response
 
         cache_lookup = _cache_lookup(app, body, lane) if body.get("stream", False) else None
         if cache_lookup is not None and cache_lookup.hit and cache_lookup.entry is not None:
@@ -887,7 +915,7 @@ async def _stream_response(
                             "generation tokens avoided"
                         ],
                     )
-                    _publish_console(app, EVENT_DECISION, loop_event)
+                    _publish_console(app, EVENT_DECISION, loop_event, request_id=request_id)
                     if options.allows(EVENT_DECISION):
                         yield format_event(EVENT_DECISION, loop_event)
                     break

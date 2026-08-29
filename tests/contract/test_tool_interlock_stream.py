@@ -247,10 +247,17 @@ def test_repeated_tool_calls_are_cut_after_three_session_strikes(client: TestCli
     request = _request([CLEAN_CONTEXT], session_id="agent-loop-1")
     first = client.post("/v1/chat/completions", json=request).text
     second = client.post("/v1/chat/completions", json=request).text
-    third = client.post("/v1/chat/completions", json=request).text
+    third_response = client.post("/v1/chat/completions", json=request)
+    third = third_response.text
     assert "tool_calls" in first and "tool_calls" in second
     assert "agent_loop" in third
     assert '"tool_calls"' not in third
+    loop_events = [
+        event
+        for event in client.app.state.console_hub.recent()
+        if event["data"].get("hard_rule") == "agent_loop"
+    ]
+    assert loop_events[0]["request_id"] == third_response.headers["x-interlock-request-id"]
 
 
 # --------------------------------------------------------------------------- #

@@ -61,3 +61,10 @@ Ollama did not respond on this machine during the final local run, so the four-s
 rehearsal was run through the real gateway and console against a deterministic local
 OpenAI-compatible fixture upstream. That validates gateway streaming, ConsoleHub
 publishing, holds and metrics endpoints; it is not a live-model quality rehearsal.
+
+## Upload Extraction
+
+The upload contract accepts text and PDF bytes and preserves the result as
+`retrieved_untrusted`. The minimal clean-checkout runtime extracts printable PDF strings
+without a heavyweight parser; this covers the included white-text fixture but does not
+claim arbitrary-PDF layout, OCR, or encrypted-document support.

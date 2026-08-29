@@ -215,10 +215,19 @@ async function uploadDocument(file) {
   const status = el("upload-status");
   if (!file) return;
   status.textContent = "Uploading...";
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  const content = isPdf
+    ? btoa(String.fromCharCode(...new Uint8Array(await file.arrayBuffer())))
+    : await file.text();
   const response = await fetch(gateway("/v1/uploads"), {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ filename: file.name, content_type: file.type, content: await file.text() }),
+    body: JSON.stringify({
+      filename: file.name,
+      content_type: file.type || (isPdf ? "application/pdf" : "text/plain"),
+      content,
+      ...(isPdf ? { encoding: "base64" } : {}),
+    }),
   });
   const data = await response.json();
   if (!response.ok) {

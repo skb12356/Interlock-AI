@@ -160,7 +160,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 ### Day 2 exit criteria
 - `[x]` Gate property test passes; a real stream can be held, repaired and released — *28 property tests green; verified live against Ollama*
-- `[ ]` Observer returns real probe scores under 25 ms p95 warm, with KV caching proven by a log line — *real probe signal verified, but a standalone first inference measured 17,966 ms on this machine; criterion remains open.*
+- `[ ]` Observer returns real probe scores under 25 ms p95 warm, with KV caching proven by a log line — *real probe signal and separated warm timing verified; warm p95 measured 37.06 ms after a 17,966 ms cold start, so criterion remains open.*
 - `[x]` `reliability.png` + `lambda.json` committed with a certified (α=0.01, δ=0.10) — *certified at threshold 0.0150 on n=840; **the 100% intervention rate must be quoted with it***
 - `[x]` Accuracy-by-layer curve exists — *`artifacts/probes/curve.json`; peaks mid-stack at layer 3, one-standard-error selection*
 - `[ ]` Governor degrades when the observer is killed

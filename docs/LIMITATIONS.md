@@ -81,8 +81,9 @@ scan.
 ## Observer Performance
 
 A standalone real-observer smoke call on this machine returned a valid non-degraded
-probe signal, but the first measured inference took 17,966 ms. This is far above the
-intended 25 ms warm-p95 target; no sub-25-ms performance claim is made until model
+probe signal. The cold inference took 17,966 ms; three subsequent warm calls measured
+43.80, 40.97, and 39.83 ms, with the service reporting a warm p95 of 37.06 ms. This
+still misses the intended 25 ms warm-p95 target; no sub-25-ms claim is made until model
 warm-up, batching, and deployment hardware are addressed.
 
 ## Upload Extraction

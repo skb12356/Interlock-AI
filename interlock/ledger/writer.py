@@ -592,7 +592,7 @@ class Ledger:
             )
 
             for seq, signal in enumerate(batch.signals):
-                span = signal.span or (None, None)
+                signal_span = signal.span or (None, None)
                 connection.execute(
                     "INSERT OR REPLACE INTO signals(request_id, seq, sentence_idx, name, raw,"
                     " prob, calib_version, latency_ms, span_start, span_end)"
@@ -606,8 +606,8 @@ class Ledger:
                         signal.prob,
                         None,
                         signal.latency_ms,
-                        span[0],
-                        span[1],
+                        signal_span[0],
+                        signal_span[1],
                     ),
                 )
 
@@ -652,21 +652,21 @@ class Ledger:
                     ),
                 )
 
-            for span in batch.spans:
+            for span_entry in batch.spans:
                 connection.execute(
                     "INSERT OR REPLACE INTO spans(span_id, trace_id, parent_span_id, name,"
                     " start_ts, end_ts, duration_ms, status, attributes_json)"
                     " VALUES (?,?,?,?,?,?,?,?,?)",
                     (
-                        span.span_id,
-                        span.trace_id or batch.trace_id,
-                        span.parent_span_id,
-                        span.name,
-                        span.start_ts,
-                        span.end_ts,
-                        span.duration_ms,
-                        span.status,
-                        json.dumps(span.attributes, sort_keys=True),
+                        span_entry.span_id,
+                        span_entry.trace_id or batch.trace_id,
+                        span_entry.parent_span_id,
+                        span_entry.name,
+                        span_entry.start_ts,
+                        span_entry.end_ts,
+                        span_entry.duration_ms,
+                        span_entry.status,
+                        json.dumps(span_entry.attributes, sort_keys=True),
                     ),
                 )
 

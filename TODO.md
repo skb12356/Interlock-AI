@@ -234,7 +234,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 > **Goal:** six measured numbers, live on a URL, and the pitch run four times.
 
 - `[ ]` **D5-J1 — FEATURE FREEZE.** No new features after this hour. Write it where you can see it.
-- `[ ]` **D5-B1 — The measurement run** — `make eval` on the full seeded set, **off vs on, three seeds** → `report.html` with all six metrics and their intervals. Fill in the final slide only now.
+- `[~]` **D5-B1 — The measurement run** — *partial 2026-08-29. `scripts/build_eval_report.py` runs the full 200-case off-vs-on evaluation across three seeds and writes `artifacts/eval/report.html` plus per-seed JSON with Wilson intervals. The three reported misses remain reproducible: verification cost 5.20/5.51/5.35%, net spend -18.96/-16.73/-16.59%, false interventions 85.35/91.08/90.45%.*
   - **If the Pre-Action Catch Rate is below 90%, do not tune the eval. Report what you got and explain the failure modes.** A panel trusts a measured 84% far more than a suspicious 97%.
 - `[ ]` **D5-A1 — Chaos pass** — kill the observer mid-stream (must degrade, not 500), an upstream 429 storm, SQLite lock contention, a malformed policy at boot (**refuse to start; the previous version stays live**), an 8 s watchdog fire.
 - `[ ]` **D5-A2 — Load pass** — 20 concurrent streams × 5 minutes → capture the **p95 overhead histogram**. This number goes on the slide.

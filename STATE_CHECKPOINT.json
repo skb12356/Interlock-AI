@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Interlock V2",
   "current_phase": "Day 5 in-place operational rehearsal complete; console served with gateway and observer",
-  "last_completed_task": "Person 1: ConsoleHub publishing, response-hold resume token, production console supervision, live economics/Lane C endpoints, semantic cache wiring, observer context cache stats, 300 manual anchor labels, artifact refresh, and deterministic four-scene gateway rehearsal",
+  "last_completed_task": "Person 1: ConsoleHub publishing, response-hold resume token, production console supervision, live economics/Lane C endpoints, semantic cache wiring, observer context cache stats, 300 manual anchor labels, artifact refresh, deterministic four-scene gateway rehearsal, untrusted upload path, and three-seed HTML evaluation scorecard",
   "next_task": "F-019 remains the release policy decision. Then run the same rehearsal against a responding live Ollama/upstream, complete measured efficacy, chaos/load/security passes, and clean-checkout deploy verification.",
   "system_status": "Amber -- backend and console wiring are now live and rehearsed in-place with a deterministic upstream; regenerated metrics still miss verification cost, net spend and false interventions, and Ollama did not respond locally for a live-model rehearsal",
   "verification": {

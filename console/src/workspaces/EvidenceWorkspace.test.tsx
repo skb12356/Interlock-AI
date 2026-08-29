@@ -57,6 +57,7 @@ describe("EvidenceWorkspace", () => {
     const guarantee = screen.getByRole("region", { name: "Certified guarantee" });
     expect(within(guarantee).getByText("0.0%", { exact: true })).toBeInTheDocument();
     expect(within(guarantee).getByText("100.0% intervention rate", { exact: false })).toBeInTheDocument();
+    expect(within(guarantee).getByText(/confidence intervals unavailable/i)).toBeInTheDocument();
     expect(screen.getByText("91.8%–100.0% CI")).toBeInTheDocument();
     expect(screen.getByText("97.6%–100.0% CI")).toBeInTheDocument();
     expect(screen.getByText("MISS")).toBeInTheDocument();
@@ -125,6 +126,7 @@ describe("EvidenceWorkspace", () => {
     expect(screen.getByText("₹12.00–₹21.00 95% CI")).toBeInTheDocument();
     expect(screen.getByText("12 observed pairs")).toBeInTheDocument();
     expect(screen.getByText("8.3% disparity rate")).toBeInTheDocument();
+    expect(screen.getByText(/disparity interval unavailable/i)).toBeInTheDocument();
     expect(screen.getByText(/below 20.00 alert threshold/i)).toBeInTheDocument();
   });
 

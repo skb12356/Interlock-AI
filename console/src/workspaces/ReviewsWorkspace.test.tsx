@@ -39,7 +39,7 @@ describe("ReviewsWorkspace", () => {
     expect(screen.getByText("send_email")).toBeInTheDocument();
     expect(screen.getByText("retrieved_untrusted content")).toBeInTheDocument();
     expect(screen.getAllByText("customer@example.test", { exact: false })).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Approve and release" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Approve hold" })).toBeDisabled();
     expect(screen.getByText(/approval unavailable/i)).toBeInTheDocument();
   });
 
@@ -60,7 +60,7 @@ describe("ReviewsWorkspace", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Approve and release" }));
+    await user.click(screen.getByRole("button", { name: "Approve hold" }));
     await user.click(screen.getByRole("button", { name: "Reject and stop" }));
     expect(approve).toHaveBeenCalledWith("hld_1");
     expect(reject).toHaveBeenCalledWith("hld_1");
@@ -82,6 +82,6 @@ describe("ReviewsWorkspace", () => {
     );
 
     expect(screen.getByText("SLA expired · refresh queue before acting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Approve and release" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Approve hold" })).toBeDisabled();
   });
 });

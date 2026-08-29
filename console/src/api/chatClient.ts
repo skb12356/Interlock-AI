@@ -50,7 +50,7 @@ export async function streamChat(
   const emit = (frame: ParsedFrame) => {
     if (frame.kind === "done") completed = true;
     if (frame.kind === "interlock" && frame.event === "interlock.decision") {
-      decisionIds.add(frame.data.decision_id);
+      if (frame.data.sentence_idx >= 0) decisionIds.add(frame.data.decision_id);
     }
     handlers.onFrame(frame);
   };

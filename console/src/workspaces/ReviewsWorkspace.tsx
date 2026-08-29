@@ -107,7 +107,7 @@ export function ReviewsWorkspace({
                       onClick={() => onApprove(hold.hold_id)}
                       disabled={!tokenReady || hold.expired || resolving}
                     >
-                      Approve and release
+                      Approve hold
                     </button>
                   </div>
                 </footer>

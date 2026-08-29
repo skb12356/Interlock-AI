@@ -15,9 +15,11 @@ export interface RequestTrace {
   assistantText: string;
   status: "streaming" | "complete" | "failed";
   error: string | null;
+  degraded?: boolean;
   stakes: StakesEvent | null;
   sentenceOrder: number[];
   sentences: Record<number, SentenceTrace>;
+  systemDecisions: DecisionEvent[];
   holds: HoldEvent[];
 }
 
@@ -57,9 +59,11 @@ function emptyTrace(requestId: string, prompt = ""): RequestTrace {
     assistantText: "",
     status: "streaming",
     error: null,
+    degraded: false,
     stakes: null,
     sentenceOrder: [],
     sentences: {},
+    systemDecisions: [],
     holds: [],
   };
 }
@@ -112,12 +116,25 @@ function applyFrame(state: ConsoleState, requestId: string, frame: ParsedFrame):
       }));
     }
   } else if (frame.event === "interlock.decision") {
-    const sentence = trace.sentences[frame.data.sentence_idx];
-    if (!sentence?.decisions.some((decision) => decision.decision_id === frame.data.decision_id)) {
-      nextTrace = updateSentence(trace, frame.data.sentence_idx, (current) => ({
-        ...current,
-        decisions: [...current.decisions, frame.data],
-      }));
+    if (frame.data.sentence_idx < 0) {
+      nextTrace = {
+        ...trace,
+        degraded: trace.degraded || frame.data.degraded === true,
+        systemDecisions: trace.systemDecisions.some(
+          (decision) => decision.decision_id === frame.data.decision_id,
+        )
+          ? trace.systemDecisions
+          : [...trace.systemDecisions, frame.data],
+      };
+    } else {
+      const decisionTrace = frame.data.degraded ? { ...trace, degraded: true } : trace;
+      const sentence = decisionTrace.sentences[frame.data.sentence_idx];
+      if (!sentence?.decisions.some((decision) => decision.decision_id === frame.data.decision_id)) {
+        nextTrace = updateSentence(decisionTrace, frame.data.sentence_idx, (current) => ({
+          ...current,
+          decisions: [...current.decisions, frame.data],
+        }));
+      }
     }
   } else if (frame.event === "interlock.hold") {
     if (!trace.holds.some((hold) => hold.hold_id === frame.data.hold_id)) {

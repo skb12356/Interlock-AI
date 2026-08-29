@@ -70,7 +70,8 @@ export function parseInterlockEvent<Name extends InterlockEventName>(
       (data.prob === null || (isFiniteNumber(data.prob) && data.prob >= 0 && data.prob <= 1));
   } else if (event === "interlock.decision") {
     valid = typeof data.decision_id === "string" && data.decision_id.length > 0 &&
-      isIndex(data.sentence_idx) && actions.has(data.action as Action) &&
+      (isIndex(data.sentence_idx) || data.sentence_idx === -1) &&
+      actions.has(data.action as Action) &&
       isFiniteNumber(data.chosen_loss) &&
       (data.runner_up === undefined || data.runner_up === null || actions.has(data.runner_up as Action)) &&
       isOptionalNumber(data.margin) && isOptionalString(data.counterfactual) &&

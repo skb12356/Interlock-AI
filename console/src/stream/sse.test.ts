@@ -61,6 +61,36 @@ describe("SseParser", () => {
     ]);
   });
 
+  it("accepts the gateway's request-level degraded decision sentinel", () => {
+    const parser = new SseParser();
+
+    expect(parser.push(
+      "event: interlock.decision\ndata: {\"decision_id\":\"dec_degraded\",\"sentence_idx\":-1,\"action\":\"L0_pass\",\"chosen_loss\":0,\"degraded\":true}\n\n",
+    )).toEqual([{
+      kind: "interlock",
+      event: "interlock.decision",
+      data: {
+        decision_id: "dec_degraded",
+        sentence_idx: -1,
+        action: "L0_pass",
+        chosen_loss: 0,
+        degraded: true,
+      },
+    }]);
+  });
+
+  it("accepts a non-degraded cache-hit decision sentinel", () => {
+    const parser = new SseParser();
+
+    expect(parser.push(
+      "event: interlock.decision\ndata: {\"decision_id\":\"dec_cache_hit\",\"sentence_idx\":-1,\"action\":\"L0_pass\",\"chosen_loss\":0,\"degraded\":false}\n\n",
+    )[0]).toMatchObject({
+      kind: "interlock",
+      event: "interlock.decision",
+      data: { decision_id: "dec_cache_hit", sentence_idx: -1, degraded: false },
+    });
+  });
+
   it("captures and removes a hold token before returning ordinary event data", () => {
     const capture = vi.fn();
     const parser = new SseParser({ onResumeToken: capture });

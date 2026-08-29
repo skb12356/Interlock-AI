@@ -118,6 +118,10 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
             <>
               <div className="guarantee-number">{percentage(bundle.conformal.escape_rate)}</div>
               <p>certified escape rate at λ {bundle.conformal.threshold.toFixed(3)}</p>
+              <p className="evidence-note">
+                Confidence intervals unavailable for the reported escape and intervention rates;
+                certificate parameters are shown below.
+              </p>
               <div className="intervention-cost">
                 <strong>{percentage(bundle.conformal.intervention_rate)} intervention rate</strong>
                 <span>{integer.format(bundle.conformal.n_eval)} evaluation cases · α {bundle.conformal.alpha} · δ {bundle.conformal.delta}</span>
@@ -222,7 +226,11 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
             <>
               <div className="lane-c-summary">
                 <div><span>Coverage</span><strong>{integer.format(bundle.laneC.n_pairs)} observed pairs</strong></div>
-                <div><span>Observed disparity</span><strong>{percentage(disparityRate)} disparity rate</strong></div>
+                <div>
+                  <span>Observed disparity</span>
+                  <strong>{percentage(disparityRate)} disparity rate</strong>
+                  <small>Disparity interval unavailable</small>
+                </div>
                 <div>
                   <span>Anytime-valid state</span>
                   <strong>

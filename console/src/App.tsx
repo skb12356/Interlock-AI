@@ -108,7 +108,9 @@ export function App() {
         if (
           envelope.event === "interlock.decision" &&
           typeof envelope.data === "object" && envelope.data !== null &&
-          "decision_id" in envelope.data && typeof envelope.data.decision_id === "string"
+          "decision_id" in envelope.data && typeof envelope.data.decision_id === "string" &&
+          "sentence_idx" in envelope.data && typeof envelope.data.sentence_idx === "number" &&
+          envelope.data.sentence_idx >= 0
         ) {
           void hydrateDecision(envelope.data.decision_id);
         }

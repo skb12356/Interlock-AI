@@ -4,6 +4,60 @@ import type { ConsoleEnvelope } from "../domain/contracts";
 import { consoleReducer, initialConsoleState } from "./consoleStore";
 
 describe("consoleReducer", () => {
+  it("records a request-level degraded sentinel without inventing sentence zero", () => {
+    const started = consoleReducer(initialConsoleState, {
+      type: "request.started",
+      requestId: "req_degraded",
+      prompt: "Hello",
+    });
+
+    const next = consoleReducer(started, {
+      type: "stream.frame",
+      requestId: "req_degraded",
+      frame: {
+        kind: "interlock",
+        event: "interlock.decision",
+        data: {
+          decision_id: "dec_degraded",
+          sentence_idx: -1,
+          action: "L0_pass",
+          chosen_loss: 0,
+          degraded: true,
+        },
+      },
+    });
+
+    expect(next.requests.req_degraded.degraded).toBe(true);
+    expect(next.requests.req_degraded.systemDecisions).toHaveLength(1);
+    expect(next.requests.req_degraded.sentenceOrder).toEqual([]);
+  });
+
+  it("records a cache-hit notice without claiming degraded checking", () => {
+    const started = consoleReducer(initialConsoleState, {
+      type: "request.started",
+      requestId: "req_cached",
+      prompt: "Hello",
+    });
+    const next = consoleReducer(started, {
+      type: "stream.frame",
+      requestId: "req_cached",
+      frame: {
+        kind: "interlock",
+        event: "interlock.decision",
+        data: {
+          decision_id: "dec_cache_hit",
+          sentence_idx: -1,
+          action: "L0_pass",
+          chosen_loss: 0,
+          degraded: false,
+        },
+      },
+    });
+
+    expect(next.requests.req_cached.degraded).toBe(false);
+    expect(next.requests.req_cached.systemDecisions[0].decision_id).toBe("dec_cache_hit");
+  });
+
   it("keeps partial assistant text when the transport fails", () => {
     let state = consoleReducer(initialConsoleState, { type: "request.started", requestId: "req_1", prompt: "Question" });
     state = consoleReducer(state, {

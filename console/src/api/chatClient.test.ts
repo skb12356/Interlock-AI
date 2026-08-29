@@ -166,4 +166,20 @@ describe("streamChat", () => {
 
     expect(settledBeforeDetail).toBe(true);
   });
+
+  it("does not hydrate request-level synthetic decisions that have no ledger row", async () => {
+    const diagnostics: string[] = [];
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(chunkedResponse([
+      "event: interlock.decision\ndata: {\"decision_id\":\"dec_cache_hit\",\"sentence_idx\":-1,\"action\":\"L0_pass\",\"chosen_loss\":0,\"degraded\":false}\n\ndata: [DONE]\n\n",
+    ], { "x-interlock-request-id": "req_cached" }));
+
+    await streamChat(
+      { prompt: "Hello", scenario: "clean", replay: false },
+      { onFrame: vi.fn(), onDecisionDetail: vi.fn(), onDiagnostic: (message) => diagnostics.push(message) },
+      fetcher,
+    );
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(diagnostics).toEqual([]);
+  });
 });

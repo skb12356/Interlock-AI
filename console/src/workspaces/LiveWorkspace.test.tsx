@@ -29,6 +29,7 @@ function trace(): RequestTrace {
       model_served: "qwen3:8b",
     },
     sentenceOrder: [0],
+    systemDecisions: [],
     sentences: {
       0: {
         sentenceIdx: 0,
@@ -124,6 +125,25 @@ describe("LiveWorkspace", () => {
 
     expect(screen.getByText("Blocked before release")).toBeInTheDocument();
     expect(screen.getByText("Hard rule: canary_leak")).toBeInTheDocument();
+  });
+
+  it("keeps degraded checking visible at request level", () => {
+    const degraded = trace();
+    degraded.degraded = true;
+
+    render(
+      <LiveWorkspace
+        trace={degraded}
+        prompt=""
+        scenario="scene1"
+        busy={false}
+        onPromptChange={vi.fn()}
+        onScenarioChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(/degraded checking/i);
   });
 
   it("keeps the submitted customer message stable while the next draft changes", () => {

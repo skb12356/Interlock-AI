@@ -103,6 +103,7 @@ h2 { margin: 0; font: 600 24px/1.05 Charter, Georgia, serif; letter-spacing: -0.
 .stream-status { padding: 6px 9px; border: 1px solid var(--rule); color: var(--ledger-soft); font: 700 9px "SFMono-Regular", Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; }
 .stream-status.live { color: var(--paper); background: var(--stop); border-color: var(--stop); }
 .stream-status.live::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: currentColor; animation: pulse 1.2s ease-in-out infinite; }
+.degraded-notice { margin: 0 24px 16px; padding: 10px 12px; border: 1px solid rgba(164, 63, 66, 0.28); border-radius: 8px; background: rgba(164, 63, 66, 0.08); color: var(--stop); font-size: 0.78rem; font-weight: 700; }
 @keyframes pulse { 50% { opacity: 0.3; } }
 
 .transcript { min-height: 360px; max-height: 510px; overflow: auto; padding: 20px; background: linear-gradient(180deg, rgba(39, 96, 121, 0.04), transparent 42%); }

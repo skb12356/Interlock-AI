@@ -123,10 +123,13 @@ def test_replay_status_ledger_and_artifacts_are_projection_routes() -> None:
         assert status["source"] == "replay"
         assert status["replay"] is True
         assert status["capabilities"]["economics"]["available"] is False
+        assert status["capabilities"]["lane_c"]["available"] is True
 
         ledger = client.get("/console/ledger/summary").json()
         assert ledger["request_count"] == 1
         assert ledger["action_counts"] == {"L0_pass": 1}
+        assert ledger["spend_inr"] == 0
+        assert ledger["overhead_ms"] == {"mean": None, "p95": None}
 
         lane_c = client.get("/console/lanec").json()
         assert lane_c["n_pairs"] == 0

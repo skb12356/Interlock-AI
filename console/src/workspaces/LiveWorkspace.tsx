@@ -94,6 +94,12 @@ export function LiveWorkspace({
           </span>
         </div>
 
+        {trace?.degraded && (
+          <p className="degraded-notice" role="status">
+            Degraded checking · one or more calibrated detectors were unavailable.
+          </p>
+        )}
+
         {trace && trace.sentenceOrder.length > 0 && (
           <nav className="sentence-timeline" aria-label="Sentence timeline">
             {trace.sentenceOrder.map((sentenceIdx) => (

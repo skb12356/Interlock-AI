@@ -274,6 +274,7 @@ class ReplayConsoleSource:
                     "available": False,
                     "reason": "Replay does not fabricate Lane C economics",
                 },
+                "lane_c": {"available": True},
             },
         }
 
@@ -522,10 +523,8 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
 
         stats = app.state.replay_stats
         stats["request_count"] += 1
-        stats["spend_inr"] += 0.04
         action_counts = stats["action_counts"]
         action_counts[decision_event["action"]] = action_counts.get(decision_event["action"], 0) + 1
-        stats["overheads"].append(15.0)
 
         return StreamingResponse(
             _stream(request_scenario, request_id),

@@ -27,6 +27,10 @@ forced-action outcomes with confidence intervals. The ledger can expose real reg
 rework when those rows exist, and the runbook records when those values are unmeasured.
 Do not present assumed repair efficacy as a measured production result.
 
+The repository includes `scripts/measure_efficacy.py` to import reviewed post-action
+outcomes. It intentionally rejects using the 300 pre-action labels as efficacy data and
+does not write a policy update automatically.
+
 ## Observer
 
 The observer probe is an optional in-process signal. On a clean CPU-only checkout the

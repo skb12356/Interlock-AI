@@ -41,6 +41,26 @@ Run the local security/privacy sweep:
 uv run python scripts/security_sweep.py
 ```
 
+## Measured Efficacy Import
+
+The efficacy matrix requires human-reviewed outcomes after forcing an action. A
+pre-action defect label is not an efficacy observation. Create one JSONL row per
+forced action and reviewed result:
+
+```json
+{"item_id":"manual-anchor-001","action":"L2_repair","defect":"ungrounded","removed":true}
+```
+
+The importer validates IDs against the 300-item manual anchor set, rejects duplicate
+cells and invalid booleans, and writes Wilson intervals only for observed cells:
+
+```powershell
+uv run python scripts/measure_efficacy.py post_action_outcomes.jsonl
+```
+
+Review `artifacts/eval/efficacy.json` before updating the versioned policy. An empty
+or missing outcomes file is intentional until forced-action review has been performed.
+
 Stop:
 
 ```powershell

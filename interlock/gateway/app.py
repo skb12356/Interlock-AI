@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import io
 import json
 import logging
 import random
@@ -103,6 +104,20 @@ def _stream_options(header_value: str | None) -> StreamOptions:
     if header_value and header_value.strip().lower() in {"off", "0", "false", "none"}:
         return StreamOptions(emit_interlock_events=False)
     return StreamOptions()
+
+
+def _extract_pdf_text(raw_bytes: bytes, fallback: str) -> str:
+    """Extract a PDF text layer, retaining the fixture fallback for malformed PDFs."""
+    try:
+        from pypdf import PdfReader
+
+        pages = PdfReader(io.BytesIO(raw_bytes)).pages
+        parsed = "\n".join(page.extract_text() or "" for page in pages)
+        if parsed.strip():
+            return parsed
+    except Exception:
+        _log.info("PDF parser could not extract text; using printable-byte fallback", exc_info=True)
+    return "\n".join(re.findall(r"[ -~]{3,}", fallback))
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -288,17 +303,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return _error_response("content is required", status=400, code="invalid_request_error")
         try:
             if payload.get("encoding") == "base64":
-                content = base64.b64decode(raw_content, validate=True).decode("utf-8", "replace")
+                raw_bytes = base64.b64decode(raw_content, validate=True)
+                content = raw_bytes.decode("utf-8", "replace")
             else:
+                raw_bytes = raw_content.encode("utf-8")
                 content = raw_content
         except (ValueError, UnicodeError):
             return _error_response("content is not valid base64 UTF-8", status=400, code="invalid_request_error")
         if len(content.encode("utf-8")) > 2_000_000:
             return _error_response("upload exceeds the 2 MB limit", status=413, code="payload_too_large")
         if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
-            # Keep visible and hidden PDF text in the fragment. A parser-backed PDF
-            # service can replace this extraction later without changing the contract.
-            content = "\n".join(re.findall(r"[ -~]{3,}", content))
+            content = _extract_pdf_text(raw_bytes, content)
         if not content.strip():
             return _error_response("upload contains no extractable text", status=422, code="empty_upload")
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]

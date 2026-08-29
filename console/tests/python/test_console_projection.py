@@ -241,6 +241,25 @@ def test_live_source_returns_complete_decisions_holds_and_ledger_summary(tmp_pat
     assert lane_c["by_axis"]["language"]["rate"] == pytest.approx(1 / 3)
 
 
+def test_live_source_marks_empty_economics_unavailable(tmp_path: Path) -> None:
+    source = live_source(tmp_path)
+    source.app.state.ledger.economics_snapshot = lambda: {
+        "requests": 0,
+        "net_value_inr": None,
+        "net_value_ci_inr": None,
+        "net_value_samples": 0,
+        "upstream_spend_basis": "unmeasured",
+    }
+
+    assert source.status()["capabilities"]["economics"] == {
+        "available": False,
+        "reason": "no request-level net-value samples are available",
+    }
+    economics = source.ledger_summary()["economics"]
+    assert economics["available"] is False
+    assert economics["net_value_inr"] is None
+
+
 def test_live_source_serves_only_allowlisted_json_artifacts(tmp_path: Path) -> None:
     source = live_source(tmp_path)
     (tmp_path / "calibration").mkdir()

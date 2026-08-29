@@ -96,7 +96,7 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
         {ledger ? (
           <>
             <div><span>Requests</span><strong>{integer.format(ledger.request_count)} requests</strong></div>
-            <div><span>Measured spend</span><strong>{money.format(ledger.spend_inr)} spend</strong></div>
+            <div><span>Recorded ledger spend</span><strong>{money.format(ledger.spend_inr)} spend</strong></div>
             <div><span>Mean overhead</span><strong>{ledger.overhead_ms.mean === null ? "Unavailable" : `${integer.format(ledger.overhead_ms.mean)} ms`}</strong></div>
             <div><span>P95 overhead</span><strong>{ledger.overhead_ms.p95 === null ? "Unavailable" : `${integer.format(ledger.overhead_ms.p95)} ms`}</strong></div>
           </>
@@ -213,7 +213,11 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
                   <div><dt>Attributed rework</dt><dd>{money.format(economics.rework_inr ?? 0)}</dd></div>
                 </dl>
               </div>
-              <p className="evidence-note">{integer.format(economics.net_value_samples ?? 0)} measured net-value samples; interval stays attached to the estimate.</p>
+              <p className="evidence-note">
+                {integer.format(economics.net_value_samples ?? 0)} request-level net-value
+                estimates; upstream spend is {economics.upstream_spend_basis ?? "unlabelled"}.
+                The interval stays attached to the estimate.
+              </p>
             </>
           ) : (
             <Unavailable detail={economics?.reason ?? status?.capabilities.economics.reason ?? "Regret, rework, and net-value projections have not been produced"} />

@@ -165,6 +165,8 @@ class LiveConsoleSource:
             name: (self.artifacts_root / name).is_file() for name in sorted(ALLOWED_ARTIFACTS)
         }
         ledger_stats = self.app.state.ledger.stats()
+        economics = self.app.state.ledger.economics_snapshot()
+        economics_available = int(economics.get("net_value_samples", 0)) > 0
         publishers_integrated = bool(
             getattr(self.app.state, "console_publishers_integrated", False)
         )
@@ -188,7 +190,12 @@ class LiveConsoleSource:
                 "holds": {"available": True, "approval_requires_token": True},
                 "artifacts": artifact_status,
                 "economics": {
-                    "available": True,
+                    "available": economics_available,
+                    **(
+                        {}
+                        if economics_available
+                        else {"reason": "no request-level net-value samples are available"}
+                    ),
                 },
                 "lane_c": {"available": True},
             },
@@ -274,14 +281,21 @@ class LiveConsoleSource:
             "mean": statistics.fmean(overheads) if overheads else None,
             "p95": overheads[p95_index] if overheads else None,
         }
+        economics = self.app.state.ledger.economics_snapshot()
+        economics_available = int(economics.get("net_value_samples", 0)) > 0
         return {
             "request_count": request_count,
             "spend_inr": spend,
             "action_counts": action_counts,
             "overhead_ms": overhead_summary,
             "economics": {
-                "available": True,
-                **self.app.state.ledger.economics_snapshot(),
+                "available": economics_available,
+                **(
+                    {}
+                    if economics_available
+                    else {"reason": "no request-level net-value samples are available"}
+                ),
+                **economics,
             },
         }
 

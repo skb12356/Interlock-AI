@@ -69,6 +69,7 @@ export interface EconomicsProjection {
   net_value_inr?: number;
   net_value_ci_inr?: [number, number];
   net_value_samples?: number;
+  upstream_spend_basis?: "recorded" | "imputed" | "unmeasured";
 }
 
 export interface LaneCAxis {

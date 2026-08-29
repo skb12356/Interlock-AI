@@ -100,6 +100,7 @@ describe("EvidenceWorkspace", () => {
         net_value_inr: 17,
         net_value_ci_inr: [12, 21],
         net_value_samples: 8,
+        upstream_spend_basis: "recorded",
       },
     } as unknown as LedgerSummary;
     const liveBundle = {
@@ -124,6 +125,8 @@ describe("EvidenceWorkspace", () => {
 
     expect(screen.getByText("₹17.00")).toBeInTheDocument();
     expect(screen.getByText("₹12.00–₹21.00 95% CI")).toBeInTheDocument();
+    expect(screen.getByText(/8 request-level net-value estimates/)).toBeInTheDocument();
+    expect(screen.getByText(/upstream spend is recorded/)).toBeInTheDocument();
     expect(screen.getByText("12 observed pairs")).toBeInTheDocument();
     expect(screen.getByText("8.3% disparity rate")).toBeInTheDocument();
     expect(screen.getByText(/disparity interval unavailable/i)).toBeInTheDocument();

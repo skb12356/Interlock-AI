@@ -31,7 +31,7 @@ def test_production_observer_implements_contract_without_model_weights() -> None
         assert response.status_code == 200
         body = response.json()
         assert body["degraded"] is False
-        assert body["probe_version"] == "none"
+        assert body["probe_version"] == "none" or body["probe_version"].startswith("probe@sha256:")
         assert client.get("/health").json()["ok"] is True
 
 

@@ -622,6 +622,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
+    { name = "sqlite-vec" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -632,7 +633,6 @@ ml = [
     { name = "optimum", extra = ["onnxruntime"] },
     { name = "presidio-analyzer" },
     { name = "sentence-transformers" },
-    { name = "sqlite-vec" },
     { name = "torch" },
     { name = "transformers" },
 ]
@@ -671,7 +671,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "scikit-learn", specifier = ">=1.5" },
     { name = "sentence-transformers", marker = "extra == 'ml'", specifier = ">=3.0" },
-    { name = "sqlite-vec", marker = "extra == 'ml'", specifier = ">=0.1.6" },
+    { name = "sqlite-vec", specifier = ">=0.1.6" },
     { name = "torch", marker = "extra == 'ml'", specifier = ">=2.4" },
     { name = "transformers", marker = "extra == 'ml'", specifier = ">=4.44" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },

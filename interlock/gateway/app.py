@@ -817,7 +817,8 @@ async def _stream_response(
                         hard_rule="agent_loop",
                         why=[
                             f"agent loop breaker: repeated tool digest {tool_history[digest]} times; "
-                            "tool call suppressed"
+                            f"tool call suppressed; estimated {app.state.policy.compute_tokens.get('L3_reroute', 0)} "
+                            "generation tokens avoided"
                         ],
                     )
                     _publish_console(app, EVENT_DECISION, loop_event)

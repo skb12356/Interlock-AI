@@ -66,6 +66,7 @@ def test_invalid_policy_is_refused(tmp_path: Path) -> None:
         load_policy(bad)
 
 
+@pytest.mark.chaos
 def test_malformed_yaml_is_refused(tmp_path: Path) -> None:
     bad = tmp_path / "bad.yaml"
     bad.write_text("version: [unclosed\n", encoding="utf-8")

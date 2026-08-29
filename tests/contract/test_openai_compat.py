@@ -413,6 +413,7 @@ def test_non_streaming_completion(client: TestClient) -> None:
 
 
 @respx.mock
+@pytest.mark.chaos
 def test_an_upstream_error_becomes_an_openai_shaped_error(client: TestClient) -> None:
     respx.post(UPSTREAM).mock(return_value=httpx.Response(429, json={"error": "slow down"}))
     response = client.post("/v1/chat/completions", json=_request(stream=False))

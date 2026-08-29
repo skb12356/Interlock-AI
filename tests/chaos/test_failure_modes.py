@@ -14,6 +14,8 @@ from interlock.gateway.governor import Governor, GovernorState
 from interlock.observer.server import create_observer
 from interlock.signals.probe_signal import ProbeSignal
 
+pytestmark = pytest.mark.chaos
+
 
 def test_observer_inference_failure_is_an_in_band_degraded_response(
     monkeypatch: pytest.MonkeyPatch,

@@ -21,9 +21,13 @@ Two properties this file exists to protect:
 
 from __future__ import annotations
 
+import asyncio
+import base64
 import hashlib
 import json
 import logging
+import random
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,26 +35,30 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, Header, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from interlock.core.clock import monotonic_ms
+from interlock.core.clock import monotonic_ms, wall_time
 from interlock.core.errors import ProviderError, UpstreamError
 from interlock.core.ids import new_hold_id, new_request_id, new_trace_id
 from interlock.core.policy import load_policy
 from interlock.core.sse import (
     EVENT_DECISION,
     EVENT_HOLD,
+    EVENT_SIGNAL,
     EVENT_STAKES,
     DecisionEvent,
     HoldEvent,
+    SignalEvent,
     StakesEvent,
     StreamOptions,
     format_data,
     format_done,
     format_event,
 )
+from interlock.core.types import RiskContext
 from interlock.gate.repair import SentenceRepairer
 from interlock.gate.sentence_gate import CommitGate, Emission
+from interlock.gateway.cache import SemanticCache
 from interlock.gateway.config import Settings, load_settings
 from interlock.gateway.console_ws import ConsoleHub
 from interlock.gateway.console_ws import router as console_router
@@ -58,10 +66,13 @@ from interlock.gateway.governor import Governor
 from interlock.gateway.lane_a import LaneA, PreflightResult
 from interlock.gateway.latency import LaneTimer, LatencyRecorder, LatencySample
 from interlock.gateway.providers import Provider, build_providers
-from interlock.interlock_tools.holds import ToolInterlock
+from interlock.interlock_tools.holds import ToolInterlock, new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
-from interlock.ledger.writer import Ledger, RequestBatch
-from interlock.retrieval.embedder import load_embedder
+from interlock.ledger.pricing import PriceBook
+from interlock.ledger.rework import ReworkLedger, SessionTurn
+from interlock.ledger.evidence import build_evidence_pack
+from interlock.ledger.writer import Ledger, RequestBatch, SpanEntry
+from interlock.retrieval.embedder import embed_query, load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever
 from interlock.risk.calibration import MultiDefectCalibrator
 from interlock.risk.engine import RealRiskEngine, load_conformal
@@ -127,6 +138,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.providers = build_providers(settings, client)
         app.state.risk_engine = _build_risk_engine(settings, policy, canaries)
         app.state.retriever = _open_retriever(settings)
+        app.state.cache_embedder = load_embedder(settings.embedder)
+        app.state.semantic_cache = SemanticCache(
+            policy_version=policy.policy_version,
+            max_stakes_inr=policy.thresholds.buffer_above_impact_inr,
+        )
         app.state.tool_interlock = ToolInterlock(policy=policy, ledger=ledger)
         app.state.governor = Governor(
             # One estimate, one threshold: 'high stakes' means the same thing to the
@@ -137,6 +153,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # stream never has to edit this file, which is the only place the two work
         # streams would otherwise collide. See coordination/ALLOTED_WORK.md.
         app.state.console_hub = ConsoleHub()
+        app.state.rework_sessions = {}
+        app.state.shadow_tasks = set()
+        app.state.shadow_rng = random.Random(20260829)
         app.state.latency = LatencyRecorder()
         app.state.lane_a = LaneA(
             policy=policy,
@@ -151,6 +170,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
+            if app.state.shadow_tasks:
+                await asyncio.gather(*app.state.shadow_tasks, return_exceptions=True)
             app.state.retriever.close()
             await ledger.stop()
             await client.aclose()
@@ -171,6 +192,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "ledger": app.state.ledger.stats(),
             "lane_a_deadline_ms": app.state.settings.lane_a_deadline_ms,
             "retrieval": _retrieval_health(app.state.retriever),
+            "cache": app.state.semantic_cache.stats(),
             "governor": app.state.governor.snapshot()["state"],
             "tiers": {
                 name: f"{tier.provider}:{tier.model}"
@@ -192,6 +214,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """What Interlock has given up, and why. Explains; never asks."""
         return app.state.governor.snapshot()
 
+    @app.get("/admin/economics")
+    async def economics() -> dict[str, Any]:
+        """Spend, regret, rework and net value from the live ledger."""
+        return app.state.ledger.economics_snapshot()
+
+    @app.get("/admin/lanec")
+    async def lane_c() -> dict[str, Any]:
+        """Background fairness projection and anytime-valid e-value state."""
+        return app.state.ledger.lane_c_snapshot()
+
+    @app.get("/admin/evidence/{request_id}.zip")
+    async def evidence(request_id: str) -> Response:
+        """Download a redacted, request-scoped evidence pack from recorded ledger facts."""
+        rows = app.state.ledger.evidence_rows(request_id)
+        calibration: dict[str, Any] = {}
+        for artifact in sorted(app.state.settings.calibration_dir.glob("*.json")):
+            try:
+                calibration[artifact.name] = json.loads(artifact.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+        pack = build_evidence_pack(
+            request_id=request_id,
+            rows=rows,
+            policy_text=app.state.settings.policy_path.read_text(encoding="utf-8"),
+            calibration=calibration,
+            generated_ts=wall_time(),
+            prompts_hashed=not app.state.settings.store_prompts,
+        )
+        return Response(
+            content=pack.to_bytes(canaries=app.state.canaries.all_canaries),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="evidence-{request_id}.zip"'},
+        )
+
     @app.get("/v1/models")
     async def models() -> dict[str, Any]:
         """Advertise the tiers, so an SDK's model list is not empty."""
@@ -208,6 +264,62 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Pending review cards. Read straight from the durable table, which is what
         makes them survive a restart (F6/F7)."""
         return {"holds": app.state.tool_interlock.pending_cards()}
+
+    @app.post("/v1/uploads")
+    async def upload_document(request: Request) -> Any:
+        """Turn an uploaded document into explicitly untrusted context.
+
+        The upload service deliberately returns fragments instead of silently adding
+        them to a global index. The caller must attach the returned fragments to the
+        next completion, which keeps tenant and conversation boundaries explicit.
+        JSON/base64 avoids making ``python-multipart`` a gateway boot dependency.
+        """
+        try:
+            payload = await request.json()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return _error_response("invalid JSON body", status=400, code="invalid_request_error")
+        if not isinstance(payload, dict):
+            return _error_response("upload must be a JSON object", status=400, code="invalid_request_error")
+        filename = str(payload.get("filename") or "upload.bin").strip()[:200]
+        content_type = str(payload.get("content_type") or "text/plain").lower()
+        raw_content = payload.get("content")
+        if not isinstance(raw_content, str) or not raw_content.strip():
+            return _error_response("content is required", status=400, code="invalid_request_error")
+        try:
+            if payload.get("encoding") == "base64":
+                content = base64.b64decode(raw_content, validate=True).decode("utf-8", "replace")
+            else:
+                content = raw_content
+        except (ValueError, UnicodeError):
+            return _error_response("content is not valid base64 UTF-8", status=400, code="invalid_request_error")
+        if len(content.encode("utf-8")) > 2_000_000:
+            return _error_response("upload exceeds the 2 MB limit", status=413, code="payload_too_large")
+        if content_type == "application/pdf" or filename.lower().endswith(".pdf"):
+            # Keep visible and hidden PDF text in the fragment. A parser-backed PDF
+            # service can replace this extraction later without changing the contract.
+            content = "\n".join(re.findall(r"[ -~]{3,}", content))
+        if not content.strip():
+            return _error_response("upload contains no extractable text", status=422, code="empty_upload")
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+        upload_id = f"upload_{digest}"
+        return {
+            "upload_id": upload_id,
+            "filename": filename,
+            "content_type": content_type,
+            "fragments": [
+                {
+                    "doc_id": upload_id,
+                    "text": content,
+                    "provenance": "retrieved_untrusted",
+                    "domain": "general",
+                    "score": 1.0,
+                }
+            ],
+            "security": {
+                "provenance": "retrieved_untrusted",
+                "requires_explicit_interlock_context": True,
+            },
+        }
 
     @app.post("/v1/holds/{hold_id}/approve")
     async def approve_hold(hold_id: str, request: Request) -> Any:
@@ -246,6 +358,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ledger: Ledger = app.state.ledger
         request_id = new_request_id()
         trace_id = new_trace_id()
+        interlock_meta = body.get("interlock") if isinstance(body.get("interlock"), dict) else {}
+        session_id = str(body.get("session_id") or interlock_meta.get("session_id") or "").strip()
+        explicit_regenerate = bool(interlock_meta.get("regenerate"))
+        previous_turn = app.state.rework_sessions.get(session_id) if session_id else None
         app.state.risk_engine.arm(request_id, x_interlock_force)
 
         # ---- Lane A: the only synchronous work before the model is called ----
@@ -280,6 +396,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 code=rule.name,
             )
 
+        cache_lookup = _cache_lookup(app, body, lane) if body.get("stream", False) else None
+        if cache_lookup is not None and cache_lookup.hit and cache_lookup.entry is not None:
+            lane.route_reason = "cache_hit"
+            generator = _cached_stream_response(
+                app=app,
+                body=body,
+                request_id=request_id,
+                trace_id=trace_id,
+                lane=lane,
+                entry=cache_lookup.entry,
+                similarity=cache_lookup.similarity,
+                options=_stream_options(x_interlock_events),
+                started_ms=started_ms,
+            )
+            return StreamingResponse(
+                generator,
+                media_type="text/event-stream",
+                headers={
+                    **_STREAM_HEADERS,
+                    "x-interlock-request-id": request_id,
+                    "x-interlock-trace-id": trace_id,
+                    "x-interlock-stakes-id": lane.stakes_id,
+                    "x-interlock-route-reason": "cache_hit",
+                    "x-interlock-cache": "hit",
+                },
+            )
+
         provider, model = _select_provider(app.state, body, lane.tier)
         upstream_body = {**body, "model": model}
         headers = {
@@ -294,9 +437,48 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             try:
                 result = await provider.complete(upstream_body)
             except (UpstreamError, ProviderError) as exc:
-                app.state.risk_engine.disarm(request_id)
-                return _error_from_exception(exc)
+                fallback = await _complete_capacity_fallback(
+                    app=app,
+                    body=body,
+                    provider=provider,
+                    model=model,
+                    lane=lane,
+                    exc=exc,
+                )
+                if fallback is None:
+                    app.state.risk_engine.disarm(request_id)
+                    return _error_from_exception(exc)
+                provider, model, result = fallback
             upstream_ms = monotonic_ms() - upstream_started
+            prompt_tokens = _usage(result, "prompt_tokens") or max(
+                1, len(_flatten_prompt(body)) // 4
+            )
+            completion_tokens = _usage(result, "completion_tokens") or max(
+                1, len(str(result.get("choices", ""))) // 4
+            )
+            rework_edges = _live_rework_edges(
+                session_id=session_id,
+                previous_turn=previous_turn,
+                request_id=request_id,
+                question=_last_user_message(body),
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                explicit_regenerate=explicit_regenerate,
+            )
+            if session_id:
+                app.state.rework_sessions[session_id] = {
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "question": _last_user_message(body),
+                    "ts": wall_time(),
+                    "cost_inr": PriceBook.default().cost_inr(
+                        model, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+                    ),
+                }
+                if len(app.state.rework_sessions) > 1000:
+                    oldest = next(iter(app.state.rework_sessions))
+                    del app.state.rework_sessions[oldest]
             ledger.record(
                 _batch_from(
                     request_id,
@@ -307,9 +489,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     model_served=model,
                     upstream_ms=upstream_ms,
                     overhead_ms=(monotonic_ms() - started_ms) - upstream_ms,
-                    completion_tokens=_usage(result, "completion_tokens"),
-                    prompt_tokens=_usage(result, "prompt_tokens"),
+                    completion_tokens=completion_tokens,
+                    prompt_tokens=prompt_tokens,
+                    rework_edges=rework_edges,
                 )
+            )
+            choices = result.get("choices") if isinstance(result, dict) else None
+            message = choices[0].get("message") if isinstance(choices, list) and choices else None
+            served_answer = str(message.get("content") or "") if isinstance(message, dict) else ""
+            _schedule_shadow(
+                app=app,
+                body=body,
+                request_id=request_id,
+                trace_id=trace_id,
+                lane=lane,
+                served_model=model,
+                served_answer=served_answer,
             )
             app.state.risk_engine.disarm(request_id)
             return JSONResponse(result, headers=headers)
@@ -325,6 +520,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             options=_stream_options(x_interlock_events),
             started_ms=started_ms,
             original_body=body,
+            session_id=session_id,
+            previous_turn=previous_turn,
+            explicit_regenerate=explicit_regenerate,
         )
         return StreamingResponse(
             generator,
@@ -340,6 +538,84 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 # --------------------------------------------------------------------------- #
 
 
+async def _cached_stream_response(
+    *,
+    app: FastAPI,
+    body: dict[str, Any],
+    request_id: str,
+    trace_id: str,
+    lane: PreflightResult,
+    entry: Any,
+    similarity: float,
+    options: StreamOptions,
+    started_ms: float,
+) -> AsyncIterator[str]:
+    """Serve a safe cache hit while preserving the observable contract."""
+    settings: Settings = app.state.settings
+    ledger: Ledger = app.state.ledger
+    chunk_id = f"chatcmpl-{request_id}"
+
+    stakes_event = StakesEvent(
+        impact_inr=lane.stakes.impact_inr,
+        reversibility=lane.stakes.reversibility,
+        domain=lane.stakes.domain,
+        mode=lane.mode,
+        stakes_id=lane.stakes_id,
+        route_reason="cache_hit",
+        model_served=entry.model,
+    )
+    decision_event = DecisionEvent(
+        decision_id="dec_cache_hit",
+        sentence_idx=-1,
+        action="L0_pass",
+        chosen_loss=0.0,
+        runner_up=None,
+        margin=0.0,
+        counterfactual=None,
+        degraded=False,
+        why=[
+            f"semantic cache hit at similarity {similarity:.3f}",
+            "cached answer previously passed verification",
+        ],
+    )
+
+    _publish_console(app, EVENT_STAKES, stakes_event)
+    _publish_console(app, EVENT_DECISION, decision_event)
+    if options.allows(EVENT_STAKES):
+        yield format_event(EVENT_STAKES, stakes_event)
+    if options.allows(EVENT_DECISION):
+        yield format_event(EVENT_DECISION, decision_event)
+    yield format_data(_chunk(chunk_id, entry.model, entry.answer))
+    yield format_done()
+
+    app.state.risk_engine.disarm(request_id)
+    app.state.governor.observe(monotonic_ms() - started_ms)
+    app.state.latency.record(
+        LatencySample(
+            request_id=request_id,
+            overhead_ms=monotonic_ms() - started_ms,
+            ttft_ms=0.0,
+            by_lane={"lane_a": lane.elapsed_ms},
+            buffered=lane.buffered,
+            tier=lane.tier,
+        )
+    )
+    ledger.record(
+        _batch_from(
+            request_id,
+            trace_id,
+            settings,
+            lane,
+            body,
+            model_served=entry.model,
+            overhead_ms=monotonic_ms() - started_ms,
+            completion_tokens=max(1, len(entry.answer) // 4),
+            finish_reason="cache_hit",
+            cache_hit=True,
+        )
+    )
+
+
 async def _stream_response(
     *,
     app: FastAPI,
@@ -352,6 +628,9 @@ async def _stream_response(
     options: StreamOptions,
     started_ms: float,
     original_body: dict[str, Any],
+    session_id: str,
+    previous_turn: dict[str, Any] | None,
+    explicit_regenerate: bool,
 ) -> AsyncIterator[str]:
     """Frame the upstream stream through the commit gate.
 
@@ -392,25 +671,26 @@ async def _stream_response(
 
     chunk_id = f"chatcmpl-{request_id}"
 
+    stakes_event = StakesEvent(
+        impact_inr=lane.stakes.impact_inr,
+        reversibility=lane.stakes.reversibility,
+        domain=lane.stakes.domain,
+        mode=lane.mode,
+        stakes_id=lane.stakes_id,
+        route_reason=lane.route_reason,
+        model_served=model,
+    )
+    _publish_console(app, EVENT_STAKES, stakes_event)
     if options.allows(EVENT_STAKES):
-        yield format_event(
-            EVENT_STAKES,
-            StakesEvent(
-                impact_inr=lane.stakes.impact_inr,
-                reversibility=lane.stakes.reversibility,
-                domain=lane.stakes.domain,
-                mode=lane.mode,
-                stakes_id=lane.stakes_id,
-                route_reason=lane.route_reason,
-                model_served=model,
-            ),
-        )
+        yield format_event(EVENT_STAKES, stakes_event)
 
     upstream_started = monotonic_ms()
     ttft_ms = 0.0
     completion_chars = 0
+    answer_parts: list[str] = []
     finish_reason: str | None = None
     completed = False
+    capacity_fallback = False
 
     # The whole stream sits inside try/finally so the ledger row is written even when
     # the client hangs up mid-stream -- a closed tab, a proxy timeout, a cancelled
@@ -420,30 +700,81 @@ async def _stream_response(
     # stream, and `record` is non-blocking so it is safe to call from there.
     try:
         try:
-            async for event in provider.stream(body):
-                if event.is_done:
+            active_provider = provider
+            active_body = body
+            while True:
+                try:
+                    async for event in active_provider.stream(active_body):
+                        if event.is_done:
+                            break
+                        if ttft_ms == 0.0:
+                            ttft_ms = monotonic_ms() - upstream_started
+                        completion_chars += len(event.text)
+                        if event.data:
+                            for choice in event.data.get("choices", []):
+                                finish_reason = choice.get("finish_reason") or finish_reason
+                        # Withheld, not dropped: replayed below if the interlock clears them.
+                        if tool_calls.absorb(event.data):
+                            continue
+                        if event.text:
+                            answer_parts.append(event.text)
+                        # A chunk we could not parse carries text we cannot segment, verify or
+                        # repair. Dropping it would violate "never drop a token", so it is
+                        # forwarded raw and unverified -- an honest, narrow gap, and better than
+                        # silently losing the customer's data. Valid chunks with no content
+                        # (a role-only opener) carry nothing and are simply consumed.
+                        if gate.buffered and event.data is None and event.raw:
+                            yield format_data(event.raw)
+                            continue
+                        for frame in _render(
+                            await gate.push(event.text, raw=event.raw),
+                            options,
+                            chunk_id,
+                            model,
+                            lane,
+                            app=app,
+                        ):
+                            yield frame
                     break
-                if ttft_ms == 0.0:
-                    ttft_ms = monotonic_ms() - upstream_started
-                completion_chars += len(event.text)
-                if event.data:
-                    for choice in event.data.get("choices", []):
-                        finish_reason = choice.get("finish_reason") or finish_reason
-                # Withheld, not dropped: replayed below if the interlock clears them.
-                if tool_calls.absorb(event.data):
+                except (UpstreamError, ProviderError) as exc:
+                    fallback = _stream_capacity_fallback(
+                        app=app,
+                        original_body=original_body,
+                        lane=lane,
+                        provider=active_provider,
+                        model=model,
+                        exc=exc,
+                        already_streamed=bool(completion_chars or ttft_ms),
+                    )
+                    if fallback is None:
+                        raise
+                    active_provider, model, active_body = fallback
+                    gate.repair = SentenceRepairer(
+                        provider=active_provider,
+                        model=model,
+                        risk_engine=engine,
+                        stakes=lane.stakes,
+                        request_id=request_id,
+                        question=_last_user_message(original_body),
+                        retrieved=lane.fragments,
+                    )
+                    capacity_fallback = True
+                    finish_reason = "capacity_fallback"
+                    fallback_event = DecisionEvent(
+                        decision_id="dec_capacity_fallback",
+                        sentence_idx=-1,
+                        action="L0_pass",
+                        chosen_loss=0.0,
+                        degraded=True,
+                        why=[
+                            "strong-tier capacity fallback: retried on the cheap tier "
+                            "after the selected model failed before emitting tokens"
+                        ],
+                    )
+                    _publish_console(app, EVENT_DECISION, fallback_event)
+                    if options.allows(EVENT_DECISION):
+                        yield format_event(EVENT_DECISION, fallback_event)
                     continue
-                # A chunk we could not parse carries text we cannot segment, verify or
-                # repair. Dropping it would violate "never drop a token", so it is
-                # forwarded raw and unverified -- an honest, narrow gap, and better than
-                # silently losing the customer's data. Valid chunks with no content
-                # (a role-only opener) carry nothing and are simply consumed.
-                if gate.buffered and event.data is None and event.raw:
-                    yield format_data(event.raw)
-                    continue
-                for frame in _render(
-                    await gate.push(event.text, raw=event.raw), options, chunk_id, model, lane
-                ):
-                    yield frame
         except (UpstreamError, ProviderError) as exc:
             # Mid-stream failure: the client already has a 200 and some tokens, so the
             # only honest thing left is an in-band error chunk followed by [DONE].
@@ -452,7 +783,7 @@ async def _stream_response(
 
         # Drain the gate: the last buffered sentence is still holding, and abandoning it
         # would silently truncate the answer.
-        for frame in _render(await gate.finish(), options, chunk_id, model, lane):
+        for frame in _render(await gate.finish(), options, chunk_id, model, lane, app=app):
             yield frame
 
         # ---- the tool-call interlock -------------------------------------- #
@@ -466,16 +797,15 @@ async def _stream_response(
             decision, held = await interlock.check(call, lane.fragments, request_id=request_id)
             if held is not None:
                 finish_reason = "tool_call_held"
+                hold_event = HoldEvent(
+                    hold_id=held.hold_id,
+                    kind="tool_call",
+                    reason=decision.reason,
+                    tool=call.name,
+                )
+                _publish_console(app, EVENT_HOLD, hold_event)
                 if options.allows(EVENT_HOLD):
-                    yield format_event(
-                        EVENT_HOLD,
-                        HoldEvent(
-                            hold_id=held.hold_id,
-                            kind="tool_call",
-                            reason=decision.reason,
-                            tool=call.name,
-                        ),
-                    )
+                    yield format_event(EVENT_HOLD, hold_event)
                 released = []
                 break
             released.append(call.call_id)
@@ -512,6 +842,7 @@ async def _stream_response(
         for decision in gate.decisions:
             if decision.action in {"L3_reroute", "L4_hold"}:
                 hold_id = new_hold_id()
+                resume_token = new_resume_token()
                 await ledger.persist_hold(
                     hold_id=hold_id,
                     request_id=request_id,
@@ -519,34 +850,77 @@ async def _stream_response(
                     payload={"action": decision.action, "decision_id": decision.decision_id},
                     evidence=decision.why,
                     reason=decision.hard_rule or decision.action,
+                    resume_token=resume_token,
                 )
+                hold_event = HoldEvent(
+                    hold_id=hold_id,
+                    kind="response",
+                    reason=decision.hard_rule or decision.action,
+                    sentence_idx=None,
+                    resume_token=resume_token,
+                )
+                _publish_console(app, EVENT_HOLD, hold_event)
                 if options.allows(EVENT_HOLD):
-                    yield format_event(
-                        EVENT_HOLD,
-                        HoldEvent(
-                            hold_id=hold_id,
-                            kind="response",
-                            reason=decision.hard_rule or decision.action,
-                        ),
-                    )
+                    yield format_event(EVENT_HOLD, hold_event)
 
         # A degraded Lane A is reported to the console rather than hidden: the reviewer
         # needs to know the answer was checked with fewer detectors than usual.
-        if lane.degraded and options.allows(EVENT_DECISION):
-            yield format_event(
-                EVENT_DECISION,
-                DecisionEvent(
-                    decision_id="dec_degraded",
-                    sentence_idx=-1,
-                    action="L0_pass",
-                    chosen_loss=0.0,
-                    degraded=True,
-                ),
+        if lane.degraded:
+            degraded_event = DecisionEvent(
+                decision_id="dec_degraded",
+                sentence_idx=-1,
+                action="L0_pass",
+                chosen_loss=0.0,
+                degraded=True,
             )
+            _publish_console(app, EVENT_DECISION, degraded_event)
+            if options.allows(EVENT_DECISION):
+                yield format_event(EVENT_DECISION, degraded_event)
 
         yield format_done()
         completed = True
     finally:
+        rework_edges = _live_rework_edges(
+            session_id=session_id,
+            previous_turn=previous_turn,
+            request_id=request_id,
+            question=_last_user_message(original_body),
+            model=model,
+            prompt_tokens=max(1, len(_flatten_prompt(original_body)) // 4),
+            completion_tokens=max(1, completion_chars // 4) if completion_chars else 0,
+            explicit_regenerate=explicit_regenerate,
+        )
+        if session_id:
+            app.state.rework_sessions[session_id] = {
+                "request_id": request_id,
+                "session_id": session_id,
+                "question": _last_user_message(original_body),
+                "ts": wall_time(),
+                "cost_inr": _request_cost(
+                    model, max(1, len(_flatten_prompt(original_body)) // 4), completion_chars
+                ),
+            }
+            if len(app.state.rework_sessions) > 1000:
+                oldest = next(iter(app.state.rework_sessions))
+                del app.state.rework_sessions[oldest]
+        _schedule_shadow(
+            app=app,
+            body=original_body,
+            request_id=request_id,
+            trace_id=trace_id,
+            lane=lane,
+            served_model=model,
+            served_answer="".join(answer_parts).strip(),
+        )
+        _store_cache(
+            app=app,
+            question=_last_user_message(original_body),
+            answer="".join(answer_parts).strip(),
+            lane=lane,
+            decisions=gate.decisions,
+            model=model,
+            degraded=lane.degraded or capacity_fallback,
+        )
         upstream_ms = monotonic_ms() - upstream_started
         ledger.record(
             _batch_from(
@@ -562,6 +936,8 @@ async def _stream_response(
                 completion_tokens=max(1, completion_chars // 4) if completion_chars else 0,
                 finish_reason=finish_reason or ("stop" if completed else "client_disconnect"),
                 decisions=gate.decisions,
+                rework_edges=rework_edges,
+                degraded=lane.degraded or capacity_fallback,
             )
         )
         engine.disarm(request_id)
@@ -598,6 +974,8 @@ def _render(
     chunk_id: str,
     model: str,
     lane: PreflightResult,
+    *,
+    app: FastAPI | None = None,
 ) -> list[str]:
     """Turn the gate's emissions into SSE frames.
 
@@ -614,30 +992,197 @@ def _render(
         elif emission.kind == "text":
             frames.append(format_data(_chunk(chunk_id, model, emission.text)))
         elif emission.kind == "event" and emission.decision is not None:
-            if not options.allows(EVENT_DECISION):
-                continue
             decision = emission.decision
-            frames.append(
-                format_event(
-                    EVENT_DECISION,
-                    DecisionEvent(
-                        decision_id=decision.decision_id,
-                        sentence_idx=emission.sentence_idx,
-                        action=decision.action,
-                        chosen_loss=decision.chosen_loss,
-                        runner_up=decision.runner_up,
-                        margin=decision.margin,
-                        # What would have shipped. The console renders it in red beside
-                        # what actually did, and it is the line the demo lands on.
-                        counterfactual=(
-                            emission.original if decision.action != "L0_pass" else None
-                        ),
-                        hard_rule=decision.hard_rule,
-                        degraded=lane.degraded,
-                    ),
+            signal_events = [
+                SignalEvent(
+                    sentence_idx=emission.sentence_idx,
+                    name=signal.name,
+                    prob=signal.prob,
                 )
+                for signal in decision.signals
+            ]
+            for signal_event in signal_events:
+                _publish_console(app, EVENT_SIGNAL, signal_event)
+                if options.allows(EVENT_SIGNAL):
+                    frames.append(format_event(EVENT_SIGNAL, signal_event))
+            decision_event = DecisionEvent(
+                decision_id=decision.decision_id,
+                sentence_idx=emission.sentence_idx,
+                action=decision.action,
+                chosen_loss=decision.chosen_loss,
+                runner_up=decision.runner_up,
+                margin=decision.margin,
+                # What would have shipped. The console renders it in red beside
+                # what actually did, and it is the line the demo lands on.
+                counterfactual=(emission.original if decision.action != "L0_pass" else None),
+                hard_rule=decision.hard_rule,
+                degraded=lane.degraded or decision.degraded,
+                loss_table=[row.model_dump() for row in decision.loss_table],
+                probs={str(k): float(v) for k, v in decision.probs.items()},
+                why=list(decision.why),
             )
+            _publish_console(app, EVENT_DECISION, decision_event)
+            if options.allows(EVENT_DECISION):
+                frames.append(format_event(EVENT_DECISION, decision_event))
     return frames
+
+
+def _publish_console(app: FastAPI | None, event_name: str, payload: Any) -> None:
+    """Best-effort fanout to the live console.
+
+    This path must never become a dependency of the stream. Serialization errors,
+    disconnected clients or missing app state are observability failures, not customer
+    request failures.
+    """
+    if app is None:
+        return
+    hub = getattr(app.state, "console_hub", None)
+    if hub is None:
+        return
+    try:
+        body = payload.model_dump(mode="json") if hasattr(payload, "model_dump") else dict(payload)
+        hub.publish(event_name, body)
+    except Exception:
+        _log.debug("console publish failed for %s", event_name, exc_info=True)
+
+
+def _cache_lookup(app: FastAPI, body: dict[str, Any], lane: PreflightResult) -> Any | None:
+    """Try the semantic cache, reporting misses in cache stats rather than logs."""
+    question = _last_user_message(body)
+    if not question:
+        return None
+    try:
+        embedding = embed_query(app.state.cache_embedder, question)
+        return app.state.semantic_cache.lookup(
+            question=question,
+            embedding=embedding,
+            retrieved=lane.fragments,
+            stakes_inr=lane.stakes.impact_inr,
+        )
+    except Exception:
+        _log.debug("semantic cache lookup failed", exc_info=True)
+        return None
+
+
+def _store_cache(
+    *,
+    app: FastAPI,
+    question: str,
+    answer: str,
+    lane: PreflightResult,
+    decisions: list[Any],
+    model: str,
+    degraded: bool,
+) -> None:
+    """Store only answers that passed verification unchanged."""
+    if degraded or not question or not answer:
+        return
+    if not decisions or any(decision.action != "L0_pass" for decision in decisions):
+        return
+    try:
+        embedding = embed_query(app.state.cache_embedder, question)
+        app.state.semantic_cache.store(
+            question=question,
+            answer=answer,
+            embedding=embedding,
+            retrieved=lane.fragments,
+            stakes_inr=lane.stakes.impact_inr,
+            action="L0_pass",
+            model=model,
+        )
+    except Exception:
+        _log.debug("semantic cache store failed", exc_info=True)
+
+
+async def _complete_capacity_fallback(
+    *,
+    app: FastAPI,
+    body: dict[str, Any],
+    provider: Provider,
+    model: str,
+    lane: PreflightResult,
+    exc: Exception,
+) -> tuple[Provider, str, dict[str, Any]] | None:
+    """Retry a non-streaming strong-tier capacity failure on the cheap tier."""
+    fallback = _capacity_fallback_target(
+        app=app,
+        lane=lane,
+        provider=provider,
+        model=model,
+        exc=exc,
+        already_streamed=False,
+    )
+    if fallback is None:
+        return None
+    fallback_provider, fallback_model = fallback
+    result = await fallback_provider.complete({**body, "model": fallback_model, "stream": False})
+    return fallback_provider, fallback_model, result
+
+
+def _stream_capacity_fallback(
+    *,
+    app: FastAPI,
+    original_body: dict[str, Any],
+    lane: PreflightResult,
+    provider: Provider,
+    model: str,
+    exc: Exception,
+    already_streamed: bool,
+) -> tuple[Provider, str, dict[str, Any]] | None:
+    """Retry a streaming strong-tier capacity failure before any model token shipped."""
+    fallback = _capacity_fallback_target(
+        app=app,
+        lane=lane,
+        provider=provider,
+        model=model,
+        exc=exc,
+        already_streamed=already_streamed,
+    )
+    if fallback is None:
+        return None
+    fallback_provider, fallback_model = fallback
+    return fallback_provider, fallback_model, {**original_body, "model": fallback_model, "stream": True}
+
+
+def _capacity_fallback_target(
+    *,
+    app: FastAPI,
+    lane: PreflightResult,
+    provider: Provider,
+    model: str,
+    exc: Exception,
+    already_streamed: bool,
+) -> tuple[Provider, str] | None:
+    """Cheap-tier target for F-021, or None when falling back would be dishonest."""
+    if already_streamed or lane.tier != "strong":
+        return None
+    if not _is_capacity_error(exc):
+        return None
+    settings: Settings = app.state.settings
+    strong = settings.strong_tier
+    cheap = settings.cheap_tier
+    if model != strong.model or cheap.provider not in app.state.providers:
+        return None
+    _log.warning(
+        "strong tier %s failed with capacity-shaped error; retrying visibly on %s",
+        strong.model,
+        cheap.model,
+    )
+    return app.state.providers[cheap.provider], cheap.model
+
+
+def _is_capacity_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(
+        phrase in text
+        for phrase in (
+            "requires more system memory",
+            "out of memory",
+            "insufficient memory",
+            "capacity",
+            "no space left on device",
+        )
+    )
 
 
 def _chunk(chunk_id: str, model: str, text: str) -> str:
@@ -663,6 +1208,127 @@ def _last_user_message(body: dict[str, Any]) -> str:
         if message.get("role") == "user":
             return str(message.get("content") or "")
     return ""
+
+
+def _schedule_shadow(
+    *,
+    app: FastAPI,
+    body: dict[str, Any],
+    request_id: str,
+    trace_id: str,
+    lane: PreflightResult,
+    served_model: str,
+    served_answer: str,
+) -> None:
+    """Sample strong traffic for regret without extending the customer response."""
+    settings: Settings = app.state.settings
+    if lane.tier != "strong" or not served_answer:
+        return
+    if app.state.shadow_rng.random() >= max(0.0, min(1.0, settings.shadow_sample_rate)):
+        return
+    task = asyncio.create_task(
+        _run_shadow(
+            app=app,
+            body=body,
+            request_id=request_id,
+            trace_id=trace_id,
+            lane=lane,
+            served_model=served_model,
+            served_answer=served_answer,
+        ),
+        name=f"shadow-{request_id}",
+    )
+    app.state.shadow_tasks.add(task)
+    task.add_done_callback(app.state.shadow_tasks.discard)
+
+
+async def _run_shadow(
+    *,
+    app: FastAPI,
+    body: dict[str, Any],
+    request_id: str,
+    trace_id: str,
+    lane: PreflightResult,
+    served_model: str,
+    served_answer: str,
+) -> None:
+    settings: Settings = app.state.settings
+    cheap_tier = settings.tiers["cheap"]
+    if served_model == cheap_tier.model:
+        return
+    provider = app.state.providers[cheap_tier.provider]
+    try:
+        result = await provider.complete({**body, "model": cheap_tier.model, "stream": False})
+        choices = result.get("choices") if isinstance(result, dict) else None
+        message = choices[0].get("message") if isinstance(choices, list) and choices else None
+        cheap_answer = str(message.get("content") or "") if isinstance(message, dict) else ""
+        if not cheap_answer:
+            return
+        decision = await app.state.risk_engine.evaluate(
+            RiskContext(
+                request_id=f"{request_id}:shadow",
+                sentence_idx=0,
+                sentence=cheap_answer,
+                answer_prefix="",
+                question=_last_user_message(body),
+                retrieved=lane.fragments,
+                stakes=lane.stakes,
+                already_emitted=False,
+                remaining_deadline_ms=settings.observe_deadline_ms,
+            )
+        )
+        prompt_tokens = max(1, len(_flatten_prompt(body)) // 4)
+        served_cost = PriceBook.default().cost_inr(
+            served_model, prompt_tokens=prompt_tokens, completion_tokens=max(1, len(served_answer) // 4)
+        )
+        cheap_cost = PriceBook.default().cost_inr(
+            cheap_tier.model, prompt_tokens=prompt_tokens, completion_tokens=max(1, len(cheap_answer) // 4)
+        )
+        sufficed = decision.action == "L0_pass"
+        await app.state.ledger.persist_shadow_run(
+            request_id=request_id,
+            cheaper_model=cheap_tier.model,
+            verdict="parity" if sufficed else "worse",
+            judged_by="risk_engine",
+            inr_saved_if_switched=max(0.0, served_cost - cheap_cost) if sufficed else 0.0,
+        )
+        _log.debug("shadow replay complete for %s trace %s", request_id, trace_id)
+    except Exception:
+        _log.debug("shadow replay failed for %s", request_id, exc_info=True)
+
+
+def _request_cost(model: str, prompt_tokens: int, completion_chars: int) -> float:
+    """Modelled live cost used only for rework attribution."""
+    return PriceBook.default().cost_inr(
+        model, prompt_tokens=prompt_tokens, completion_tokens=max(1, completion_chars // 4)
+    )
+
+
+def _live_rework_edges(
+    *,
+    session_id: str,
+    previous_turn: dict[str, Any] | None,
+    request_id: str,
+    question: str,
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    explicit_regenerate: bool,
+) -> list[dict[str, Any]]:
+    if not session_id or previous_turn is None:
+        return []
+    current = SessionTurn(
+        request_id=request_id,
+        session_id=session_id,
+        question=question,
+        ts=wall_time(),
+        cost_inr=PriceBook.default().cost_inr(
+            model, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+        ),
+        explicit_regenerate=explicit_regenerate,
+    )
+    previous = SessionTurn(**previous_turn)
+    return [edge.as_row() for edge in ReworkLedger().attribute([previous, current])]
 
 
 def _batch_from(
@@ -699,6 +1365,33 @@ def _batch_from(
     )
     for key, value in overrides.items():
         setattr(batch, key, value)
+    if not batch.spans:
+        finish = batch.ts + max(batch.overhead_ms, 0.0) / 1000.0
+        batch.spans.append(
+            SpanEntry(
+                trace_id=trace_id,
+                name="interlock.request",
+                start_ts=batch.ts,
+                end_ts=finish,
+                duration_ms=batch.overhead_ms,
+                status="error" if str(batch.finish_reason or "").endswith("error") else "ok",
+                attributes={
+                    "gen_ai.system": "interlock",
+                    "gen_ai.request.model": batch.model_requested or "",
+                    "gen_ai.response.model": batch.model_served or "",
+                    "gen_ai.usage.prompt_tokens": batch.prompt_tokens,
+                    "gen_ai.usage.completion_tokens": batch.completion_tokens,
+                    "interlock.request_id": request_id,
+                    "interlock.stakes_id": lane.stakes_id,
+                    "interlock.stakes.impact_inr": lane.stakes.impact_inr,
+                    "interlock.stakes.domain": lane.stakes.domain,
+                    "interlock.route_reason": batch.route_reason or "",
+                    "interlock.gate_mode": lane.mode,
+                    "interlock.cache_hit": batch.cache_hit,
+                    "interlock.degraded": batch.degraded,
+                },
+            )
+        )
     return batch
 
 

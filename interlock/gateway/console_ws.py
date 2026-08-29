@@ -119,7 +119,6 @@ class ConsoleHub:
     def client_count(self) -> int:
         return len(self._clients)
 
-
 class ConsoleSource(Protocol):
     def status(self) -> dict[str, Any]: ...
 

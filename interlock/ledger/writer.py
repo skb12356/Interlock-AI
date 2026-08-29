@@ -31,10 +31,17 @@ from pathlib import Path
 from typing import Any
 
 from interlock.core.clock import wall_time
-from interlock.core.ids import sha256_text
+from interlock.core.ids import new_span_id, sha256_text
 from interlock.core.types import Decision, SignalReading
 
-__all__ = ["Ledger", "RequestBatch", "SpendEntry", "apply_migrations", "connect"]
+__all__ = [
+    "Ledger",
+    "RequestBatch",
+    "SpanEntry",
+    "SpendEntry",
+    "apply_migrations",
+    "connect",
+]
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 
@@ -101,6 +108,21 @@ class SpendEntry:
 
 
 @dataclass(slots=True)
+class SpanEntry:
+    """One trace span exported to SQLite."""
+
+    span_id: str = field(default_factory=new_span_id)
+    trace_id: str = ""
+    parent_span_id: str | None = None
+    name: str = "interlock.request"
+    start_ts: float = field(default_factory=wall_time)
+    end_ts: float | None = None
+    duration_ms: float | None = None
+    status: str = "ok"
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class RequestBatch:
     """Everything about one request, committed in a single transaction."""
 
@@ -134,6 +156,8 @@ class RequestBatch:
     signals: list[SignalReading] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)
     spend: list[SpendEntry] = field(default_factory=list)
+    spans: list[SpanEntry] = field(default_factory=list)
+    rework_edges: list[dict[str, Any]] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -154,6 +178,7 @@ class Ledger:
     _queue: asyncio.Queue[RequestBatch] | None = field(default=None, init=False, repr=False)
     _task: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
     _connection: sqlite3.Connection | None = field(default=None, init=False, repr=False)
+    _write_lock: asyncio.Lock | None = field(default=None, init=False, repr=False)
     _dropped: int = field(default=0, init=False)
     _written: int = field(default=0, init=False)
 
@@ -163,6 +188,7 @@ class Ledger:
         self._connection = connect(self.db_path)
         apply_migrations(self._connection)
         self._queue = asyncio.Queue(maxsize=self.max_queue)
+        self._write_lock = asyncio.Lock()
         self._task = asyncio.create_task(self._drain(), name="ledger-writer")
 
     async def stop(self) -> None:
@@ -177,6 +203,7 @@ class Ledger:
         if self._connection is not None:
             self._connection.close()
             self._connection = None
+        self._write_lock = None
 
     async def flush(self) -> None:
         """Wait for the queue to empty. For tests and for a clean shutdown."""
@@ -222,36 +249,103 @@ class Ledger:
         to provide (F6/F7).
         """
         connection = self._require_connection()
-        await asyncio.to_thread(
-            connection.execute,
-            "INSERT OR REPLACE INTO holds(hold_id, request_id, kind, payload_json,"
-            " flagged_span, evidence_json, state, resume_token, reason, created_ts,"
-            " sla_deadline_ts) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (
-                hold_id,
-                request_id,
-                kind,
-                json.dumps(payload or {}),
-                flagged_span,
-                json.dumps(evidence or []),
-                "pending",
-                resume_token,
-                reason,
-                wall_time(),
-                sla_deadline_ts,
-            ),
-        )
+        if self._write_lock is None:
+            raise RuntimeError("ledger write lock is not initialized")
+        async with self._write_lock:
+            await asyncio.to_thread(
+                connection.execute,
+                "INSERT OR REPLACE INTO holds(hold_id, request_id, kind, payload_json,"
+                " flagged_span, evidence_json, state, resume_token, reason, created_ts,"
+                " sla_deadline_ts) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    hold_id,
+                    request_id,
+                    kind,
+                    json.dumps(payload or {}),
+                    flagged_span,
+                    json.dumps(evidence or []),
+                    "pending",
+                    resume_token,
+                    reason,
+                    wall_time(),
+                    sla_deadline_ts,
+                ),
+            )
 
     async def resolve_hold(self, hold_id: str, *, state: str, resolved_by: str) -> bool:
         """Approve or reject a hold. Awaited for the same reason as `persist_hold`."""
         connection = self._require_connection()
-        cursor = await asyncio.to_thread(
-            connection.execute,
-            "UPDATE holds SET state=?, resolved_by=?, resolved_ts=?"
-            " WHERE hold_id=? AND state='pending'",
-            (state, resolved_by, wall_time(), hold_id),
-        )
-        return bool(cursor.rowcount)
+        if self._write_lock is None:
+            raise RuntimeError("ledger write lock is not initialized")
+        async with self._write_lock:
+            cursor = await asyncio.to_thread(
+                connection.execute,
+                "UPDATE holds SET state=?, resolved_by=?, resolved_ts=?"
+                " WHERE hold_id=? AND state='pending'",
+                (state, resolved_by, wall_time(), hold_id),
+            )
+            return bool(cursor.rowcount)
+
+    async def persist_shadow_run(
+        self,
+        *,
+        request_id: str,
+        cheaper_model: str,
+        verdict: str,
+        judged_by: str,
+        inr_saved_if_switched: float,
+    ) -> None:
+        """Persist one asynchronous cheap-tier replay without touching the token path."""
+        connection = self._require_connection()
+        if self._write_lock is None:
+            raise RuntimeError("ledger write lock is not initialized")
+        async with self._write_lock:
+            await asyncio.to_thread(
+                connection.execute,
+                "INSERT OR REPLACE INTO shadow_runs(request_id, cheaper_model, verdict, judged_by,"
+                " inr_saved_if_switched, ts) VALUES (?,?,?,?,?,?)",
+                (request_id, cheaper_model, verdict, judged_by, inr_saved_if_switched, wall_time()),
+            )
+
+    async def persist_fairness_pair(
+        self,
+        *,
+        pair_id: str,
+        base_request_id: str,
+        twin_request_id: str,
+        attribute: str,
+        decision_field: str,
+        base_value: str,
+        twin_value: str,
+        delta: float,
+        ts: float | None = None,
+    ) -> None:
+        """Persist one completed Lane C twin observation through the ledger writer."""
+        if not pair_id or not base_request_id or not twin_request_id:
+            raise ValueError("pair and request ids are required")
+        if base_request_id == twin_request_id:
+            raise ValueError("base and twin requests must be distinct")
+        connection = self._require_connection()
+        if self._write_lock is None:
+            raise RuntimeError("ledger write lock is not initialized")
+        async with self._write_lock:
+            await asyncio.to_thread(
+                connection.execute,
+                "INSERT OR REPLACE INTO fairness_pairs(pair_id, base_request_id, twin_request_id,"
+                " attribute, decision_field, base_value, twin_value, delta, ts)"
+                " VALUES (?,?,?,?,?,?,?,?,?)",
+                (
+                    pair_id,
+                    base_request_id,
+                    twin_request_id,
+                    attribute,
+                    decision_field,
+                    base_value,
+                    twin_value,
+                    delta,
+                    wall_time() if ts is None else ts,
+                ),
+            )
 
     def pending_holds(self) -> list[dict[str, Any]]:
         """Every hold still waiting. Read at boot, which is what makes it survive."""
@@ -260,6 +354,215 @@ class Ledger:
             "SELECT * FROM holds WHERE state='pending' ORDER BY created_ts"
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def evidence_rows(self, request_id: str) -> dict[str, Any]:
+        """Collect recorded facts for one evidence-pack export.
+
+        This is read-only and intentionally does not infer missing fields. The evidence
+        pack marks absent decisions, policy or calibration as incomplete for the caller.
+        """
+        connection = self._require_connection()
+
+        def fetch(query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+            return [dict(row) for row in connection.execute(query, params).fetchall()]
+
+        def fetch_json(query: str, json_columns: tuple[str, ...]) -> list[dict[str, Any]]:
+            output = fetch(query, (request_id,))
+            for row in output:
+                for column in json_columns:
+                    value = row.get(column)
+                    if isinstance(value, str):
+                        try:
+                            row[column] = json.loads(value)
+                        except json.JSONDecodeError:
+                            pass
+                    if column.endswith("_json") and column in row:
+                        row[column.removesuffix("_json")] = row[column]
+            return output
+
+        request = fetch("SELECT * FROM requests WHERE request_id=?", (request_id,))
+        return {
+            "request": request[0] if request else {},
+            "decisions": fetch_json("SELECT * FROM decisions WHERE request_id=? ORDER BY ts", ("loss_table_json", "probs_json", "why_json")),
+            "signals": fetch("SELECT * FROM signals WHERE request_id=? ORDER BY seq", (request_id,)),
+            "spend": fetch("SELECT * FROM spend WHERE request_id=? ORDER BY ts", (request_id,)),
+            "tool_calls": fetch_json("SELECT * FROM tool_calls WHERE request_id=? ORDER BY ts", ("args_json",)),
+            "holds": fetch_json("SELECT * FROM holds WHERE request_id=? ORDER BY created_ts", ("payload_json", "evidence_json")),
+        }
+
+    def economics_snapshot(self) -> dict[str, Any]:
+        """Read-side economics for the console.
+
+        This is deliberately a ledger method rather than a gateway query. The gateway
+        must not learn SQLite, and a missing measurement must remain visibly missing.
+        """
+        from interlock.ledger.pricing import PriceBook
+        from interlock.ledger.regret import bootstrap_ci
+
+        connection = self._require_connection()
+        book = PriceBook.default()
+
+        request_rows = connection.execute(
+            "SELECT request_id, model_served, prompt_tokens, completion_tokens, cache_hit "
+            "FROM requests ORDER BY ts"
+        ).fetchall()
+        request_spend = connection.execute(
+            "SELECT request_id, SUM(CASE WHEN component = 'upstream' THEN inr ELSE 0 END) AS upstream, "
+            "SUM(CASE WHEN component != 'upstream' THEN inr ELSE 0 END) AS verification "
+            "FROM spend GROUP BY request_id"
+        ).fetchall()
+        spend_by_request = {row["request_id"]: row for row in request_spend}
+        spend_rows = connection.execute(
+            "SELECT component, model, SUM(tokens) AS tokens, SUM(inr) AS inr "
+            "FROM spend GROUP BY component, model"
+        ).fetchall()
+        shadow_rows = connection.execute(
+            "SELECT inr_saved_if_switched FROM shadow_runs ORDER BY ts"
+        ).fetchall()
+        rework_rows = connection.execute(
+            "SELECT kind, COUNT(*) AS count, SUM(inr_charged) AS inr "
+            "FROM rework_edges GROUP BY kind"
+        ).fetchall()
+
+        actual_modelled = 0.0
+        baseline_strong = 0.0
+        cache_hits = 0
+        for row in request_rows:
+            prompt = int(row["prompt_tokens"] or 0)
+            completion = int(row["completion_tokens"] or 0)
+            actual_modelled += book.cost_inr(
+                row["model_served"], prompt_tokens=prompt, completion_tokens=completion
+            )
+            baseline_strong += book.cost_inr(
+                "qwen3:8b", prompt_tokens=prompt, completion_tokens=completion
+            )
+            cache_hits += int(row["cache_hit"] or 0)
+
+        spend_by_component = [
+            {
+                "component": row["component"],
+                "model": row["model"],
+                "tokens": int(row["tokens"] or 0),
+                "inr": float(row["inr"] or 0.0),
+            }
+            for row in spend_rows
+        ]
+        recorded_upstream = sum(
+            row["inr"] for row in spend_by_component if row["component"] == "upstream"
+        )
+        upstream_spend = recorded_upstream or actual_modelled
+        verification_spend = sum(
+            row["inr"]
+            for row in spend_by_component
+            if row["component"] in {"observer", "verifier", "judge", "repair", "reroute"}
+        )
+        routing_savings = max(0.0, baseline_strong - upstream_spend)
+        regret_values = [float(row["inr_saved_if_switched"] or 0.0) for row in shadow_rows]
+        regret = sum(v for v in regret_values if v > 0.0)
+        rework_by_kind = [
+            {
+                "kind": row["kind"],
+                "count": int(row["count"] or 0),
+                "inr": float(row["inr"] or 0.0),
+            }
+            for row in rework_rows
+        ]
+        rework_total = sum(row["inr"] for row in rework_by_kind)
+        net_value = routing_savings + rework_total - verification_spend - regret
+
+        # Request-level contributions make uncertainty visible. Regret and rework are
+        # allocated evenly because their current aggregate rows lack a request join.
+        contributions: list[float] = []
+        for row in request_rows:
+            prompt = int(row["prompt_tokens"] or 0)
+            completion = int(row["completion_tokens"] or 0)
+            baseline = book.cost_inr("qwen3:8b", prompt_tokens=prompt, completion_tokens=completion)
+            spend = spend_by_request.get(row["request_id"])
+            actual = float(spend["upstream"] or 0.0) if spend else book.cost_inr(
+                row["model_served"], prompt_tokens=prompt, completion_tokens=completion
+            )
+            checking = float(spend["verification"] or 0.0) if spend else 0.0
+            contributions.append(baseline - actual - checking)
+        if contributions:
+            shared_adjustment = (rework_total - regret) / len(contributions)
+            contributions = [value + shared_adjustment for value in contributions]
+        net_ci = bootstrap_ci(contributions, seed=20260829) if contributions else (0.0, 0.0)
+
+        notes: list[str] = []
+        if not request_rows:
+            notes.append("no requests recorded yet; live economics are unmeasured")
+        if not spend_rows:
+            notes.append("no spend rows yet; upstream spend is imputed from request token counts")
+        if not shadow_rows:
+            notes.append("no shadow runs yet; regret is unmeasured, not zero")
+        if not rework_rows:
+            notes.append("no rework edges yet; avoided rework is unmeasured, not zero")
+        if cache_hits == 0:
+            notes.append("no cache hit has been measured, so no cache saving is claimed")
+        if contributions and (regret or rework_total):
+            notes.append(
+                "net-value CI allocates aggregate regret and rework evenly across requests; "
+                "request-linked attribution is not yet available"
+            )
+
+        return {
+            "requests": len(request_rows),
+            "cache_hits": cache_hits,
+            "upstream_spend_inr": round(upstream_spend, 4),
+            "verification_spend_inr": round(verification_spend, 4),
+            "verification_cost_ratio": (
+                round(verification_spend / upstream_spend, 6) if upstream_spend > 0 else None
+            ),
+            "routing_savings_inr": round(routing_savings, 4),
+            "regret_inr": round(regret, 4),
+            "regret_samples": len(regret_values),
+            "rework_inr": round(rework_total, 4),
+            "rework_by_kind": rework_by_kind,
+            "net_value_inr": round(net_value, 4),
+            "net_value_ci_inr": [round(net_ci[0], 4), round(net_ci[1], 4)],
+            "net_value_samples": len(contributions),
+            "spend_by_component": spend_by_component,
+            "price_book": book.report(),
+            "notes": notes,
+        }
+
+    def lane_c_snapshot(self) -> dict[str, Any]:
+        """Read-side Lane C projection: fairness pairs and the e-value series."""
+        from interlock.lanec.evalues import EValueMonitor
+
+        connection = self._require_connection()
+        rows = connection.execute(
+            "SELECT attribute, base_value, twin_value, delta FROM fairness_pairs ORDER BY ts"
+        ).fetchall()
+
+        monitor = EValueMonitor()
+        by_axis: dict[str, dict[str, int]] = {}
+        for row in rows:
+            axis = str(row["attribute"] or "unknown")
+            disparate = _fairness_row_disparate(row)
+            bucket = by_axis.setdefault(axis, {"n": 0, "disparate": 0})
+            bucket["n"] += 1
+            bucket["disparate"] += int(disparate)
+            monitor.update(1.0 if disparate else 0.0)
+
+        notes: list[str] = []
+        if not rows:
+            notes.append("no fairness pairs recorded yet; Lane C projection has no live samples")
+        report = monitor.report()
+        return {
+            "n_pairs": len(rows),
+            "by_axis": {
+                axis: {
+                    "n": counts["n"],
+                    "disparate": counts["disparate"],
+                    "rate": round(counts["disparate"] / counts["n"], 4) if counts["n"] else 0.0,
+                }
+                for axis, counts in sorted(by_axis.items())
+            },
+            "e_value": report,
+            "series": monitor.chart_series(),
+            "notes": notes + list(report.get("notes", [])),
+        }
 
     # -- internals --------------------------------------------------------- #
 
@@ -273,7 +576,10 @@ class Ledger:
         while True:
             batch = await self._queue.get()
             try:
-                await asyncio.to_thread(self._write, batch)
+                if self._write_lock is None:
+                    raise RuntimeError("ledger write lock is not initialized")
+                async with self._write_lock:
+                    await asyncio.to_thread(self._write, batch)
                 self._written += 1
             except Exception:
                 self._dropped += 1
@@ -327,7 +633,7 @@ class Ledger:
             )
 
             for seq, signal in enumerate(batch.signals):
-                span = signal.span or (None, None)
+                signal_span = signal.span or (None, None)
                 connection.execute(
                     "INSERT OR REPLACE INTO signals(request_id, seq, sentence_idx, name, raw,"
                     " prob, calib_version, latency_ms, span_start, span_end)"
@@ -341,8 +647,8 @@ class Ledger:
                         signal.prob,
                         None,
                         signal.latency_ms,
-                        span[0],
-                        span[1],
+                        signal_span[0],
+                        signal_span[1],
                     ),
                 )
 
@@ -387,6 +693,38 @@ class Ledger:
                     ),
                 )
 
+            for span_entry in batch.spans:
+                connection.execute(
+                    "INSERT OR REPLACE INTO spans(span_id, trace_id, parent_span_id, name,"
+                    " start_ts, end_ts, duration_ms, status, attributes_json)"
+                    " VALUES (?,?,?,?,?,?,?,?,?)",
+                    (
+                        span_entry.span_id,
+                        span_entry.trace_id or batch.trace_id,
+                        span_entry.parent_span_id,
+                        span_entry.name,
+                        span_entry.start_ts,
+                        span_entry.end_ts,
+                        span_entry.duration_ms,
+                        span_entry.status,
+                        json.dumps(span_entry.attributes, sort_keys=True),
+                    ),
+                )
+
+            for edge in batch.rework_edges:
+                connection.execute(
+                    "INSERT OR REPLACE INTO rework_edges(child_request_id, parent_request_id, "
+                    "kind, confidence, inr_charged, ts) VALUES (?,?,?,?,?,?)",
+                    (
+                        edge["child_request_id"],
+                        edge["parent_request_id"],
+                        edge["kind"],
+                        edge["confidence"],
+                        edge["inr_charged"],
+                        edge["ts"],
+                    ),
+                )
+
             connection.execute("COMMIT")
         except Exception:
             connection.execute("ROLLBACK")
@@ -399,3 +737,13 @@ class Ledger:
             "dropped": self._dropped,
             "queued": self._queue.qsize() if self._queue else 0,
         }
+
+
+def _fairness_row_disparate(row: sqlite3.Row) -> bool:
+    delta = row["delta"]
+    if delta is not None:
+        try:
+            return abs(float(delta)) > 0.0
+        except (TypeError, ValueError):
+            pass
+    return str(row["base_value"] or "") != str(row["twin_value"] or "")

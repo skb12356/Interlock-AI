@@ -25,6 +25,7 @@ from interlock.core.types import Decision, LossRow, SignalReading
 from interlock.ledger.writer import (
     Ledger,
     RequestBatch,
+    SpanEntry,
     SpendEntry,
     apply_migrations,
     connect,
@@ -162,6 +163,25 @@ async def test_signals_decisions_and_spend_commit_together(ledger: Ledger) -> No
     assert connection.execute("SELECT COUNT(*) FROM signals").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM spend").fetchone()[0] == 1
+
+
+async def test_spans_commit_with_the_request(ledger: Ledger) -> None:
+    ledger.record(
+        _batch(
+            spans=[
+                SpanEntry(
+                    trace_id="trc_1",
+                    name="interlock.request",
+                    duration_ms=12.0,
+                    attributes={"interlock.stakes_id": "stk_1"},
+                )
+            ]
+        )
+    )
+    await ledger.flush()
+    row = ledger._require_connection().execute("SELECT * FROM spans").fetchone()
+    assert row["trace_id"] == "trc_1"
+    assert json.loads(row["attributes_json"])["interlock.stakes_id"] == "stk_1"
 
 
 async def test_the_full_loss_table_is_stored(ledger: Ledger) -> None:
@@ -321,6 +341,99 @@ async def test_resolving_records_who_did_it(ledger: Ledger) -> None:
     )
     assert row["resolved_by"] == "reviewer@bank"
     assert row["resolved_ts"] is not None
+
+
+async def test_economics_snapshot_reports_missing_measurements(ledger: Ledger) -> None:
+    snapshot = ledger.economics_snapshot()
+    assert snapshot["requests"] == 0
+    assert any("regret is unmeasured" in note for note in snapshot["notes"])
+    assert any("rework edges" in note for note in snapshot["notes"])
+
+
+async def test_economics_snapshot_exposes_net_value(ledger: Ledger) -> None:
+    ledger.record(
+        _batch(
+            prompt_tokens=100,
+            completion_tokens=50,
+            spend=[
+                SpendEntry(component="upstream", model="qwen3:4b", tokens=150, inr=1.0),
+                SpendEntry(component="observer", model="probe", tokens=10, inr=0.1),
+            ],
+        )
+    )
+    await ledger.flush()
+    connection = ledger._require_connection()
+    connection.execute(
+        "INSERT INTO rework_edges(child_request_id, parent_request_id, kind, confidence,"
+        " inr_charged, ts) VALUES ('c','p','retry',0.8,2.0,1.0)"
+    )
+    connection.execute(
+        "INSERT INTO shadow_runs(request_id, cheaper_model, verdict, judged_by,"
+        " inr_saved_if_switched, ts) VALUES ('r','qwen3:4b','parity','risk',0.4,1.0)"
+    )
+    snapshot = ledger.economics_snapshot()
+    assert snapshot["verification_cost_ratio"] == 0.1
+    assert snapshot["regret_inr"] == 0.4
+    assert snapshot["rework_inr"] == 2.0
+    assert "net_value_inr" in snapshot
+    assert len(snapshot["net_value_ci_inr"]) == 2
+    assert snapshot["net_value_samples"] == 1
+
+
+async def test_lane_c_snapshot_computes_e_value_series(ledger: Ledger) -> None:
+    connection = ledger._require_connection()
+    for index in range(12):
+        connection.execute(
+            "INSERT INTO fairness_pairs(pair_id, base_request_id, twin_request_id, attribute,"
+            " decision_field, base_value, twin_value, delta, ts)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                f"pair_{index}",
+                f"base_{index}",
+                f"twin_{index}",
+                "gender",
+                "action",
+                "L0_pass",
+                "L4_hold" if index % 3 == 0 else "L0_pass",
+                1.0 if index % 3 == 0 else 0.0,
+                float(index),
+            ),
+        )
+    snapshot = ledger.lane_c_snapshot()
+    assert snapshot["n_pairs"] == 12
+    assert snapshot["by_axis"]["gender"]["disparate"] == 4
+    assert len(snapshot["series"]["e_value"]) == 12
+
+
+async def test_lane_c_pair_writer_persists_observation(ledger: Ledger) -> None:
+    await ledger.persist_fairness_pair(
+        pair_id="pair-imported",
+        base_request_id="base-request",
+        twin_request_id="twin-request",
+        attribute="gender",
+        decision_field="action",
+        base_value="L0_pass",
+        twin_value="L4_hold",
+        delta=1.0,
+    )
+    row = ledger._require_connection().execute(
+        "SELECT attribute, base_value, twin_value, delta FROM fairness_pairs"
+    ).fetchone()
+    assert tuple(row) == ("gender", "L0_pass", "L4_hold", 1.0)
+
+
+async def test_lane_c_pair_writer_rejects_self_pair(ledger: Ledger) -> None:
+    with pytest.raises(ValueError, match="distinct"):
+        await ledger.persist_fairness_pair(
+            pair_id="bad",
+            base_request_id="same",
+            twin_request_id="same",
+            attribute="gender",
+            decision_field="action",
+            base_value="L0_pass",
+            twin_value="L0_pass",
+            delta=0.0,
+        )
 
 
 # --------------------------------------------------------------------------- #

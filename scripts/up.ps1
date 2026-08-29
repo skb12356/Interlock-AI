@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Start Interlock locally: gateway + observer.
+    Start Interlock locally: gateway + observer + console.
 
 .DESCRIPTION
     Replaces `docker compose up` (deviation D-001: Docker was dropped from this build).
@@ -17,7 +17,10 @@
 param(
     [int]$GatewayPort = 8080,
     [int]$ObserverPort = 8081,
+    [int]$ConsolePort = 5173,
     [int]$TimeoutSeconds = 90,
+    [ValidateSet('real', 'stub')]
+    [string]$RiskEngine = $(if ($env:INTERLOCK_RISK_ENGINE) { $env:INTERLOCK_RISK_ENGINE } else { 'real' }),
     [switch]$MockObserver
 )
 
@@ -41,7 +44,8 @@ $observerApp = if ($MockObserver) {
 
 $services = @(
     @{ Name = 'observer'; App = $observerApp;                  Port = $ObserverPort },
-    @{ Name = 'gateway';  App = 'interlock.gateway.app:app';   Port = $GatewayPort  }
+    @{ Name = 'gateway';  App = 'interlock.gateway.app:app';   Port = $GatewayPort  },
+    @{ Name = 'console';  App = 'interlock.console.app:app';   Port = $ConsolePort  }
 )
 
 function Test-Health {
@@ -55,20 +59,32 @@ function Test-Health {
 }
 
 Write-Host "Starting Interlock (repo: $repo)" -ForegroundColor Cyan
+Write-Host ("  risk engine: {0}" -f $RiskEngine) -ForegroundColor DarkGray
+
+$previousRiskEngine = $env:INTERLOCK_RISK_ENGINE
+$previousObserverUrl = $env:INTERLOCK_OBSERVER_URL
+$env:INTERLOCK_RISK_ENGINE = $RiskEngine
+$env:INTERLOCK_OBSERVER_URL = "http://127.0.0.1:$ObserverPort"
 
 $started = @()
-foreach ($service in $services) {
-    if (Test-Health -Port $service.Port) {
-        Write-Host ("  {0,-9} already running on :{1}" -f $service.Name, $service.Port) -ForegroundColor DarkGray
-        continue
+try {
+    foreach ($service in $services) {
+        if (Test-Health -Port $service.Port) {
+            Write-Host ("  {0,-9} already running on :{1}" -f $service.Name, $service.Port) -ForegroundColor DarkGray
+            continue
+        }
+        $log = Join-Path $logDir "$($service.Name).log"
+        $process = Start-Process -FilePath 'uv' `
+            -ArgumentList 'run', 'uvicorn', $service.App, '--host', '127.0.0.1', '--port', $service.Port, '--log-level', 'info' `
+            -RedirectStandardOutput $log -RedirectStandardError "$log.err" `
+            -WindowStyle Hidden -PassThru
+        $started += [pscustomobject]@{ Name = $service.Name; Port = $service.Port; Pid = $process.Id }
+        Write-Host ("  {0,-9} starting on :{1} (pid {2}, log {3})" -f $service.Name, $service.Port, $process.Id, $log)
     }
-    $log = Join-Path $logDir "$($service.Name).log"
-    $process = Start-Process -FilePath 'uv' `
-        -ArgumentList 'run', 'uvicorn', $service.App, '--host', '127.0.0.1', '--port', $service.Port, '--log-level', 'info' `
-        -RedirectStandardOutput $log -RedirectStandardError "$log.err" `
-        -WindowStyle Hidden -PassThru
-    $started += [pscustomobject]@{ Name = $service.Name; Port = $service.Port; Pid = $process.Id }
-    Write-Host ("  {0,-9} starting on :{1} (pid {2}, log {3})" -f $service.Name, $service.Port, $process.Id, $log)
+}
+finally {
+    if ($null -eq $previousRiskEngine) { Remove-Item Env:\INTERLOCK_RISK_ENGINE -ErrorAction SilentlyContinue } else { $env:INTERLOCK_RISK_ENGINE = $previousRiskEngine }
+    if ($null -eq $previousObserverUrl) { Remove-Item Env:\INTERLOCK_OBSERVER_URL -ErrorAction SilentlyContinue } else { $env:INTERLOCK_OBSERVER_URL = $previousObserverUrl }
 }
 
 # Poll until healthy. A cold start must reach healthy inside the timeout, which is the
@@ -100,6 +116,8 @@ if (-not $allHealthy) {
 Write-Host ''
 Write-Host 'Point any OpenAI-compatible client at the gateway:' -ForegroundColor Cyan
 Write-Host '    client = OpenAI(base_url="http://localhost:8080/v1", api_key="local")'
+Write-Host ''
+Write-Host ("Open the console at: http://127.0.0.1:{0}" -f $ConsolePort) -ForegroundColor Cyan
 Write-Host ''
 Write-Host 'Stop with: .\scripts\down.ps1'
 exit 0

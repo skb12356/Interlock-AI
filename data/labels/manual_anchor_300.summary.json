@@ -1,0 +1,9 @@
+{
+  "count": 300,
+  "gold_ungrounded": 25,
+  "gold_contradicted": 5,
+  "gold_unsafe": 0,
+  "clean": 270,
+  "source": "calibration split only; document-disjoint from seeded eval split",
+  "labeller": "person1_codex_manual_review"
+}

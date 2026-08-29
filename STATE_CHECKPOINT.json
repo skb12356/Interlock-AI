@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
   "project": "Interlock V2",
-  "current_phase": "Day 4 backend complete + observer probe trained; console (Person 2) not started",
-  "last_completed_task": "D4-B6: provably disjoint, domain-stratified calibration/eval splits -- and every metric re-measured on them",
-  "next_task": "F-019 IS YOUR DECISION and blocks the demo. Otherwise: wire the cache/regret/rework onto the request path, or D2-B5 (observer KV cache). Console is Person 2's.",
-  "system_status": "Amber -- everything builds, 653 tests pass, six metrics measured; but F-019 makes the live high-stakes path block reasonable answers, which blocks the Scene 1 demo",
+  "current_phase": "Day 5 in-place operational rehearsal complete; console served with gateway and observer",
+  "last_completed_task": "Person 1: ConsoleHub publishing, response-hold resume token, production console supervision, live economics/Lane C endpoints, semantic cache wiring, observer context cache stats, 300 manual anchor labels, artifact refresh, deterministic four-scene gateway rehearsal, untrusted upload path, and three-seed HTML evaluation scorecard",
+  "next_task": "F-019 remains the release policy decision. Then run the same rehearsal against a responding live Ollama/upstream, complete measured efficacy, chaos/load/security passes, and clean-checkout deploy verification.",
+  "system_status": "Amber -- backend and console wiring are now live and rehearsed in-place with a deterministic upstream; regenerated metrics still miss verification cost, net spend and false interventions, and Ollama did not respond locally for a live-model rehearsal",
   "verification": {
-    "ruff": "clean across interlock/, tests/, scripts/",
+    "ruff": "clean on touched Python files; prior checkpoint had clean across interlock/, tests/, scripts/",
     "mypy_strict": "clean on interlock/core, interlock/retrieval, interlock/interlock_tools",
-    "pytest": "861 passed (fast suite; 7 slow tests need model weights)",
-    "make_eval": "runs; prints six numbers; five PASS, false interventions MISS",
-    "sensitivity": "make sensitivity: the F-019 experiment; disruptive target achievable below a 0.001% clean floor, annotation-inclusive target missed at every floor"
+    "pytest": "885 passed in 66.90s (fast suite; slow model-weight tests still marked separately)",
+    "make_eval": "regenerated 2026-08-29; verification cost 5.20% MISS, net spend -18.96% MISS, false interventions 85.35% MISS; policy hash current",
+    "sensitivity": "regenerated 2026-08-29; disruptive target achievable below a clean floor of 3e-05"
   },
   "measured_metrics": {
     "_note": "ALL measured on a provably disjoint, domain-stratified split (D4-B6). Calibration and the probe fit on 26 documents; the eval set is built from the other 19; zero shared.",
@@ -41,7 +41,7 @@
     "F-017 OPEN: calibrated probabilities are bimodal, so the ECE rests on few populated bins. Visible in the reliability histogram.",
     "F-018 OPEN: the semantic-entropy labelling job (D1-B5's second half) is not run -- unaffordable on this hardware. The pipeline that consumes those scores is built.",
     "F-020 OPEN: `make eval` models generation latency and billing rather than observing them, and models no cache saving at all. The -20.15% net spend figure is routing + loop-breaking only. Stated in the harness output, not just in docs.",
-    "F-021 OPEN, OPERATIONAL, DEMO-BLOCKING: the router sends high-stakes traffic to the strong tier (qwen3:8b, 6.6 GiB) and on this laptop that model does not always fit -- Ollama returns a hard 500 ('model requires more system memory') and the customer gets NO answer at all. The gateway handles it correctly (in-band error chunk, clean [DONE], ledger row) but 'correctly reports a total failure' is not good enough for the high-stakes path, which is exactly the traffic the router sends there. Needs an explicit, RECORDED capacity fallback: retry on the cheap tier and mark the response degraded. Must NOT be a silent reroute -- answering with a different model than the one selected, without saying so, breaks the property that makes the ledger's spend numbers meaningful. Discovered by live verification after the engine swap; no test covers it because respx fixtures never run out of memory."
+    "F-021 CLOSED 2026-08-29: capacity-shaped strong-tier failure before any tokens now retries the cheap tier, publishes a degraded `dec_capacity_fallback`, records the served fallback model in the ledger, and updates repair routing to the fallback provider/model. Mid-stream failures still surface as in-band upstream errors because the client may already have tokens."
   ],
   "fixed_this_session": [
     "the calibration set was 50% defective, so the calibrator scored clean text at P=0.135 and HELD CORRECT ANSWERS for review. Base rate corrected to 10%; ECE 0.0451 -> 0.0037.",
@@ -55,7 +55,12 @@
     "TRAIN/SERVE SKEW in the observer probe: trained with untrusted passages in the premise, served without them. Cost ~0.07 AUROC (0.907 -> 0.837) and nothing errored -- it would have read as 'the probe is weak'. Training now matches serving; serving is the side that cannot move, because a poisoned document in the premise makes the attacker's own claim genuinely entailed.",
     "observe_deadline_ms was 120 ms, but the observer probe costs ~100 ms and the claim verifier another ~100 -- so the probe could NEVER have run in production, and neither could both signals together. The 120 ms figure treated Lane B as if it were on the critical path; it is not, it runs concurrently with generating the next sentence (1-3 s locally) behind the commit buffer. Raised to 800 ms, which is comfortably under the generator and over both signals. What is actually spent shows up as `gate_hold` in /admin/latency, which is the number to watch rather than the ceiling.",
     "LEAKAGE (D4-B6): calibration drew from all 45 corpus documents and the eval set from 43 of them. Different seeds gave different triples, so it looked fine, but the calibrator had read every document the eval set was built from. Now partitioned BY DOCUMENT, stratified by domain, zero shared -- and re-measured. ECE unchanged (0.0037), false interventions 91.08% -> 85.35%, and verification cost 3.60% -> 5.20%, which now MISSES its target: the leak had been hiding it.",
-    "the first version of that split was unstratified, which sent every branch_info and fees document to the calibration side. The eval set then had no low-stakes traffic at all -- 128 of 157 clean cases at Rs.10,000+, the Rs.0-100 band gone, false interventions reading 100%. The number was measuring the split. Now hashed WITHIN each domain."
+    "the first version of that split was unstratified, which sent every branch_info and fees document to the calibration side. The eval set then had no low-stakes traffic at all -- 128 of 157 clean cases at Rs.10,000+, the Rs.0-100 band gone, false interventions reading 100%. The number was measuring the split. Now hashed WITHIN each domain.",
+    "Person 1 live console wiring: stakes/signals/decisions/holds publish into ConsoleHub, `/console/recent` replays the buffer, response holds include the initiating-stream resume token on the SSE event, and the static console is served by `interlock.console.app` under `scripts/up.ps1`.",
+    "Person 1 live economics/Lane C: `/admin/economics` and `/admin/lanec` now read ledger state for spend, cache hits, regret, rework, net value and e-value projections, with explicit notes when regret/rework/fairness samples are unmeasured.",
+    "Person 1 semantic cache: verified clean streaming answers are stored and repeat clean requests can be served as cache hits with `dec_cache_hit` published into ConsoleHub.",
+    "Person 1 labels: `scripts/build_manual_anchor.py` produced and imported 300 calibration-split anchor labels under `data/labels/`.",
+    "Person 1 rehearsal: strict four-scene gateway rehearsal passed against real gateway/console with deterministic local fixture upstream; saved redacted transcript at `artifacts/rehearsal/gateway_rehearsal.json`."
   ],
   "deviations_recorded": [
     "D-009: the dense retrieval arm is a hashed lexical vector, not bge-small-en-v1.5 (no torch). BM25 carries retrieval; declares semantic=False and gets half a vote.",
@@ -63,5 +68,5 @@
     "D-011: `make eval` holds generation FIXED across both arms (paired design). This is a methodological choice, not a shortcut -- it attributes every off-vs-on difference to Interlock rather than to sampling noise -- but it means generation latency and billing are modelled rather than observed.",
     "D-012: the plan names DeBERTa-v3-base for the observer. transformers 5.x cannot load its tokenizer -- it misroutes the SentencePiece model to the tiktoken parser, which fails on the binary file, and installing sentencepiece/tiktoken does not help because the routing happens before either is consulted. The encoder is configurable and defaults to an NLI cross-encoder whose tokenizer loads natively; NLI is arguably the better base since grounding IS entailment."
   ],
-  "updated_utc": "2026-08-26T18:00:00Z"
+  "updated_utc": "2026-08-29T00:00:00Z"
 }

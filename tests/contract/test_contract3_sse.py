@@ -137,6 +137,22 @@ def test_decision_event_carries_the_counterfactual() -> None:
     assert json.loads(event.model_dump_json())["counterfactual"].startswith("Clause 7.4")
 
 
+def test_decision_event_can_carry_the_full_explanation() -> None:
+    event = DecisionEvent(
+        decision_id="dec_1",
+        sentence_idx=0,
+        action="L4_hold",
+        chosen_loss=10.0,
+        loss_table=[{"action": "L4_hold", "total": 10.0}],
+        probs={"ungrounded": 0.91},
+        why=["priced against the policy"],
+    )
+    payload = json.loads(event.model_dump_json())
+    assert payload["loss_table"][0]["action"] == "L4_hold"
+    assert payload["probs"]["ungrounded"] == 0.91
+    assert payload["why"] == ["priced against the policy"]
+
+
 def test_signal_event_exposes_only_the_calibrated_probability() -> None:
     """The console must never render an uncalibrated score as if it meant something."""
     assert "raw" not in SignalEvent.model_fields
@@ -153,6 +169,17 @@ def test_hold_event_matches_the_documented_example() -> None:
     frame = format_event(EVENT_HOLD, event)
     assert frame.startswith("event: interlock.hold\n")
     assert json.loads(frame.split("data: ", 1)[1])["tool"] == "send_email"
+
+
+def test_response_hold_event_can_carry_the_initiating_resume_token() -> None:
+    event = HoldEvent(
+        hold_id="hld_1",
+        kind="response",
+        reason="L4_hold",
+        resume_token="resume-on-this-stream-only",
+    )
+    payload = json.loads(format_event(EVENT_HOLD, event).split("data: ", 1)[1])
+    assert payload["resume_token"] == "resume-on-this-stream-only"
 
 
 # --------------------------------------------------------------------------- #

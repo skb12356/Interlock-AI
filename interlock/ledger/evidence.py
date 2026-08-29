@@ -37,6 +37,7 @@ table was empty.
 from __future__ import annotations
 
 import json
+import io
 import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -138,6 +139,11 @@ class EvidencePack:
         """Write the zip. Returns the path."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(self.to_bytes(canaries=canaries))
+        return path
+
+    def to_bytes(self, *, canaries: Sequence[str] = ()) -> bytes:
+        """Return the same evidence ZIP as ``write`` without a temporary file."""
         payloads: dict[str, Any] = {
             "manifest.json": self.manifest(),
             "request.json": self.request,
@@ -148,14 +154,15 @@ class EvidencePack:
             "holds.json": self.holds,
             "calibration.json": self.calibration,
         }
-        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for name, payload in payloads.items():
                 archive.writestr(
                     name, json.dumps(_redact(payload, canaries=canaries), indent=2, default=str)
                 )
             if self.policy_text:
                 archive.writestr("policy.yaml", _redact(self.policy_text, canaries=canaries))
-        return path
+        return output.getvalue()
 
 
 def build_evidence_pack(

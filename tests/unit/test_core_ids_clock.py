@@ -17,6 +17,7 @@ from interlock.core.ids import (
     inputs_digest,
     new_decision_id,
     new_request_id,
+    new_span_id,
     new_stakes_id,
 )
 from interlock.core.types import Fragment
@@ -31,6 +32,7 @@ def test_ids_carry_their_type_as_a_prefix() -> None:
     assert new_request_id().startswith("req_")
     assert new_decision_id().startswith("dec_")
     assert new_stakes_id().startswith("stk_")
+    assert new_span_id().startswith("spn_")
 
 
 def test_ids_are_unique() -> None:

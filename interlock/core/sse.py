@@ -109,6 +109,9 @@ class DecisionEvent(_Event):
     counterfactual: str | None = None  # the text that would have shipped
     hard_rule: str | None = None  # set when a deterministic rule fired
     degraded: bool = False
+    loss_table: list[dict[str, Any]] = Field(default_factory=list)
+    probs: dict[str, float] = Field(default_factory=dict)
+    why: list[str] = Field(default_factory=list)
 
 
 class HoldEvent(_Event):
@@ -119,6 +122,7 @@ class HoldEvent(_Event):
     reason: str
     tool: str | None = None
     sentence_idx: int | None = None
+    resume_token: str | None = None
 
 
 # --------------------------------------------------------------------------- #

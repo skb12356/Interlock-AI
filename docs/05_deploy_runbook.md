@@ -41,6 +41,16 @@ Run the local security/privacy sweep:
 uv run python scripts/security_sweep.py
 ```
 
+Run the deployment failure-mode checks:
+
+```powershell
+uv run pytest -m chaos
+```
+
+These checks cover in-band observer degradation, breaker-driven shallow mode, and
+refusal to load malformed policy. Upstream 429 and watchdog behavior are covered by
+the contract/property suites.
+
 ## Measured Efficacy Import
 
 The efficacy matrix requires human-reviewed outcomes after forcing an action. A

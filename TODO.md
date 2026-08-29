@@ -9,6 +9,9 @@
 - `pytest -m chaos` now covers observer degradation, breaker shallow mode, and malformed
   policy refusal; upstream 429 and watchdog behavior remain covered by the contract and
   property suites.
+- `scripts/build_pitch_pack.py` now generates `artifacts/eval/pitch_pack.json` from the
+  regenerated seed reports and the versioned policy, including measured metrics,
+  evidence references, and policy-derived stakes cases.
 
 **Source of truth:** `Implementation/Implementation01.md` (5-day plan) · `Implementation02.md` (system design) · `Implementation03.md` (frozen contracts) · `Implementation04.md` (ADR-001…009) · `CLAUDE.md` (engineering principles) · `Interlock-v2.pdf` (design intent, target numbers).
 

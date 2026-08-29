@@ -346,6 +346,9 @@ async def test_resolving_records_who_did_it(ledger: Ledger) -> None:
 async def test_economics_snapshot_reports_missing_measurements(ledger: Ledger) -> None:
     snapshot = ledger.economics_snapshot()
     assert snapshot["requests"] == 0
+    assert snapshot["net_value_inr"] is None
+    assert snapshot["net_value_ci_inr"] is None
+    assert snapshot["upstream_spend_basis"] == "unmeasured"
     assert any("regret is unmeasured" in note for note in snapshot["notes"])
     assert any("rework edges" in note for note in snapshot["notes"])
 
@@ -362,6 +365,7 @@ async def test_economics_snapshot_exposes_net_value(ledger: Ledger) -> None:
         )
     )
     await ledger.flush()
+    baseline = ledger.economics_snapshot()
     connection = ledger._require_connection()
     connection.execute(
         "INSERT INTO rework_edges(child_request_id, parent_request_id, kind, confidence,"
@@ -375,7 +379,9 @@ async def test_economics_snapshot_exposes_net_value(ledger: Ledger) -> None:
     assert snapshot["verification_cost_ratio"] == 0.1
     assert snapshot["regret_inr"] == 0.4
     assert snapshot["rework_inr"] == 2.0
-    assert "net_value_inr" in snapshot
+    assert snapshot["net_value_inr"] == pytest.approx(baseline["net_value_inr"] - 2.4)
+    assert snapshot["net_value_ci_inr"][0] == pytest.approx(baseline["net_value_ci_inr"][0] - 2.4)
+    assert snapshot["upstream_spend_basis"] == "recorded"
     assert len(snapshot["net_value_ci_inr"]) == 2
     assert snapshot["net_value_samples"] == 1
 

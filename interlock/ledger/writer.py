@@ -459,6 +459,9 @@ class Ledger:
             row["inr"] for row in spend_by_component if row["component"] == "upstream"
         )
         upstream_spend = recorded_upstream or actual_modelled
+        upstream_spend_basis = (
+            "recorded" if recorded_upstream else "imputed" if request_rows else "unmeasured"
+        )
         verification_spend = sum(
             row["inr"]
             for row in spend_by_component
@@ -476,7 +479,7 @@ class Ledger:
             for row in rework_rows
         ]
         rework_total = sum(row["inr"] for row in rework_by_kind)
-        net_value = routing_savings + rework_total - verification_spend - regret
+        net_value = routing_savings - rework_total - verification_spend - regret
 
         # Request-level contributions make uncertainty visible. Regret and rework are
         # allocated evenly because their current aggregate rows lack a request join.
@@ -496,9 +499,9 @@ class Ledger:
             checking = float(spend["verification"] or 0.0) if spend else 0.0
             contributions.append(baseline - actual - checking)
         if contributions:
-            shared_adjustment = (rework_total - regret) / len(contributions)
+            shared_adjustment = (-rework_total - regret) / len(contributions)
             contributions = [value + shared_adjustment for value in contributions]
-        net_ci = bootstrap_ci(contributions, seed=20260829) if contributions else (0.0, 0.0)
+        net_ci = bootstrap_ci(contributions, seed=20260829) if contributions else None
 
         notes: list[str] = []
         if not request_rows:
@@ -508,7 +511,7 @@ class Ledger:
         if not shadow_rows:
             notes.append("no shadow runs yet; regret is unmeasured, not zero")
         if not rework_rows:
-            notes.append("no rework edges yet; avoided rework is unmeasured, not zero")
+            notes.append("no rework edges yet; downstream rework cost is unmeasured, not zero")
         if cache_hits == 0:
             notes.append("no cache hit has been measured, so no cache saving is claimed")
         if contributions and (regret or rework_total):
@@ -521,6 +524,7 @@ class Ledger:
             "requests": len(request_rows),
             "cache_hits": cache_hits,
             "upstream_spend_inr": round(upstream_spend, 4),
+            "upstream_spend_basis": upstream_spend_basis,
             "verification_spend_inr": round(verification_spend, 4),
             "verification_cost_ratio": (
                 round(verification_spend / upstream_spend, 6) if upstream_spend > 0 else None
@@ -530,8 +534,10 @@ class Ledger:
             "regret_samples": len(regret_values),
             "rework_inr": round(rework_total, 4),
             "rework_by_kind": rework_by_kind,
-            "net_value_inr": round(net_value, 4),
-            "net_value_ci_inr": [round(net_ci[0], 4), round(net_ci[1], 4)],
+            "net_value_inr": round(net_value, 4) if contributions else None,
+            "net_value_ci_inr": (
+                [round(net_ci[0], 4), round(net_ci[1], 4)] if net_ci is not None else None
+            ),
             "net_value_samples": len(contributions),
             "spend_by_component": spend_by_component,
             "price_book": book.report(),

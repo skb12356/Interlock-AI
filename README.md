@@ -55,6 +55,16 @@ On Windows without `make`, use the equivalents in `scripts/`:
 .\scripts\down.ps1
 ```
 
+The supervisor builds the React console on first start and serves it at
+`http://127.0.0.1:5173` through the production same-origin proxy. For a deterministic UI
+rehearsal without a model, run these in separate terminals:
+
+```bash
+uv run python scripts/replay_console.py --port 8099
+npm --prefix console ci
+npm --prefix console run dev -- --host 127.0.0.1
+```
+
 Then point any OpenAI-compatible client at it:
 
 ```python
@@ -75,6 +85,8 @@ interlock/signals/         injection, PII, canary, stakes, fusion
 interlock/risk/            calibration, conformal thresholds, expected-loss optimiser
 interlock/lanec/           fairness twins, e-values, deep judge, drift
 interlock/eval/            seeded evaluation set and metrics
+interlock/console/         production React host and same-origin gateway proxy
+console/                   React/TypeScript console, unit tests, and Playwright journeys
 policies/                  versioned policy-as-code (diffable, auditable)
 migrations/                NNN_*.sql, applied at boot, idempotent
 ```

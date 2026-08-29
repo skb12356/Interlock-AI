@@ -13,27 +13,27 @@ The console has three workspaces:
 - **Reviews** presents durable response and tool-call holds with evidence and explicit
   approve/reject actions.
 - **Evidence** presents calibration, evaluation confidence intervals, measured action
-  latency, ledger totals, and honest unavailable states for missing Lane C economics.
+  latency, ledger totals, live cost-regret/rework economics, and Lane C evidence. Replay
+  mode uses explicit unavailable or zero-observation states instead of invented values.
 
-## Ownership
+## Integration scope
 
-Person 2 may change only:
-
-- `console/**`
-- `interlock/gateway/console_ws.py`
-- `scripts/replay_console.py`
-- `coordination/PERSON2_NOTES.md`
-
-`interlock/gateway/app.py`, frozen core contracts, ledger internals, dependency metadata,
-and native supervision remain Person 1 responsibilities.
+The original Person 2 branch was limited to `console/**`,
+`interlock/gateway/console_ws.py`, `scripts/replay_console.py`, and this handoff. After
+Person 1 completed the backend on `master`, the approved integration branch merged that
+work and connected the two surfaces. The integration therefore also contains focused
+changes to the gateway publishers, ledger projections, production console host,
+supervisor, CI, and their tests. Frozen core contracts and dependency metadata remain
+unchanged.
 
 ## Architecture
 
 The browser posts chat requests through `/gateway/v1/chat/completions`. Vite rewrites the
 `/gateway` prefix to either the replay gateway on port 8099 or the live gateway on port
-8080. A custom streaming parser consumes OpenAI `data:` chunks and the four named Contract
-3 events: `interlock.stakes`, `interlock.signal`, `interlock.decision`, and
-`interlock.hold`.
+8080. The production console service serves the compiled React application and proxies
+both HTTP streams and `/console/ws` to the gateway on the same origin. A custom streaming
+parser consumes OpenAI `data:` chunks and the four named Contract 3 events:
+`interlock.stakes`, `interlock.signal`, `interlock.decision`, and `interlock.hold`.
 
 Immediate chat and event state lives in a pure reducer keyed by request and sentence.
 Read-only REST and WebSocket projections under `/console` provide recent history, complete
@@ -66,10 +66,12 @@ events set `replayed` to true without changing their sequence.
 - `GET /console/decisions/{decision_id}` returns the six loss rows and persisted rationale.
 - `GET /console/holds` returns enriched pending holds without resume tokens.
 - `GET /console/ledger/summary` returns spend, traffic, action, and overhead summaries.
+- `GET /console/lanec` returns the current fairness/e-value projection.
 - `GET /console/artifacts/{name:path}` serves only the explicit JSON allowlist.
 
 The artefact allowlist is `action_latency.json`, `calibration/report.json`,
-`calibration/lambda.json`, `eval/report.json`, and `eval/report-guaranteed.json`.
+`calibration/lambda.json`, `eval/report.json`, `eval/report-guaranteed.json`,
+`eval/sensitivity.json`, and `probes/curve.json`.
 
 ## Secret and safety rules
 
@@ -90,47 +92,57 @@ rather than crashes. Network failure preserves partial text and never resubmits 
 - The certified ungrounded-escape result is always displayed beside its 100% intervention
   rate.
 - Replay data is visibly labelled `REPLAY`.
-- Regret, rework, running net, and Lane C economics remain unavailable until real artefacts
-  exist; the UI never fabricates them.
+- Live regret, rework, running net value, confidence intervals, and Lane C observations are
+  read from the ledger. Replay mode exposes deterministic zero-observation/unavailable
+  projections; the UI never fabricates evidence.
 
-## Person 1 integration handoff
+## Person 1 integration status
 
-Person 1 must:
+The merged integration now completes the browser/backend seam:
 
-1. Create one process-lifetime `ConsoleHub` at `app.state.console_hub`, mount the router
-   from `interlock.gateway.console_ws`, and publish stakes, calibrated signals, decisions,
-   and holds with the request ID in every envelope. Set
-   `app.state.console_publishers_integrated = True` only after all four publishers are
-   wired; until then `/console/status` deliberately reports recent live events unavailable.
-2. Add an optional resume token only to the initiating hold SSE event, including response
-   holds; never publish that token to console projections.
-3. Add production static/proxy serving and native console supervision.
-4. Make `sqlite-vec` part of the non-heavy development/runtime installation, or align the
-   retrieval tests with the declared dependency extra. Person 2 installs `sqlite-vec==0.1.9`
-   locally only so the existing 653-test baseline can run.
-5. Supply real Lane C economics, regret, rework, net-value, and confidence-interval data.
+1. The gateway owns one process-lifetime `ConsoleHub`, mounts the projection router, and
+   publishes stakes, signals, decisions, and holds with request IDs.
+2. Tool and response hold tokens appear only in the initiating SSE stream. Recursive hub
+   redaction keeps them out of WebSocket/recent projections.
+3. The production console service hosts `console/dist`, proxies gateway HTTP/SSE and
+   WebSocket traffic on one origin, and is supervised by `scripts/up.ps1`.
+4. Live ledger projections supply economics and Lane C data. The semantic-cache path also
+   records rework attribution.
+5. The upload endpoint and UI connect Scene 2 with explicitly untrusted retrieved text.
+
+Remaining backend/environment follow-up is narrower:
+
+- Replace the conservative printable-text PDF extractor with a parser-backed worker before
+  claiming arbitrary-PDF support.
+- Run the final rehearsal with the real local model; the deterministic fixture rehearsal is
+  complete, but Ollama did not respond on this machine.
+- Decide whether `sqlite-vec` belongs in the core/dev installation. It is currently declared
+  only by the `ml` extra even though baseline retrieval tests exercise it.
+- Populate live fairness observations and production economics through normal traffic; an
+  empty ledger correctly reports zero observations rather than sample evidence.
 
 ## Delivered implementation
 
-The `console` branch now contains the complete Person 2 replay implementation:
+The integration branch contains the complete Person 2 console and its live backend seam:
 
 - React 19, TypeScript, Vite, Vitest, Testing Library, Recharts, and Playwright tooling.
 - Runtime-validated direct SSE and projection events, sentence-keyed state, partial-output
   preservation, eventually consistent decision-detail hydration, reconnect cursors, stream
   reset handling, duplicate suppression, and replay-gap buffering.
 - Responsive Live, Reviews, and Evidence workspaces with keyboard focus behavior, reduced
-  motion-safe charts, source provenance, action totals, confidence intervals, and explicit
-  unavailable economics.
+  motion-safe charts, source provenance, action totals, confidence intervals, live
+  economics, Lane C e-values, and honest empty/unavailable states.
 - Request-scoped replay decisions, holds, and resume tokens. The L4 response remains
   withheld until review; L5 emits no customer content. Expected-loss tables agree with the
   declared winner, runner-up, and margin.
 - Recursive server-side token redaction, an allowlisted JSON artefact surface, no browser
   storage of secrets, no unsafe HTML injection, and no WebSocket mutation commands.
+- Text/PDF upload, explicit untrusted-context attachment, a compiled same-origin production
+  host, and frontend unit/type/build CI.
 
-The standards, specification, independent code, bug, and security reviews were completed
-over `002e8600cb8252f03d448610a8469228703648b5..HEAD`. All verified findings were covered by
-regression tests and resolved in the focused review-fix commit. The security review found no
-remaining high-confidence vulnerability in the owned Person 2 surface.
+Final standards, specification, bug, and security reviews are run over the complete
+`master...console-master-integration` diff before the branch is proposed for merge. Any
+verified finding receives a regression test and a focused fix commit.
 
 ## Runbook
 
@@ -138,6 +150,13 @@ Install the frontend once:
 
 ```bash
 npm --prefix console ci
+```
+
+Build and run the production same-origin console:
+
+```bash
+npm --prefix console run build
+uv run uvicorn interlock.console.app:app --host 127.0.0.1 --port 5173
 ```
 
 Start the deterministic replay server and UI in separate terminals:
@@ -161,28 +180,30 @@ npm --prefix console run typecheck
 npm --prefix console run build
 uv run ruff check .
 uv run mypy --strict interlock/core interlock/retrieval interlock/interlock_tools
-uv run pytest -q tests console/tests/python
+uv run pytest -q --ignore=tests/chaos -m "not slow" tests console/tests/python
 npm --prefix console run test:e2e
 ```
 
-The final local gate on 26 August 2026 produced 43 passing frontend unit tests, 665 passing
-Python tests, and 8 passing Playwright journeys: the four replay scenarios at desktop
-1440×900 and mobile 390×844. TypeScript, Vite build, Ruff, and strict mypy also passed. The
-production npm dependency audit reported zero vulnerabilities. The Vite build emits only a
-non-blocking bundle-size warning, and its development WebSocket proxy can log `EPIPE` or
-`ECONNRESET` when Playwright closes a page.
+The latest targeted gate on 29 August 2026 produced 48 passing frontend unit tests and 10
+passing Playwright journeys across desktop 1440×900 and mobile 390×844. The pre-documentation
+Python gate produced 898 passing non-slow tests with 7 slow tests deselected. TypeScript,
+Vite build, Ruff lint/format, and strict mypy also passed. Exact final counts are refreshed
+after the complete review gate. The Vite build emits a non-blocking bundle-size warning,
+and its development proxy can log `EPIPE` or `ECONNRESET` when Playwright closes a page.
 
-## Known unavailable data and integration
+## Known limits
 
-- Live `ConsoleHub` publishers, production router mounting, static/proxy serving, and native
-  console supervision remain Person 1 work. Direct SSE still operates, while the status
-  projection labels missing history honestly.
-- A live initiating-stream resume token, especially for response holds, remains Person 1
-  gateway integration. A browser without that token can reject but cannot approve.
-- Lane C regret, rework, running net value, economics, and their confidence intervals do not
-  exist and remain visibly unavailable.
-- `sqlite-vec==0.1.9` is installed only in the local environment. The repository dependency
-  declaration still does not provide it along the baseline retrieval-test path.
+- Arbitrary PDFs need a parser-backed extraction worker; the current endpoint intentionally
+  uses a conservative dependency-free extractor.
+- The required live-model rehearsal remains environment-dependent because Ollama was not
+  available on this machine. Deterministic replay and real-gateway fixture rehearsal pass.
+- Seven slow verifier/probe tests need the cached or downloadable
+  `cross-encoder/nli-distilroberta-base` model. They cannot run in a network-isolated
+  environment without that model; the non-slow suite remains the CI gate.
+- `sqlite-vec` is still declared only in the `ml` extra while baseline retrieval tests use
+  it. The integration environment includes version 0.1.9 without changing dependency files.
+- A fresh ledger has no real fairness or economics samples. The UI labels zero observations
+  and does not substitute replay values.
 
 ## Acceptance
 

@@ -5,6 +5,7 @@
 Prerequisites:
 
 - Python 3.12 and `uv`
+- Node.js 22 and npm for the first console build
 - Local OpenAI-compatible upstream, defaulting to Ollama at `http://127.0.0.1:11434/v1`
 - A built corpus index at `data/corpus.db`; rebuild with `uv run python scripts/build_index.py` if missing
 
@@ -57,6 +58,15 @@ uv run python scripts/rehearse_gateway.py --strict-actions
 The rehearsal writes `artifacts/rehearsal/gateway_rehearsal.json` with raw resume tokens
 redacted.
 
+For a UI-only deterministic replay, leave the real gateway stopped and run the replay
+projection plus the Vite development server in separate terminals:
+
+```powershell
+uv run python scripts/replay_console.py --port 8099
+npm --prefix console ci
+npm --prefix console run dev -- --host 127.0.0.1
+```
+
 ## Single-VM Production Shape
 
 Run the gateway and console as supervised processes behind a TLS reverse proxy:
@@ -64,7 +74,9 @@ Run the gateway and console as supervised processes behind a TLS reverse proxy:
 - `uv run uvicorn interlock.gateway.app:app --host 127.0.0.1 --port 8080`
 - `uv run uvicorn interlock.console.app:app --host 127.0.0.1 --port 5173`
 - observer on `127.0.0.1:8081`, using `interlock.observer.mock_server:app` for CPU-only rehearsals or `interlock.observer.server:app` when a real observer server is added
-- Caddy/nginx routes `/v1/*`, `/admin/*`, `/console/*` to `:8080`; route `/` and `/api/artifacts/*` to `:5173`
+- The console service serves the compiled React assets and proxies `/gateway/*` plus
+  `/console/*` (including WebSocket upgrades) to the configured gateway. Route the browser
+  origin to `:5173`; do not expose a second browser-facing gateway origin.
 
 Environment:
 
@@ -72,6 +84,7 @@ Environment:
 - `INTERLOCK_OLLAMA_BASE_URL` or provider-specific API keys for upstreams
 - `INTERLOCK_OBSERVER_URL=http://127.0.0.1:8081`
 - `INTERLOCK_DB_PATH=/var/lib/interlock/interlock.db`
+- `INTERLOCK_GATEWAY_URL=http://127.0.0.1:8080` for the console's upstream
 - `INTERLOCK_STORE_PROMPTS=0` unless the deployment has explicit approval to store prompts
 
 Health and rollback:

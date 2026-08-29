@@ -121,7 +121,12 @@ class OpenAICompatProvider:
         self._extra_body = dict(extra_body or {})
 
     def _body(self, body: dict[str, Any]) -> dict[str, Any]:
-        return {**self._extra_body, **body}
+        # ``interlock`` is private control-plane metadata. It may contain uploaded or
+        # retrieved text that Lane A and the tool interlock inspect locally, but it is
+        # not authorized provider prompt context and must not cross this final egress
+        # boundary on primary, fallback, repair, or shadow requests.
+        public_body = {key: value for key, value in body.items() if key != "interlock"}
+        return {**self._extra_body, **public_body}
 
     def _headers(self) -> dict[str, str]:
         headers = {"content-type": "application/json"}

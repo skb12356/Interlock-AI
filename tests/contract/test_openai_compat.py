@@ -384,6 +384,29 @@ def test_a_verified_clean_answer_is_served_from_cache_on_repeat(
     )
 
 
+@respx.mock
+def test_private_interlock_context_never_leaves_the_gateway(client: TestClient) -> None:
+    """Uploaded/retrieved text is local evidence until provider egress is authorized."""
+    _, raws = load_fixture("branch_hours")
+    route = respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    private_fragment = {
+        "text": "customer-private-claim-text",
+        "provenance": "retrieved_untrusted",
+        "doc_id": "upload_private#0",
+        "domain": "claims",
+    }
+
+    response = client.post(
+        "/v1/chat/completions",
+        json=_request(interlock={"retrieved": [private_fragment]}),
+    )
+
+    assert response.status_code == 200
+    upstream = json.loads(route.calls[0].request.content)
+    assert "interlock" not in upstream
+    assert "customer-private-claim-text" not in route.calls[0].request.content.decode()
+
+
 # --------------------------------------------------------------------------- #
 # The claim Contract 3 makes, verified against the real SDK
 # --------------------------------------------------------------------------- #

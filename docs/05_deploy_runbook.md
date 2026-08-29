@@ -63,7 +63,7 @@ Run the gateway and console as supervised processes behind a TLS reverse proxy:
 
 - `uv run uvicorn interlock.gateway.app:app --host 127.0.0.1 --port 8080`
 - `uv run uvicorn interlock.console.app:app --host 127.0.0.1 --port 5173`
-- observer on `127.0.0.1:8081`, using `interlock.observer.mock_server:app` for CPU-only rehearsals or `interlock.observer.server:app` when a real observer server is added
+- observer on `127.0.0.1:8081`, using `interlock.observer.server:app` in production or `interlock.observer.mock_server:app` only with `-MockObserver` for deterministic rehearsals
 - Caddy/nginx routes `/v1/*`, `/admin/*`, `/console/*` to `:8080`; route `/` and `/api/artifacts/*` to `:5173`
 
 Environment:

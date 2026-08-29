@@ -78,6 +78,13 @@ defaults, tenant canary isolation, evidence redaction, policy validation, and se
 exclusion. It is not a network penetration test, dependency audit, or container-image
 scan.
 
+## Observer Performance
+
+A standalone real-observer smoke call on this machine returned a valid non-degraded
+probe signal, but the first measured inference took 17,966 ms. This is far above the
+intended 25 ms warm-p95 target; no sub-25-ms performance claim is made until model
+warm-up, batching, and deployment hardware are addressed.
+
 ## Upload Extraction
 
 The upload contract accepts text and PDF bytes and preserves the result as

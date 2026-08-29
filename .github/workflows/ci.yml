@@ -39,3 +39,27 @@ jobs:
 
       - name: Tests
         run: uv run pytest -q --ignore=tests/chaos -m "not slow"
+
+  console:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+
+      - name: Install console dependencies
+        run: npm --prefix console ci
+
+      - name: Console unit tests
+        run: npm --prefix console run test:unit -- --run
+
+      - name: Console typecheck
+        run: npm --prefix console run typecheck
+
+      - name: Console production build
+        run: npm --prefix console run build

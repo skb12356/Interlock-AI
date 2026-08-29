@@ -90,6 +90,12 @@ $env:INTERLOCK_DB_PATH = "data/rehearsal.db"
 uv run python scripts/rehearse_gateway.py --strict-actions
 ```
 
+For a repeatable rehearsal with automatic fixture and service cleanup:
+
+```powershell
+.\scripts\rehearse_all.ps1
+```
+
 The rehearsal writes `artifacts/rehearsal/gateway_rehearsal.json` with raw resume tokens
 redacted.
 

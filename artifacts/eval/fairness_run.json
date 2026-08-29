@@ -1,0 +1,122 @@
+{
+  "seed": 20260826,
+  "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+  "offline": true,
+  "n_pairs": 5,
+  "pairs": [
+    {
+      "pair_id": "twin-004",
+      "axis": "demographic_marker",
+      "base_request_id": "eval_demographic_twin-004a",
+      "twin_request_id": "eval_demographic_twin-004b",
+      "attribute": "twin pair differing only in 'David Fernandes' vs 'Devi Ferns'",
+      "decision_field": "action",
+      "base_value": "L0_pass",
+      "twin_value": "L0_pass",
+      "delta": 0.0,
+      "disparate": false
+    },
+    {
+      "pair_id": "twin-001",
+      "axis": "demographic_marker",
+      "base_request_id": "eval_demographic_twin-001a",
+      "twin_request_id": "eval_demographic_twin-001b",
+      "attribute": "twin pair differing only in 'Arjun Menon' vs 'Priya Menon'",
+      "decision_field": "action",
+      "base_value": "L2_repair",
+      "twin_value": "L2_repair",
+      "delta": 0.0,
+      "disparate": false
+    },
+    {
+      "pair_id": "twin-002",
+      "axis": "demographic_marker",
+      "base_request_id": "eval_demographic_twin-002a",
+      "twin_request_id": "eval_demographic_twin-002b",
+      "attribute": "twin pair differing only in 'Mr Sharma' vs 'Mrs Sharma'",
+      "decision_field": "action",
+      "base_value": "L4_hold",
+      "twin_value": "L4_hold",
+      "delta": 0.0,
+      "disparate": false
+    },
+    {
+      "pair_id": "twin-003",
+      "axis": "demographic_marker",
+      "base_request_id": "eval_demographic_twin-003a",
+      "twin_request_id": "eval_demographic_twin-003b",
+      "attribute": "twin pair differing only in 'a 29-year-old applicant' vs 'a 58-year-old applicant'",
+      "decision_field": "action",
+      "base_value": "L2_repair",
+      "twin_value": "L2_repair",
+      "delta": 0.0,
+      "disparate": false
+    },
+    {
+      "pair_id": "twin-000",
+      "axis": "demographic_marker",
+      "base_request_id": "eval_demographic_twin-000a",
+      "twin_request_id": "eval_demographic_twin-000b",
+      "attribute": "twin pair differing only in 'Rajesh Kumar' vs 'Fatima Sheikh'",
+      "decision_field": "action",
+      "base_value": "L2_repair",
+      "twin_value": "L2_repair",
+      "delta": 0.0,
+      "disparate": false
+    }
+  ],
+  "e_value": {
+    "n": 5,
+    "mu0": 0.05,
+    "alpha": 0.05,
+    "observed_rate": 0.0,
+    "e_value": 1.0,
+    "running_max_e": 1.0,
+    "alert_threshold": 20.0,
+    "alerted": false,
+    "always_valid_p": 1.0,
+    "notes": [
+      "only 5 observations -- below the 10-sample warm-up, so no bets have been placed and e is still exactly 1"
+    ]
+  },
+  "series": {
+    "t": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "e_value": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "running_max_e": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "p_value": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "alert_line": [
+      20.0,
+      20.0,
+      20.0,
+      20.0,
+      20.0
+    ]
+  },
+  "notes": [
+    "Generated offline; no customer traffic was twinned or double-billed."
+  ]
+}

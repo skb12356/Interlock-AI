@@ -222,8 +222,8 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 ### Day 4 exit criteria
 - `[x]` Ledger shows a net number with a confidence interval — live `/admin/economics` exposes `net_value_inr`, `net_value_ci_inr`, and sample count; the console renders the interval band.
-- `[ ]` Fairness run produces an e-value chart
-- `[ ]` All four scenes run without a human touching a terminal mid-scene
+- `[x]` Fairness run produces an e-value chart — *offline five-pair twin run committed as `artifacts/eval/fairness_run.json` and `.html`; the report remains below the 10-pair warm-up and does not claim a live fairness result.*
+- `[x]` All four scenes run without a human touching a terminal mid-scene — *`scripts/rehearse_gateway.py --strict-actions` completed all four scenarios against the real gateway and console.*
 - `[x]` Evidence pack downloads and opens — `GET /admin/evidence/{request_id}.zip` exports the recorded, redacted request pack; contract-tested by opening the ZIP and checking its manifest.
 - `[x]` Calibration set and eval set provably disjoint — *D4-B6: by document, stratified by domain, zero shared, asserted end-to-end*
 

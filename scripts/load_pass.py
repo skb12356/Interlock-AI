@@ -10,7 +10,6 @@ import argparse
 import asyncio
 import json
 import statistics
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -39,7 +38,7 @@ async def one(
                 "status": response.status_code,
                 "elapsed_ms": (time.perf_counter() - started) * 1000.0,
             }
-        except (httpx.HTTPError, asyncio.TimeoutError) as exc:
+        except (httpx.HTTPError, TimeoutError) as exc:
             return {
                 "ok": False,
                 "status": None,

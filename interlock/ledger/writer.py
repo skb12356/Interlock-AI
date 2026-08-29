@@ -372,10 +372,8 @@ class Ledger:
                 for column in json_columns:
                     value = row.get(column)
                     if isinstance(value, str):
-                        try:
+                        with contextlib.suppress(json.JSONDecodeError):
                             row[column] = json.loads(value)
-                        except json.JSONDecodeError:
-                            pass
                     if column.endswith("_json") and column in row:
                         row[column.removesuffix("_json")] = row[column]
             return output

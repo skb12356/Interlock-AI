@@ -18,7 +18,6 @@ from fastapi import FastAPI
 
 from interlock.core.observer_api import (
     ClaimVerdict,
-    ContextFragment,
     ObserveRequest,
     ObserveResponse,
     ObserverHealth,
@@ -27,7 +26,7 @@ from interlock.core.observer_api import (
 from interlock.core.types import Fragment
 from interlock.signals.probe_signal import ProbeSignal
 
-__all__ = ["create_observer", "app"]
+__all__ = ["app", "create_observer"]
 
 
 @dataclass

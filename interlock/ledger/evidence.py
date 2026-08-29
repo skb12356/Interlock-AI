@@ -36,8 +36,8 @@ table was empty.
 
 from __future__ import annotations
 
-import json
 import io
+import json
 import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass, field

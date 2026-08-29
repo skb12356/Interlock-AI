@@ -1,0 +1,420 @@
+{
+  "policy_version": "banking-v3@sha256:0aeb8a4b17fe218c",
+  "metrics": [
+    {
+      "name": "Pre-Action Catch Rate",
+      "target": ">= 90%",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 1.0,
+          "unit": "%",
+          "ci": [
+            0.9179874299767729,
+            1.0
+          ],
+          "met": true
+        },
+        {
+          "seed": 20260827,
+          "value": 1.0,
+          "unit": "%",
+          "ci": [
+            0.9179874299767729,
+            1.0
+          ],
+          "met": true
+        },
+        {
+          "seed": 20260828,
+          "value": 1.0,
+          "unit": "%",
+          "ci": [
+            0.9179874299767729,
+            1.0
+          ],
+          "met": true
+        }
+      ]
+    },
+    {
+      "name": "Added p95 latency",
+      "target": "<= 120 ms",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 16.0,
+          "unit": "ms",
+          "ci": null,
+          "met": true
+        },
+        {
+          "seed": 20260827,
+          "value": 16.0,
+          "unit": "ms",
+          "ci": null,
+          "met": true
+        },
+        {
+          "seed": 20260828,
+          "value": 16.0,
+          "unit": "ms",
+          "ci": null,
+          "met": true
+        }
+      ]
+    },
+    {
+      "name": "Verification cost",
+      "target": "<= 5% of model spend",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 0.05196078431372549,
+          "unit": "%",
+          "ci": null,
+          "met": false
+        },
+        {
+          "seed": 20260827,
+          "value": 0.05511182108626198,
+          "unit": "%",
+          "ci": null,
+          "met": false
+        },
+        {
+          "seed": 20260828,
+          "value": 0.0535031847133758,
+          "unit": "%",
+          "ci": null,
+          "met": false
+        }
+      ]
+    },
+    {
+      "name": "Net spend change",
+      "target": "~ -30%",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": -0.1895999999999998,
+          "unit": "%",
+          "ci": null,
+          "met": false
+        },
+        {
+          "seed": 20260827,
+          "value": -0.16733333333333322,
+          "unit": "%",
+          "ci": null,
+          "met": false
+        },
+        {
+          "seed": 20260828,
+          "value": -0.1658666666666665,
+          "unit": "%",
+          "ci": null,
+          "met": false
+        }
+      ]
+    },
+    {
+      "name": "Ungrounded escapes",
+      "target": "<= 1% @ 90% conf",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 0.0,
+          "unit": "%",
+          "ci": [
+            0.0,
+            0.13319649395317873
+          ],
+          "met": true
+        },
+        {
+          "seed": 20260827,
+          "value": 0.0,
+          "unit": "%",
+          "ci": [
+            0.0,
+            0.13319649395317873
+          ],
+          "met": true
+        },
+        {
+          "seed": 20260828,
+          "value": 0.0,
+          "unit": "%",
+          "ci": [
+            0.0,
+            0.13319649395317873
+          ],
+          "met": true
+        }
+      ]
+    },
+    {
+      "name": "False interventions",
+      "target": "<= 2%",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 0.8535031847133758,
+          "unit": "%",
+          "ci": [
+            0.7897636779608116,
+            0.9003562910024417
+          ],
+          "met": false
+        },
+        {
+          "seed": 20260827,
+          "value": 0.910828025477707,
+          "unit": "%",
+          "ci": [
+            0.8558916184304337,
+            0.946139696851185
+          ],
+          "met": false
+        },
+        {
+          "seed": 20260828,
+          "value": 0.9044585987261147,
+          "unit": "%",
+          "ci": [
+            0.8483521994308755,
+            0.9412445218153694
+          ],
+          "met": false
+        }
+      ]
+    },
+    {
+      "name": "  ...of those, disruptive",
+      "target": "(no separate target)",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 0.7133757961783439,
+          "unit": "%",
+          "ci": [
+            0.6382107131583525,
+            0.7783481870266742
+          ],
+          "met": null
+        },
+        {
+          "seed": 20260827,
+          "value": 0.732484076433121,
+          "unit": "%",
+          "ci": [
+            0.6582945988717948,
+            0.7955680834193537
+          ],
+          "met": null
+        },
+        {
+          "seed": 20260828,
+          "value": 0.7515923566878981,
+          "unit": "%",
+          "ci": [
+            0.6785358471561937,
+            0.8126306172410767
+          ],
+          "met": null
+        }
+      ]
+    },
+    {
+      "name": "  ...Rs.0-100",
+      "target": "",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 0.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        },
+        {
+          "seed": 20260827,
+          "value": 0.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        },
+        {
+          "seed": 20260828,
+          "value": 0.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        }
+      ]
+    },
+    {
+      "name": "  ...Rs.100-1,000",
+      "target": "",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        },
+        {
+          "seed": 20260827,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        },
+        {
+          "seed": 20260828,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        }
+      ]
+    },
+    {
+      "name": "  ...Rs.1,000-10,000",
+      "target": "",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        },
+        {
+          "seed": 20260827,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        },
+        {
+          "seed": 20260828,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        }
+      ]
+    },
+    {
+      "name": "  ...Rs.10,000+",
+      "target": "",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        },
+        {
+          "seed": 20260827,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        },
+        {
+          "seed": 20260828,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": null
+        }
+      ]
+    },
+    {
+      "name": "Twin pairs treated alike",
+      "target": "100%",
+      "measurements": [
+        {
+          "seed": 20260826,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": true
+        },
+        {
+          "seed": 20260827,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": true
+        },
+        {
+          "seed": 20260828,
+          "value": 1.0,
+          "unit": "%",
+          "ci": null,
+          "met": true
+        }
+      ]
+    }
+  ],
+  "mechanisms": [
+    {
+      "mechanism": "stakes-aware routing",
+      "evidence": "interlock/signals/stakes.py"
+    },
+    {
+      "mechanism": "calibrated multi-defect risk",
+      "evidence": "artifacts/calibration/report.json"
+    },
+    {
+      "mechanism": "conformal escape bound",
+      "evidence": "artifacts/calibration/lambda.json"
+    },
+    {
+      "mechanism": "durable response holds",
+      "evidence": "tests/contract/test_tool_interlock_stream.py"
+    },
+    {
+      "mechanism": "cost regret and rework ledger",
+      "evidence": "interlock/ledger/writer.py"
+    },
+    {
+      "mechanism": "live ConsoleHub trail",
+      "evidence": "interlock/gateway/console_ws.py"
+    }
+  ],
+  "stakes": [
+    {
+      "domain": "branch_info",
+      "impact_inr": 50,
+      "reversibility": "reversible",
+      "reversibility_multiplier": 1.0
+    },
+    {
+      "domain": "fees",
+      "impact_inr": 3000,
+      "reversibility": "costly",
+      "reversibility_multiplier": 2.5
+    },
+    {
+      "domain": "prepayment",
+      "impact_inr": 40000,
+      "reversibility": "costly",
+      "reversibility_multiplier": 2.5
+    }
+  ],
+  "sources": {
+    "design_targets": "TODO.md and Implementation/Implementation02.md",
+    "limitations": "docs/LIMITATIONS.md",
+    "seed_reports": [
+      "artifacts\\eval\\report-seed-20260826.json",
+      "artifacts\\eval\\report-seed-20260827.json",
+      "artifacts\\eval\\report-seed-20260828.json"
+    ]
+  }
+}

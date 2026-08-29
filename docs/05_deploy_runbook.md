@@ -28,6 +28,13 @@ Invoke-RestMethod http://127.0.0.1:5173/health
 uv run python scripts/rehearse_gateway.py
 ```
 
+Load pass (run against the supervised stack; this writes measured client latency and
+the gateway's `/admin/latency` histogram to an evidence artifact):
+
+```powershell
+uv run python scripts/load_pass.py --duration-seconds 300 --concurrency 20
+```
+
 Stop:
 
 ```powershell

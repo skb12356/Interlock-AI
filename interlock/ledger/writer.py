@@ -393,6 +393,11 @@ class Ledger:
             notes.append("no rework edges yet; avoided rework is unmeasured, not zero")
         if cache_hits == 0:
             notes.append("no cache hit has been measured, so no cache saving is claimed")
+        if contributions and (regret or rework_total):
+            notes.append(
+                "net-value CI allocates aggregate regret and rework evenly across requests; "
+                "request-linked attribution is not yet available"
+            )
 
         return {
             "requests": len(request_rows),

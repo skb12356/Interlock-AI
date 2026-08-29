@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,6 +38,7 @@ class ObserverRuntime:
     contexts: OrderedDict[str, list[Fragment]] = field(default_factory=OrderedDict)
     requests: int = 0
     failures: int = 0
+    latencies_ms: list[float] = field(default_factory=list)
 
     def context_for(self, request: ObserveRequest) -> tuple[list[Fragment], bool]:
         cached = self.contexts.get(request.context_key)
@@ -77,6 +79,7 @@ def create_observer() -> FastAPI:
     async def observe(request: ObserveRequest) -> ObserveResponse:
         runtime.requests += 1
         context, cached = runtime.context_for(request)
+        started = time.perf_counter()
         try:
             signals: list[RawSignal] = []
             if "probe" in request.want:
@@ -110,6 +113,9 @@ def create_observer() -> FastAPI:
         except Exception as exc:
             runtime.failures += 1
             return ObserveResponse.degraded_response(f"observer inference failed: {type(exc).__name__}")
+        finally:
+            runtime.latencies_ms.append((time.perf_counter() - started) * 1000.0)
+            del runtime.latencies_ms[:-200]
 
     @service.get("/health", response_model=ObserverHealth)
     async def health() -> ObserverHealth:
@@ -123,7 +129,13 @@ def create_observer() -> FastAPI:
             probe_version=runtime.probe.version,
             gpu=False,
             queue_depth=0,
-            p95_ms=0.0,
+            p95_ms=(
+                sorted(runtime.latencies_ms)[
+                    min(len(runtime.latencies_ms) - 1, round(0.95 * (len(runtime.latencies_ms) - 1)))
+                ]
+                if runtime.latencies_ms
+                else 0.0
+            ),
             ok=True,
         )
 

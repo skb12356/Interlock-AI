@@ -83,6 +83,15 @@ def forcing_client(tmp_path: Path) -> Iterator[TestClient]:
         yield test_client
 
 
+@pytest.fixture
+def shadow_client(tmp_path: Path) -> Iterator[TestClient]:
+    settings = Settings(
+        db_path=tmp_path / "shadow.db", risk_engine="stub", shadow_sample_rate=1.0
+    )
+    with TestClient(create_app(settings)) as test_client:
+        yield test_client
+
+
 #: A LOW-stakes question. Lane A routes it unbuffered, so the gate passes the
 #: provider's bytes through untouched and byte-identity is the right assertion.
 def _request(**overrides: object) -> dict[str, object]:
@@ -722,6 +731,25 @@ def test_non_streaming_session_regenerate_is_written_as_rework(client: TestClien
     ).status_code == 200
     rows = _wait_for_rows(client, "SELECT kind FROM rework_edges")
     assert [row["kind"] for row in rows] == ["regenerate"]
+
+
+@respx.mock
+def test_strong_traffic_is_shadowed_on_the_cheap_tier(shadow_client: TestClient) -> None:
+    _, raws = load_fixture("short_answer")
+    route = respx.post(UPSTREAM)
+    route.side_effect = [
+        httpx.Response(200, content=sse_bytes(raws)),
+        httpx.Response(200, json={"choices": [{"message": {"content": "Yes."}}]}),
+    ]
+    shadow_client.post(
+        "/v1/chat/completions",
+        json=_high_stakes_request(model="interlock/auto"),
+    )
+    rows = _wait_for_rows(shadow_client, "SELECT cheaper_model, verdict FROM shadow_runs")
+    assert len(rows) == 1
+    assert rows[0]["cheaper_model"] == "qwen3:4b"
+    assert rows[0]["verdict"] in {"parity", "worse"}
+    assert json.loads(route.calls[1].request.content)["model"] == "qwen3:4b"
 
 
 def test_upload_contract_marks_pdf_text_as_untrusted(client: TestClient) -> None:

@@ -21,10 +21,12 @@ Two properties this file exists to protect:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
 import logging
+import random
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -53,6 +55,7 @@ from interlock.core.sse import (
     format_done,
     format_event,
 )
+from interlock.core.types import RiskContext
 from interlock.gate.repair import SentenceRepairer
 from interlock.gate.sentence_gate import CommitGate, Emission
 from interlock.gateway.cache import SemanticCache
@@ -150,6 +153,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # streams would otherwise collide. See coordination/ALLOTED_WORK.md.
         app.state.console_hub = ConsoleHub()
         app.state.rework_sessions = {}
+        app.state.shadow_tasks = set()
+        app.state.shadow_rng = random.Random(20260829)
         app.state.latency = LatencyRecorder()
         app.state.lane_a = LaneA(
             policy=policy,
@@ -164,6 +169,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
+            if app.state.shadow_tasks:
+                await asyncio.gather(*app.state.shadow_tasks, return_exceptions=True)
             app.state.retriever.close()
             await ledger.stop()
             await client.aclose()
@@ -461,6 +468,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     prompt_tokens=prompt_tokens,
                     rework_edges=rework_edges,
                 )
+            )
+            choices = result.get("choices") if isinstance(result, dict) else None
+            message = choices[0].get("message") if isinstance(choices, list) and choices else None
+            served_answer = str(message.get("content") or "") if isinstance(message, dict) else ""
+            _schedule_shadow(
+                app=app,
+                body=body,
+                request_id=request_id,
+                trace_id=trace_id,
+                lane=lane,
+                served_model=model,
+                served_answer=served_answer,
             )
             app.state.risk_engine.disarm(request_id)
             return JSONResponse(result, headers=headers)
@@ -859,6 +878,15 @@ async def _stream_response(
             if len(app.state.rework_sessions) > 1000:
                 oldest = next(iter(app.state.rework_sessions))
                 del app.state.rework_sessions[oldest]
+        _schedule_shadow(
+            app=app,
+            body=original_body,
+            request_id=request_id,
+            trace_id=trace_id,
+            lane=lane,
+            served_model=model,
+            served_answer="".join(answer_parts).strip(),
+        )
         _store_cache(
             app=app,
             question=_last_user_message(original_body),
@@ -1155,6 +1183,93 @@ def _last_user_message(body: dict[str, Any]) -> str:
         if message.get("role") == "user":
             return str(message.get("content") or "")
     return ""
+
+
+def _schedule_shadow(
+    *,
+    app: FastAPI,
+    body: dict[str, Any],
+    request_id: str,
+    trace_id: str,
+    lane: PreflightResult,
+    served_model: str,
+    served_answer: str,
+) -> None:
+    """Sample strong traffic for regret without extending the customer response."""
+    settings: Settings = app.state.settings
+    if lane.tier != "strong" or not served_answer:
+        return
+    if app.state.shadow_rng.random() >= max(0.0, min(1.0, settings.shadow_sample_rate)):
+        return
+    task = asyncio.create_task(
+        _run_shadow(
+            app=app,
+            body=body,
+            request_id=request_id,
+            trace_id=trace_id,
+            lane=lane,
+            served_model=served_model,
+            served_answer=served_answer,
+        ),
+        name=f"shadow-{request_id}",
+    )
+    app.state.shadow_tasks.add(task)
+    task.add_done_callback(app.state.shadow_tasks.discard)
+
+
+async def _run_shadow(
+    *,
+    app: FastAPI,
+    body: dict[str, Any],
+    request_id: str,
+    trace_id: str,
+    lane: PreflightResult,
+    served_model: str,
+    served_answer: str,
+) -> None:
+    settings: Settings = app.state.settings
+    cheap_tier = settings.tiers["cheap"]
+    if served_model == cheap_tier.model:
+        return
+    provider = app.state.providers[cheap_tier.provider]
+    try:
+        result = await provider.complete({**body, "model": cheap_tier.model, "stream": False})
+        choices = result.get("choices") if isinstance(result, dict) else None
+        message = choices[0].get("message") if isinstance(choices, list) and choices else None
+        cheap_answer = str(message.get("content") or "") if isinstance(message, dict) else ""
+        if not cheap_answer:
+            return
+        decision = await app.state.risk_engine.evaluate(
+            RiskContext(
+                request_id=f"{request_id}:shadow",
+                sentence_idx=0,
+                sentence=cheap_answer,
+                answer_prefix="",
+                question=_last_user_message(body),
+                retrieved=lane.fragments,
+                stakes=lane.stakes,
+                already_emitted=False,
+                remaining_deadline_ms=settings.observe_deadline_ms,
+            )
+        )
+        prompt_tokens = max(1, len(_flatten_prompt(body)) // 4)
+        served_cost = PriceBook.default().cost_inr(
+            served_model, prompt_tokens=prompt_tokens, completion_tokens=max(1, len(served_answer) // 4)
+        )
+        cheap_cost = PriceBook.default().cost_inr(
+            cheap_tier.model, prompt_tokens=prompt_tokens, completion_tokens=max(1, len(cheap_answer) // 4)
+        )
+        sufficed = decision.action == "L0_pass"
+        await app.state.ledger.persist_shadow_run(
+            request_id=request_id,
+            cheaper_model=cheap_tier.model,
+            verdict="parity" if sufficed else "worse",
+            judged_by="risk_engine",
+            inr_saved_if_switched=max(0.0, served_cost - cheap_cost) if sufficed else 0.0,
+        )
+        _log.debug("shadow replay complete for %s trace %s", request_id, trace_id)
+    except Exception:
+        _log.debug("shadow replay failed for %s", request_id, exc_info=True)
 
 
 def _request_cost(model: str, prompt_tokens: int, completion_chars: int) -> float:

@@ -277,6 +277,24 @@ class Ledger:
         )
         return bool(cursor.rowcount)
 
+    async def persist_shadow_run(
+        self,
+        *,
+        request_id: str,
+        cheaper_model: str,
+        verdict: str,
+        judged_by: str,
+        inr_saved_if_switched: float,
+    ) -> None:
+        """Persist one asynchronous cheap-tier replay without touching the token path."""
+        connection = self._require_connection()
+        await asyncio.to_thread(
+            connection.execute,
+            "INSERT OR REPLACE INTO shadow_runs(request_id, cheaper_model, verdict, judged_by,"
+            " inr_saved_if_switched, ts) VALUES (?,?,?,?,?,?)",
+            (request_id, cheaper_model, verdict, judged_by, inr_saved_if_switched, wall_time()),
+        )
+
     def pending_holds(self) -> list[dict[str, Any]]:
         """Every hold still waiting. Read at boot, which is what makes it survive."""
         connection = self._require_connection()

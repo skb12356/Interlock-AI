@@ -221,7 +221,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[~]` **D4-J1 — First full rehearsal** — *partial 2026-08-29. `scripts/rehearse_gateway.py --strict-actions` runs all four scenes against the real gateway and console with a deterministic local OpenAI-compatible fixture upstream, validates ConsoleHub replay, response-hold resume tokens and live economics/Lane C endpoints, and writes `artifacts/rehearsal/gateway_rehearsal.json`. Ollama did not respond on this machine, so this is not yet the required live-model run-through on the real box.*
 
 ### Day 4 exit criteria
-- `[ ]` Ledger shows a net number with a confidence interval
+- `[x]` Ledger shows a net number with a confidence interval — live `/admin/economics` exposes `net_value_inr`, `net_value_ci_inr`, and sample count; the console renders the interval band.
 - `[ ]` Fairness run produces an e-value chart
 - `[ ]` All four scenes run without a human touching a terminal mid-scene
 - `[ ]` Evidence pack downloads and opens

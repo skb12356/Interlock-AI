@@ -237,7 +237,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[~]` **D5-B1 — The measurement run** — *partial 2026-08-29. `scripts/build_eval_report.py` runs the full 200-case off-vs-on evaluation across three seeds and writes `artifacts/eval/report.html` plus per-seed JSON with Wilson intervals. The three reported misses remain reproducible: verification cost 5.20/5.51/5.35%, net spend -18.96/-16.73/-16.59%, false interventions 85.35/91.08/90.45%.*
   - **If the Pre-Action Catch Rate is below 90%, do not tune the eval. Report what you got and explain the failure modes.** A panel trusts a measured 84% far more than a suspicious 97%.
 - `[ ]` **D5-A1 — Chaos pass** — kill the observer mid-stream (must degrade, not 500), an upstream 429 storm, SQLite lock contention, a malformed policy at boot (**refuse to start; the previous version stays live**), an 8 s watchdog fire.
-- `[ ]` **D5-A2 — Load pass** — 20 concurrent streams × 5 minutes → capture the **p95 overhead histogram**. This number goes on the slide.
+- `[x]` **D5-A2 — Load pass** — *completed 2026-08-29 against the real gateway with the deterministic upstream fixture: 4,023 requests, 20-way concurrency, zero failures; measured gateway overhead p95 531 ms against the 120 ms budget, with 123.3 ms mean unattributed overhead. Artifact: `artifacts/load/load_pass.json`.*
 - `[ ]` **D5-A3 — Security sweep** — API keys never logged; prompts hashed unless `INTERLOCK_STORE_PROMPTS=1`; canary registry per tenant; no secrets in the image.
 - `[~]` **D5-A4 — Deploy** — *partial 2026-08-29. `docs/05_deploy_runbook.md` exists; `scripts/up.ps1` now supervises gateway, observer and console, passes the observer URL to the gateway, and supports explicit `-RiskEngine real|stub` for production vs deterministic rehearsal. The CPU profile was tested in-place, not from a clean checkout.*
 - `[ ]` **D5-B2 — Evidence pack for the pitch** — the mechanism table with **our measured numbers beside the published ones**; the six-metric scorecard; the three-case stakes table regenerated from the real policy files.
@@ -246,7 +246,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 
 ### Day 5 exit criteria
 - `[ ]` Six metrics measured, with intervals, in `report.html`
-- `[ ]` p95 overhead histogram captured under load
+- `[x]` p95 overhead histogram captured under load — *the measured report is committed in `artifacts/load/load_pass.json`; it is over budget and remains a release finding.*
 - `[ ]` Clean-checkout deploy verified on both profiles
 - `[ ]` `LIMITATIONS.md` written
 - `[ ]` Backup video recorded

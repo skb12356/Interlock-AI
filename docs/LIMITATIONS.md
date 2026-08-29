@@ -64,6 +64,13 @@ rehearsal was run through the real gateway and console against a deterministic l
 OpenAI-compatible fixture upstream. That validates gateway streaming, ConsoleHub
 publishing, holds and metrics endpoints; it is not a live-model quality rehearsal.
 
+## Load Result
+
+The five-minute load pass used 20 concurrent workers against the real gateway and a
+deterministic local upstream fixture. It completed 4,023 requests with zero failures,
+but gateway overhead p95 was 531 ms against the 120 ms budget. Mean unattributed
+overhead was 123.3 ms. These are measured findings, not production capacity claims.
+
 ## Upload Extraction
 
 The upload contract accepts text and PDF bytes and preserves the result as

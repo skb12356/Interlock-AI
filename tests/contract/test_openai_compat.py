@@ -14,8 +14,8 @@ from __future__ import annotations
 import json
 import time
 import zipfile
-from io import BytesIO
 from collections.abc import Iterator
+from io import BytesIO
 from pathlib import Path
 
 import httpx

@@ -178,6 +178,7 @@ class Ledger:
     _queue: asyncio.Queue[RequestBatch] | None = field(default=None, init=False, repr=False)
     _task: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
     _connection: sqlite3.Connection | None = field(default=None, init=False, repr=False)
+    _write_lock: asyncio.Lock | None = field(default=None, init=False, repr=False)
     _dropped: int = field(default=0, init=False)
     _written: int = field(default=0, init=False)
 
@@ -187,6 +188,7 @@ class Ledger:
         self._connection = connect(self.db_path)
         apply_migrations(self._connection)
         self._queue = asyncio.Queue(maxsize=self.max_queue)
+        self._write_lock = asyncio.Lock()
         self._task = asyncio.create_task(self._drain(), name="ledger-writer")
 
     async def stop(self) -> None:
@@ -201,6 +203,7 @@ class Ledger:
         if self._connection is not None:
             self._connection.close()
             self._connection = None
+        self._write_lock = None
 
     async def flush(self) -> None:
         """Wait for the queue to empty. For tests and for a clean shutdown."""
@@ -288,12 +291,15 @@ class Ledger:
     ) -> None:
         """Persist one asynchronous cheap-tier replay without touching the token path."""
         connection = self._require_connection()
-        await asyncio.to_thread(
-            connection.execute,
-            "INSERT OR REPLACE INTO shadow_runs(request_id, cheaper_model, verdict, judged_by,"
-            " inr_saved_if_switched, ts) VALUES (?,?,?,?,?,?)",
-            (request_id, cheaper_model, verdict, judged_by, inr_saved_if_switched, wall_time()),
-        )
+        if self._write_lock is None:
+            raise RuntimeError("ledger write lock is not initialized")
+        async with self._write_lock:
+            await asyncio.to_thread(
+                connection.execute,
+                "INSERT OR REPLACE INTO shadow_runs(request_id, cheaper_model, verdict, judged_by,"
+                " inr_saved_if_switched, ts) VALUES (?,?,?,?,?,?)",
+                (request_id, cheaper_model, verdict, judged_by, inr_saved_if_switched, wall_time()),
+            )
 
     def pending_holds(self) -> list[dict[str, Any]]:
         """Every hold still waiting. Read at boot, which is what makes it survive."""
@@ -489,7 +495,10 @@ class Ledger:
         while True:
             batch = await self._queue.get()
             try:
-                await asyncio.to_thread(self._write, batch)
+                if self._write_lock is None:
+                    raise RuntimeError("ledger write lock is not initialized")
+                async with self._write_lock:
+                    await asyncio.to_thread(self._write, batch)
                 self._written += 1
             except Exception:
                 self._dropped += 1

@@ -127,4 +127,16 @@ describe("EvidenceWorkspace", () => {
     expect(screen.getByText("8.3% disparity rate")).toBeInTheDocument();
     expect(screen.getByText(/below 20.00 alert threshold/i)).toBeInTheDocument();
   });
+
+  it("does not invent an alert threshold when Lane C has no observations", () => {
+    const noObservations = {
+      ...bundle,
+      laneC: { n_pairs: 0, by_axis: {}, e_value: {}, series: {}, notes: [] },
+    } as EvidenceBundle;
+
+    render(<EvidenceWorkspace bundle={noObservations} status={status} ledger={ledger} loading={false} error={null} />);
+
+    expect(screen.getByText("No observations yet")).toBeInTheDocument();
+    expect(screen.queryByText(/below 0.00 alert threshold/i)).not.toBeInTheDocument();
+  });
 });

@@ -223,7 +223,16 @@ export function EvidenceWorkspace({ bundle, status, ledger, loading, error }: Ev
               <div className="lane-c-summary">
                 <div><span>Coverage</span><strong>{integer.format(bundle.laneC.n_pairs)} observed pairs</strong></div>
                 <div><span>Observed disparity</span><strong>{percentage(disparityRate)} disparity rate</strong></div>
-                <div><span>Anytime-valid state</span><strong>{bundle.laneC.e_value.alerted ? "Alerted" : `Below ${(bundle.laneC.e_value.alert_threshold ?? 0).toFixed(2)} alert threshold`}</strong></div>
+                <div>
+                  <span>Anytime-valid state</span>
+                  <strong>
+                    {bundle.laneC.n_pairs === 0
+                      ? "No observations yet"
+                      : bundle.laneC.e_value.alerted
+                        ? "Alerted"
+                        : `Below ${(bundle.laneC.e_value.alert_threshold ?? 0).toFixed(2)} alert threshold`}
+                  </strong>
+                </div>
               </div>
               {laneSeries.length > 0 && (
                 <div className="chart-frame" aria-label="Lane C anytime-valid e-value chart">

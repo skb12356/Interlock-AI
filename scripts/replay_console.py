@@ -40,6 +40,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
+import hashlib
 import json
 import sys
 from collections.abc import AsyncIterator
@@ -311,7 +313,13 @@ class ReplayConsoleSource:
             "n_pairs": 0,
             "by_axis": {},
             "e_value": {},
-            "series": [],
+            "series": {
+                "t": [],
+                "e_value": [],
+                "running_max_e": [],
+                "p_value": [],
+                "alert_line": [],
+            },
             "notes": ["Replay does not fabricate Lane C observations"],
         }
 
@@ -396,6 +404,42 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
     async def holds() -> dict[str, Any]:
         # Resume tokens are never listed, exactly as in the real gateway.
         return {"holds": app.state.console_source.holds()}
+
+    @app.post("/v1/uploads")
+    async def upload(request: Request) -> Any:
+        try:
+            payload = await request.json()
+            raw = payload.get("content") if isinstance(payload, dict) else None
+            if not isinstance(raw, str) or not raw:
+                raise ValueError("content is required")
+            content = (
+                base64.b64decode(raw, validate=True).decode("utf-8", "replace")
+                if payload.get("encoding") == "base64"
+                else raw
+            )
+        except (ValueError, json.JSONDecodeError, UnicodeError):
+            return JSONResponse({"error": {"message": "invalid upload"}}, status_code=400)
+        if len(content.encode("utf-8")) > 2_000_000:
+            return JSONResponse({"error": {"message": "upload exceeds 2 MB"}}, status_code=413)
+        upload_id = f"upload_{hashlib.sha256(content.encode()).hexdigest()[:16]}"
+        return {
+            "upload_id": upload_id,
+            "filename": str(payload.get("filename") or "upload.txt")[:200],
+            "content_type": str(payload.get("content_type") or "text/plain"),
+            "fragments": [
+                {
+                    "doc_id": upload_id,
+                    "text": content,
+                    "provenance": "retrieved_untrusted",
+                    "domain": "general",
+                    "score": 1.0,
+                }
+            ],
+            "security": {
+                "provenance": "retrieved_untrusted",
+                "requires_explicit_interlock_context": True,
+            },
+        }
 
     @app.post("/v1/holds/{hold_id}/approve")
     async def approve(hold_id: str, request: Request) -> Any:

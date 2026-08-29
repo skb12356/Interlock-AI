@@ -707,6 +707,23 @@ def test_live_session_retry_is_written_as_confidence_weighted_rework(
     assert rows[0]["inr_charged"] > 0.0
 
 
+@respx.mock
+def test_non_streaming_session_regenerate_is_written_as_rework(client: TestClient) -> None:
+    route = respx.post(UPSTREAM)
+    route.side_effect = [
+        httpx.Response(200, json={"choices": [{"message": {"content": "Yes."}}]}),
+        httpx.Response(200, json={"choices": [{"message": {"content": "Yes again."}}]}),
+    ]
+    request = {**_request(stream=False), "session_id": "session-non-stream"}
+    assert client.post("/v1/chat/completions", json=request).status_code == 200
+    assert client.post(
+        "/v1/chat/completions",
+        json={**request, "interlock": {"session_id": "session-non-stream", "regenerate": True}},
+    ).status_code == 200
+    rows = _wait_for_rows(client, "SELECT kind FROM rework_edges")
+    assert [row["kind"] for row in rows] == ["regenerate"]
+
+
 def test_upload_contract_marks_pdf_text_as_untrusted(client: TestClient) -> None:
     response = client.post(
         "/v1/uploads",

@@ -418,6 +418,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     return _error_from_exception(exc)
                 provider, model, result = fallback
             upstream_ms = monotonic_ms() - upstream_started
+            prompt_tokens = _usage(result, "prompt_tokens") or max(
+                1, len(_flatten_prompt(body)) // 4
+            )
+            completion_tokens = _usage(result, "completion_tokens") or max(
+                1, len(str(result.get("choices", ""))) // 4
+            )
+            rework_edges = _live_rework_edges(
+                session_id=session_id,
+                previous_turn=previous_turn,
+                request_id=request_id,
+                question=_last_user_message(body),
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                explicit_regenerate=explicit_regenerate,
+            )
+            if session_id:
+                app.state.rework_sessions[session_id] = {
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "question": _last_user_message(body),
+                    "ts": wall_time(),
+                    "cost_inr": PriceBook.default().cost_inr(
+                        model, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+                    ),
+                }
+                if len(app.state.rework_sessions) > 1000:
+                    oldest = next(iter(app.state.rework_sessions))
+                    del app.state.rework_sessions[oldest]
             ledger.record(
                 _batch_from(
                     request_id,
@@ -428,8 +457,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     model_served=model,
                     upstream_ms=upstream_ms,
                     overhead_ms=(monotonic_ms() - started_ms) - upstream_ms,
-                    completion_tokens=_usage(result, "completion_tokens"),
-                    prompt_tokens=_usage(result, "prompt_tokens"),
+                    completion_tokens=completion_tokens,
+                    prompt_tokens=prompt_tokens,
+                    rework_edges=rework_edges,
                 )
             )
             app.state.risk_engine.disarm(request_id)

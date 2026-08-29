@@ -355,6 +355,41 @@ class Ledger:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def evidence_rows(self, request_id: str) -> dict[str, Any]:
+        """Collect recorded facts for one evidence-pack export.
+
+        This is read-only and intentionally does not infer missing fields. The evidence
+        pack marks absent decisions, policy or calibration as incomplete for the caller.
+        """
+        connection = self._require_connection()
+
+        def fetch(query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+            return [dict(row) for row in connection.execute(query, params).fetchall()]
+
+        def fetch_json(query: str, json_columns: tuple[str, ...]) -> list[dict[str, Any]]:
+            output = fetch(query, (request_id,))
+            for row in output:
+                for column in json_columns:
+                    value = row.get(column)
+                    if isinstance(value, str):
+                        try:
+                            row[column] = json.loads(value)
+                        except json.JSONDecodeError:
+                            pass
+                    if column.endswith("_json") and column in row:
+                        row[column.removesuffix("_json")] = row[column]
+            return output
+
+        request = fetch("SELECT * FROM requests WHERE request_id=?", (request_id,))
+        return {
+            "request": request[0] if request else {},
+            "decisions": fetch_json("SELECT * FROM decisions WHERE request_id=? ORDER BY ts", ("loss_table_json", "probs_json", "why_json")),
+            "signals": fetch("SELECT * FROM signals WHERE request_id=? ORDER BY seq", (request_id,)),
+            "spend": fetch("SELECT * FROM spend WHERE request_id=? ORDER BY ts", (request_id,)),
+            "tool_calls": fetch_json("SELECT * FROM tool_calls WHERE request_id=? ORDER BY ts", ("args_json",)),
+            "holds": fetch_json("SELECT * FROM holds WHERE request_id=? ORDER BY created_ts", ("payload_json", "evidence_json")),
+        }
+
     def economics_snapshot(self) -> dict[str, Any]:
         """Read-side economics for the console.
 

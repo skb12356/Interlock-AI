@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import time
+import zipfile
+from io import BytesIO
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -247,6 +249,25 @@ def test_the_response_carries_a_request_id(client: TestClient) -> None:
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
     response = client.post("/v1/chat/completions", json=_request())
     assert response.headers["x-interlock-request-id"].startswith("req_")
+
+
+@respx.mock
+def test_evidence_pack_downloads_for_a_recorded_request(client: TestClient) -> None:
+    _, raws = load_fixture("short_answer")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    response = client.post("/v1/chat/completions", json=_request())
+    request_id = response.headers["x-interlock-request-id"]
+    # Wait for the asynchronous ledger writer so the download is testing recorded data,
+    # not a response-side fixture.
+    _wait_for_rows(client, "SELECT request_id FROM requests")
+    pack = client.get(f"/admin/evidence/{request_id}.zip")
+    assert pack.status_code == 200
+    assert pack.headers["content-type"] == "application/zip"
+    with zipfile.ZipFile(BytesIO(pack.content)) as archive:
+        names = set(archive.namelist())
+        assert {"manifest.json", "request.json", "decisions.json", "policy.yaml"} <= names
+        manifest = json.loads(archive.read("manifest.json"))
+        assert manifest["request_id"] == request_id
 
 
 # --------------------------------------------------------------------------- #

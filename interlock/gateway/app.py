@@ -35,7 +35,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, Header, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from interlock.core.clock import monotonic_ms, wall_time
 from interlock.core.errors import ProviderError, UpstreamError
@@ -70,6 +70,7 @@ from interlock.interlock_tools.holds import ToolInterlock, new_resume_token
 from interlock.interlock_tools.streaming import ToolCallAccumulator
 from interlock.ledger.pricing import PriceBook
 from interlock.ledger.rework import ReworkLedger, SessionTurn
+from interlock.ledger.evidence import build_evidence_pack
 from interlock.ledger.writer import Ledger, RequestBatch, SpanEntry
 from interlock.retrieval.embedder import embed_query, load_embedder
 from interlock.retrieval.retriever import NullRetriever, Retriever
@@ -222,6 +223,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lane_c() -> dict[str, Any]:
         """Background fairness projection and anytime-valid e-value state."""
         return app.state.ledger.lane_c_snapshot()
+
+    @app.get("/admin/evidence/{request_id}.zip")
+    async def evidence(request_id: str) -> Response:
+        """Download a redacted, request-scoped evidence pack from recorded ledger facts."""
+        rows = app.state.ledger.evidence_rows(request_id)
+        calibration: dict[str, Any] = {}
+        for artifact in sorted(app.state.settings.calibration_dir.glob("*.json")):
+            try:
+                calibration[artifact.name] = json.loads(artifact.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+        pack = build_evidence_pack(
+            request_id=request_id,
+            rows=rows,
+            policy_text=app.state.settings.policy_path.read_text(encoding="utf-8"),
+            calibration=calibration,
+            generated_ts=wall_time(),
+            prompts_hashed=not app.state.settings.store_prompts,
+        )
+        return Response(
+            content=pack.to_bytes(canaries=app.state.canaries.all_canaries),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="evidence-{request_id}.zip"'},
+        )
 
     @app.get("/v1/models")
     async def models() -> dict[str, Any]:

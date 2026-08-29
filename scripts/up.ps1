@@ -32,6 +32,20 @@ $logDir = Join-Path $repo 'logs'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $repo 'data') | Out-Null
 
+$consoleIndex = Join-Path $repo 'console\dist\index.html'
+if (-not (Test-Path $consoleIndex)) {
+    Write-Host 'Building the React console...' -ForegroundColor Cyan
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        throw 'Node.js/npm is required to build console/dist before the console service starts.'
+    }
+    if (-not (Test-Path (Join-Path $repo 'console\node_modules'))) {
+        & npm --prefix console ci
+        if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE" }
+    }
+    & npm --prefix console run build
+    if ($LASTEXITCODE -ne 0) { throw "console build failed with exit code $LASTEXITCODE" }
+}
+
 # The real observer (D2-B4) is not built yet, so the mock stands in. It implements the
 # identical HTTP contract, which is the entire point of having frozen that contract.
 $observerApp = if ($MockObserver) {

@@ -234,7 +234,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 > **Goal:** six measured numbers, live on a URL, and the pitch run four times.
 
 - `[ ]` **D5-J1 — FEATURE FREEZE.** No new features after this hour. Write it where you can see it.
-- `[~]` **D5-B1 — The measurement run** — *partial 2026-08-29. `scripts/build_eval_report.py` runs the full 200-case off-vs-on evaluation across three seeds and writes `artifacts/eval/report.html` plus per-seed JSON with Wilson intervals. The three reported misses remain reproducible: verification cost 5.20/5.51/5.35%, net spend -18.96/-16.73/-16.59%, false interventions 85.35/91.08/90.45%.*
+- `[x]` **D5-B1 — The measurement run** — *completed 2026-08-29. `scripts/build_eval_report.py` runs the full 200-case off-vs-on evaluation across three seeds and writes `artifacts/eval/report.html` plus per-seed JSON with Wilson intervals. The three reported misses remain reproducible: verification cost 5.20/5.51/5.35%, net spend -18.96/-16.73/-16.59%, false interventions 85.35/91.08/90.45%.*
   - **If the Pre-Action Catch Rate is below 90%, do not tune the eval. Report what you got and explain the failure modes.** A panel trusts a measured 84% far more than a suspicious 97%.
 - `[ ]` **D5-A1 — Chaos pass** — kill the observer mid-stream (must degrade, not 500), an upstream 429 storm, SQLite lock contention, a malformed policy at boot (**refuse to start; the previous version stays live**), an 8 s watchdog fire.
 - `[x]` **D5-A2 — Load pass** — *completed 2026-08-29 against the real gateway with the deterministic upstream fixture: 4,023 requests, 20-way concurrency, zero failures; measured gateway overhead p95 531 ms against the 120 ms budget, with 123.3 ms mean unattributed overhead. Artifact: `artifacts/load/load_pass.json`.*
@@ -245,7 +245,7 @@ The plan assumes 2 engineers, Docker, and a GPU. The audit of this machine found
 - `[ ]` **D5-J2 — Rehearse** — four run-throughs, 8 minutes each. Drill the two questions that decide the round: *"you need model internals but claim model-agnosticism"* and *"latency, honestly."* **Record one run as the backup video. Never demo live without a fallback.**
 
 ### Day 5 exit criteria
-- `[ ]` Six metrics measured, with intervals, in `report.html`
+- `[x]` Six metrics measured, with intervals, in `report.html` — *the scorecard records misses as well as passes.*
 - `[x]` p95 overhead histogram captured under load — *the measured report is committed in `artifacts/load/load_pass.json`; it is over budget and remains a release finding.*
 - `[ ]` Clean-checkout deploy verified on both profiles
 - `[ ]` `LIMITATIONS.md` written

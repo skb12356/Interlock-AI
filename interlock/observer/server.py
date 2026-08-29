@@ -116,7 +116,11 @@ def create_observer() -> FastAPI:
         probe_health = runtime.probe.health()
         verifier_health = runtime.verifier.health() if runtime.verifier is not None else {}
         return ObserverHealth(
-            model=str(probe_health.get("model") or verifier_health.get("model") or "unavailable"),
+            model=str(
+                getattr(runtime.probe.encoder, "model_name", None)
+                or verifier_health.get("model")
+                or "unavailable"
+            ),
             probe_version=runtime.probe.version,
             gpu=False,
             queue_depth=0,

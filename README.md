@@ -236,16 +236,11 @@ starts three localhost-bound processes with health checks.
 ### Python dependency tiers
 
 - **Core runtime:** FastAPI/Uvicorn, HTTPX, Pydantic, PyYAML, OpenTelemetry, NumPy,
-  scikit-learn, DuckDB, pysbd, and pyahocorasick.
+  scikit-learn, DuckDB, pysbd, pypdf, pyahocorasick, and sqlite-vec.
 - **Development:** pytest, pytest-asyncio, Hypothesis, respx, Ruff, mypy, pre-commit, the
   OpenAI SDK, and HTTPX test support.
 - **Optional ML extra:** PyTorch, Transformers, Sentence Transformers, ONNX Runtime,
-  Optimum, Presidio, sqlite-vec, and Matplotlib.
-
-> [!NOTE]
-> Baseline retrieval tests currently exercise `sqlite-vec`, while it is declared only in
-> the `ml` extra. Until packaging is aligned, install `sqlite-vec==0.1.9` explicitly when
-> using the light core/dev environment.
+  Optimum, Presidio, and Matplotlib.
 
 ### Console stack
 
@@ -280,7 +275,6 @@ For the lighter deterministic replay and standard test profile:
 
 ```bash
 uv sync --group dev
-uv pip install sqlite-vec==0.1.9
 npm --prefix console ci
 ```
 

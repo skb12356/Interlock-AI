@@ -23,8 +23,9 @@ The original Person 2 branch was limited to `console/**`,
 Person 1 completed the backend on `master`, the approved integration branch merged that
 work and connected the two surfaces. The integration therefore also contains focused
 changes to the gateway publishers, ledger projections, production console host,
-supervisor, CI, and their tests. Frozen core contracts and dependency metadata remain
-unchanged.
+supervisor, CI, dependency declaration, and their tests. Frozen core contracts remain
+unchanged; `sqlite-vec` moved from the heavy ML extra to the core runtime because baseline
+hybrid retrieval imports it.
 
 ## Architecture
 
@@ -109,17 +110,24 @@ The merged integration now completes the browser/backend seam:
 4. Live ledger projections supply economics and Lane C data. The semantic-cache path also
    records rework attribution.
 5. The upload endpoint and UI connect Scene 2 with explicitly untrusted retrieved text.
+6. Pre-provider hard blocks and agent-loop cuts publish request-scoped live decisions, and
+   the UI explains request-level L5 outcomes even when no sentence or customer content exists.
+7. Custom gateway ports propagate to the production console, and CI runs console Python
+   projections plus desktop/mobile Playwright journeys instead of checking only the build.
+8. Per-client projection queues preserve replay/live sequence order under backpressure;
+   unknown projection events become diagnostics, and incomplete regret/rework measurements
+   keep the entire net-value result unavailable instead of presenting zero-valued evidence.
 
 Remaining backend/environment follow-up is narrower:
 
-- Replace the conservative printable-text PDF extractor with a parser-backed worker before
-  claiming arbitrary-PDF support.
+- Text-layer PDFs use the locked `pypdf` parser. OCR, encrypted files, and arbitrary layout
+  fidelity remain outside the claim.
 - Run the final rehearsal with the real local model; the deterministic fixture rehearsal is
   complete, but Ollama did not respond on this machine.
-- Decide whether `sqlite-vec` belongs in the core/dev installation. It is currently declared
-  only by the `ml` extra even though baseline retrieval tests exercise it.
 - Populate live fairness observations and production economics through normal traffic; an
   empty ledger correctly reports zero observations rather than sample evidence.
+- Keep provider-bound use of uploaded text disabled until the deferred sensitive-data egress
+  authorization is explicitly designed and approved.
 
 ## Delivered implementation
 
@@ -138,11 +146,11 @@ The integration branch contains the complete Person 2 console and its live backe
 - Recursive server-side token redaction, an allowlisted JSON artefact surface, no browser
   storage of secrets, no unsafe HTML injection, and no WebSocket mutation commands.
 - Text/PDF upload, explicit untrusted-context attachment, a compiled same-origin production
-  host, and frontend unit/type/build CI.
+  host, and frontend unit/type/build/browser CI.
 
-Final standards, specification, bug, and security reviews are run over the complete
-`master...console-master-integration` diff before the branch is proposed for merge. Any
-verified finding receives a regression test and a focused fix commit.
+Standards, specification, bug, dependency, and security reviews were run over the complete
+`master...console-master-integration` diff. Verified findings received regression tests and
+the focused `fix(console): preserve ordered and honest projections` commit.
 
 ## Runbook
 
@@ -179,31 +187,34 @@ npm --prefix console run test:unit -- --run
 npm --prefix console run typecheck
 npm --prefix console run build
 uv run ruff check .
+uv run ruff format --check .
 uv run mypy --strict interlock/core interlock/retrieval interlock/interlock_tools
-uv run pytest -q --ignore=tests/chaos -m "not slow" tests console/tests/python
+uv run pytest -q tests console/tests/python
 npm --prefix console run test:e2e
 ```
 
-The latest targeted gate on 29 August 2026 produced 48 passing frontend unit tests and 10
-passing Playwright journeys across desktop 1440×900 and mobile 390×844. The pre-documentation
-Python gate produced 898 passing non-slow tests with 7 slow tests deselected. TypeScript,
-Vite build, Ruff lint/format, and strict mypy also passed. Exact final counts are refreshed
-after the complete review gate. The Vite build emits a non-blocking bundle-size warning,
-and its development proxy can log `EPIPE` or `ECONNRESET` when Playwright closes a page.
+The integration gate on 30 August 2026 produced 59 passing frontend unit tests and 10
+passing Playwright journeys across desktop 1440×900 and mobile 390×844. The clean core/dev
+Python gate produced 893 passing tests and 2 optional-ML skips. TypeScript,
+Vite build, Ruff lint/format, strict mypy, dependency locking, and the 36-test retrieval
+suite also passed. The Vite build emits a non-blocking bundle-size warning, and its
+development proxy can log `EPIPE` or `ECONNRESET` when Playwright closes a page.
 
 ## Known limits
 
-- Arbitrary PDFs need a parser-backed extraction worker; the current endpoint intentionally
-  uses a conservative dependency-free extractor.
+- Text-layer PDFs are parsed with `pypdf`; OCR, encrypted PDFs, and arbitrary layout fidelity
+  remain unsupported.
 - The required live-model rehearsal remains environment-dependent because Ollama was not
   available on this machine. Deterministic replay and real-gateway fixture rehearsal pass.
-- Seven slow verifier/probe tests need the cached or downloadable
-  `cross-encoder/nli-distilroberta-base` model. They cannot run in a network-isolated
-  environment without that model; the non-slow suite remains the CI gate.
-- `sqlite-vec` is still declared only in the `ml` extra while baseline retrieval tests use
-  it. The integration environment includes version 0.1.9 without changing dependency files.
+- Two optional-ML unit cases are skipped in the light core/dev profile: the observer encoder
+  and verifier cases require PyTorch. The complete deterministic suite otherwise runs
+  without downloading model weights.
+- `sqlite-vec` is a locked core dependency, so the light core/dev profile supports baseline
+  hybrid retrieval without installing PyTorch or the rest of the ML extra.
 - A fresh ledger has no real fairness or economics samples. The UI labels zero observations
   and does not substitute replay values.
+- Provider-bound use of uploaded text remains deferred until the separate sensitive-data
+  egress authorization step is approved.
 
 ## Acceptance
 

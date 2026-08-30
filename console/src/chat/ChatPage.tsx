@@ -6,6 +6,9 @@ import { color, font, radius, TONE } from "../theater/tokens";
 import { ActionStamp, StageProgress } from "./StageProgress";
 import type { ChatSession, ChatTurn } from "./types";
 
+/** Who the console greets. A deployment would take this from the signed-in session. */
+const OPERATOR_NAME = "Soham";
+
 export interface StreamingTurn {
   turnId: string;
   stage: number;
@@ -132,9 +135,8 @@ export function ChatPage({
         aria-label="Empty session"
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
-          <MicroLabel tone={color.accent}>Banking assistant · every request traced</MicroLabel>
           <h1 style={{ margin: 0, font: `300 34px/1.15 ${font.sans}`, letterSpacing: "-.02em" }}>
-            What can Interlock check for you?
+            How can I help, {OPERATOR_NAME}?
           </h1>
           <p style={{ margin: 0, maxWidth: "520px", font: `400 14px/1.7 ${font.sans}`, color: color.textDim }}>
             Ask a question. The answer arrives with the seven stages that priced it, and{" "}

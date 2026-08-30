@@ -51,6 +51,7 @@ dev = [
     "pre-commit>=3.8",
     "httpx>=0.28.1",
     "openai>=3.3.1",
+    "reportlab>=5.0.1",
 ]
 
 [project.scripts]

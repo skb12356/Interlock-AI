@@ -371,7 +371,11 @@ def context_conflict(context: Sequence[Fragment]) -> float:
     return conflicted / compared
 
 
-def question_drift(question: str, answer: str) -> float:
+def question_drift(
+    question: str,
+    answer: str,
+    context: Sequence[Fragment] = (),
+) -> float:
     """Does the answer address what was actually asked?
 
     The signal that sees an *unanswerable* question answered anyway. The context does
@@ -379,16 +383,49 @@ def question_drift(question: str, answer: str) -> float:
     customer asked about. Every grounding check passes; the answer is still useless and
     confidently so.
 
-    Measured as the share of the question's content words the answer does not touch.
-    Crude, and it will fire on a legitimately terse answer, which is why it is one
-    signal among six rather than a rule.
+    A direct question/answer word comparison fires on legitimately terse answers: the
+    answer "Rs. 500" need not repeat "account closure charge". Instead, compare both
+    sides through the retrieved context. Two failure modes become visible:
+
+    * most of the question is absent from every passage, but the model answers anyway;
+    * the question points to one passage while the answer follows a distractor.
+
+    A gap of 60% or less is normal for the corpus's terse support questions and maps to
+    zero. A gap of 80% maps to one, with a linear transition between them. This scale is
+    then calibrated like every other raw signal; it is not used as a probability.
     """
     question_words = set(_words(question))
     if not question_words:
         return 0.0
-    answered = set(_words(answer))
-    missed = sum(1 for word in question_words if word not in answered)
-    return missed / len(question_words)
+    if not context:
+        answered = set(_words(answer))
+        missed = sum(1 for word in question_words if word not in answered)
+        return missed / len(question_words)
+
+    context_words = set(_words(_context_text(context)))
+    gap = len(question_words - context_words) / len(question_words)
+    gap_risk = min(1.0, max(0.0, (gap - 0.60) / 0.20))
+
+    answer_words = set(_words(answer))
+    question_overlap: list[float] = []
+    answer_overlap: list[float] = []
+    for fragment in context:
+        fragment_words = set(_words(fragment.text))
+        question_overlap.append(len(question_words & fragment_words) / len(question_words))
+        answer_overlap.append(
+            len(answer_words & fragment_words) / len(answer_words) if answer_words else 0.0
+        )
+
+    question_fragment = max(range(len(context)), key=question_overlap.__getitem__)
+    answer_fragment = max(range(len(context)), key=answer_overlap.__getitem__)
+    mismatch = (
+        1.0
+        if question_fragment != answer_fragment
+        and question_overlap[question_fragment] > 0.0
+        and answer_overlap[answer_fragment] > 0.0
+        else 0.0
+    )
+    return max(gap_risk, mismatch)
 
 
 def hedge_density(answer: str) -> float:
@@ -432,7 +469,7 @@ def grounding_signals(
         # stated flatly, because the reader is being told what to do with it.
         overconfidence=1.0 - hedge_density(answer),
         context_conflict=context_conflict(context),
-        question_drift=question_drift(question, answer) if question else 0.0,
+        question_drift=question_drift(question, answer, context) if question else 0.0,
         unsupported_numbers=bad_numbers,
         unsupported_citations=bad_citations,
     )

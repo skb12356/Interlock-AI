@@ -69,6 +69,7 @@ def test_most_of_the_set_is_clean(cases: list) -> None:
     """
     clean = sum(1 for case in cases if not case.is_defective)
     assert clean / len(cases) > 0.7
+    assert sum(1 for case in cases if case.category == "clean") == 140
 
 
 def test_the_plan_s_sixty_induced_failures_are_present(cases: list) -> None:
@@ -296,8 +297,9 @@ async def test_the_false_intervention_rate_is_measured_over_clean_cases_only(
     )
     metric = metrics.by_name("False interventions")
     assert metric is not None
-    clean = sum(1 for case in cases if not case.is_defective)
+    clean = sum(1 for case in cases if case.category == "clean")
     assert metric.denominator == clean
+    assert clean == 140
 
 
 def test_the_harness_reports_what_it_does_not_measure(cases: list) -> None:

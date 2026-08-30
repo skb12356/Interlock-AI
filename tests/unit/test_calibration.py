@@ -148,11 +148,10 @@ def test_the_calibrator_meets_the_ece_target_out_of_fold(
     assert report.auroc > 0.8
 
 
-def test_the_report_names_the_failure_modes_the_signals_cannot_see(
+def test_context_aware_drift_separates_unanswerable_from_clean(
     dataset: tuple[np.ndarray, np.ndarray, list[str]],
 ) -> None:
-    """'unanswerable' scores at the clean baseline. That must appear in the report as a
-    note, not be left for someone to notice in a table."""
+    """The old direct-overlap signal put unanswerable at the clean baseline."""
     features, labels, modes = dataset
     calibrator = SignalCalibrator(signals=list(GROUNDING_SIGNALS))
     probabilities, _ = calibrator.evaluate(features, labels)
@@ -164,8 +163,18 @@ def test_the_report_names_the_failure_modes_the_signals_cannot_see(
         modes=modes,
         folds=5,
     )
-    assert any("unanswerable" in note for note in report.notes)
-    assert any("observer probe" in note for note in report.notes)
+    unanswerable = [
+        float(probability)
+        for probability, mode in zip(probabilities, modes, strict=True)
+        if mode == "unanswerable"
+    ]
+    clean = [
+        float(probability)
+        for probability, mode in zip(probabilities, modes, strict=True)
+        if mode == "clean"
+    ]
+    assert np.mean(unanswerable) > np.mean(clean) + 0.25
+    assert not any("unanswerable" in note for note in report.notes)
 
 
 def test_predicting_before_fitting_raises_rather_than_guessing() -> None:
@@ -385,6 +394,24 @@ def test_corrupted_numbers_stay_plausible() -> None:
             assert 0.4 <= corrupted / original <= 2.5
 
 
+def test_corrupted_number_is_absent_from_its_retrieved_passage() -> None:
+    """The seeded category promises a figure no passage contains.
+
+    This catches collisions in numbered lists, such as corrupting item 2 to item 1
+    when a different item 1 is already present in the same passage.
+    """
+    from interlock.signals.grounding import numeric_unsupported
+
+    documents = load_corpus(REPO_ROOT / "corpus" / "manifest.json", root=REPO_ROOT)
+    generator = TripleGenerator(chunks=corpus_chunks(documents))
+    for triple in generator.generate(1000):
+        if triple.failure_mode != "number_corrupted":
+            continue
+        score, missing = numeric_unsupported(triple.answer, triple.context)
+        assert score > 0.0
+        assert missing
+
+
 # --------------------------------------------------------------------------- #
 # The grounding signals themselves
 # --------------------------------------------------------------------------- #
@@ -413,6 +440,52 @@ def test_equivalent_number_formats_are_not_false_positives() -> None:
     context = [Fragment(text="The balance is Rs. 25000.", provenance="retrieved_verified")]
     score, _ = numeric_unsupported("The balance is Rs. 25,000.", context)
     assert score == 0.0
+
+
+def test_context_aware_question_drift_does_not_penalize_a_terse_grounded_answer() -> None:
+    from interlock.signals.grounding import question_drift
+
+    context = [
+        Fragment(
+            text="Account closure within twelve months costs Rs. 500.",
+            provenance="retrieved_verified",
+        )
+    ]
+    assert question_drift("What is the early account closure charge?", "Rs. 500.", context) == 0.0
+
+
+def test_context_aware_question_drift_finds_an_unanswerable_question() -> None:
+    from interlock.signals.grounding import question_drift
+
+    context = [
+        Fragment(
+            text="Account closure within twelve months costs Rs. 500.",
+            provenance="retrieved_verified",
+        )
+    ]
+    score = question_drift(
+        "What is the exact penalty after two defaults in the same quarter?",
+        "Account closure within twelve months costs Rs. 500.",
+        context,
+    )
+    assert score >= 0.5
+
+
+def test_context_aware_question_drift_finds_a_distractor_answer() -> None:
+    from interlock.signals.grounding import question_drift
+
+    context = [
+        Fragment(text="The Fort branch opens at 9:30 AM.", provenance="retrieved_verified"),
+        Fragment(text="UPI transfers are capped at Rs. 1 lakh.", provenance="retrieved_verified"),
+    ]
+    assert (
+        question_drift(
+            "When does the Fort branch open?",
+            "UPI transfers are capped at Rs. 1 lakh.",
+            context,
+        )
+        == 1.0
+    )
 
 
 def test_a_citation_to_an_unretrieved_clause_is_caught() -> None:

@@ -181,9 +181,7 @@ def test_minimum_relative_gain_passes_when_intervention_gain_is_too_small(
     probs = {"ungrounded": 0.01}
     original = choose_action(probs=probs, stakes=stakes, policy=ungated)
     rows = {row.action: row for row in original.loss_table}
-    gain = (rows["L0_pass"].total - original.chosen_loss) / max(
-        rows["L0_pass"].total, 1.0
-    )
+    gain = (rows["L0_pass"].total - original.chosen_loss) / max(rows["L0_pass"].total, 1.0)
 
     assert original.action == "L2_repair"
     assert 0.49 <= gain < 0.5
@@ -230,6 +228,62 @@ def test_minimum_relative_gain_does_not_restore_unavailable_pass(policy: Policy)
     )
 
     assert choice.action != "L0_pass"
+
+
+def test_probability_floor_prevents_tiny_risk_from_being_amplified_by_stakes(
+    policy: Policy,
+) -> None:
+    gated = policy.model_copy(
+        update={
+            "minimum_action_probability": 0.01,
+            "minimum_relative_action_gain": 0.0,
+        }
+    )
+    choice = choose_action(
+        probs={"ungrounded": 0.0032},
+        stakes=_stakes(40_000, "costly", "loan_terms"),
+        policy=gated,
+    )
+
+    assert choice.action == "L0_pass"
+    assert "calibrated risk floor" in " ".join(choice.why)
+
+
+def test_probability_floor_keeps_a_material_calibrated_risk(policy: Policy) -> None:
+    gated = policy.model_copy(
+        update={
+            "minimum_action_probability": 0.01,
+            "minimum_relative_action_gain": 0.0,
+        }
+    )
+    choice = choose_action(
+        probs={"ungrounded": 0.02},
+        stakes=_stakes(40_000, "costly", "loan_terms"),
+        policy=gated,
+    )
+
+    assert choice.action != "L0_pass"
+
+
+def test_probability_floor_does_not_override_hard_or_unavailable_constraints(
+    policy: Policy,
+) -> None:
+    gated = policy.model_copy(update={"minimum_action_probability": 0.99})
+    hard = choose_action(
+        probs={"ungrounded": 0.0},
+        stakes=_stakes(50),
+        policy=gated,
+        hard_rules=[HardRule(name="canary", action="L5_block", reason="canary")],
+    )
+    constrained = choose_action(
+        probs={"ungrounded": 0.0},
+        stakes=_stakes(50),
+        policy=gated,
+        extra_unavailable={"L0_pass": "conformal_safety"},
+    )
+
+    assert hard.action == "L5_block"
+    assert constrained.action != "L0_pass"
 
 
 # --------------------------------------------------------------------------- #

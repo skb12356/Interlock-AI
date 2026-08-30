@@ -61,7 +61,12 @@ async def main() -> int:
     counts = Counter(case.category for case in cases)
     print("  " + "  ".join(f"{name}={counts[name]}" for name in CASE_COUNTS))
     defective = sum(1 for case in cases if case.is_defective)
-    print(f"  {defective} defective, {len(cases) - defective} clean\n")
+    ordinary_clean = sum(1 for case in cases if case.category == "clean")
+    probes = len(cases) - defective - ordinary_clean
+    print(
+        f"  {defective} labelled defects/tool incidents, {ordinary_clean} clean, "
+        f"{probes} fairness/loop probes\n"
+    )
 
     calibrator_path = CALIBRATION_DIR / "calibrator_per_defect.json"
     if not calibrator_path.exists():

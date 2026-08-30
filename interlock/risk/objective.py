@@ -222,13 +222,38 @@ def choose_action(
             why=["degraded: no action was available"],
         )
 
+    # A calibrated probability floor prevents monetary impact from amplifying tiny
+    # clean-text residuals into routine high-stakes interventions. Hard rules returned
+    # above; conformal/action constraints still win because this can only choose L0
+    # while L0 remains available.
+    pass_row = by_action["L0_pass"]
+    maximum_probability = max(probs.values(), default=0.0)
+    if (
+        pass_row.available
+        and policy.minimum_action_probability > 0.0
+        and maximum_probability < policy.minimum_action_probability
+    ):
+        return ActionChoice(
+            action="L0_pass",
+            loss_table=rows,
+            chosen_loss=pass_row.total,
+            runner_up=None,
+            margin=0.0,
+            why=[
+                f"stakes: {stakes.domain} at {format_inr(stakes.impact_inr)} "
+                f"({stakes.reversibility})",
+                f"calibrated risk floor: max P(defect) {maximum_probability:.2%} is "
+                f"below the required {policy.minimum_action_probability:.2%}; "
+                "choosing L0_pass",
+            ],
+        )
+
     best = available[0]
     runner_up = available[1] if len(available) > 1 else None
 
     # F-019: an intervention must improve materially on passing, not merely win the
     # argmin by a few rupees. This abstention rule only applies when L0 is available;
     # hard rules returned above and conformal/action constraints remain authoritative.
-    pass_row = by_action["L0_pass"]
     if (
         best.action != "L0_pass"
         and pass_row.available

@@ -3,7 +3,7 @@
   "conformal_filter": false,
   "n_cases": 200,
   "n_defective": 43,
-  "policy_version": "banking-v3@sha256:218a79e602a71ac3",
+  "policy_version": "banking-v3@sha256:4b63a6b7b5416683",
   "metrics": {
     "metrics": [
       {
@@ -22,7 +22,7 @@
       },
       {
         "name": "Added p95 latency",
-        "value": 15.0,
+        "value": 16.0,
         "unit": "ms",
         "target": "<= 120 ms",
         "met": true,
@@ -33,7 +33,7 @@
       },
       {
         "name": "Verification cost",
-        "value": 0.049509803921568625,
+        "value": 0.00784313725490196,
         "unit": "%",
         "target": "<= 5% of model spend",
         "met": true,
@@ -44,7 +44,7 @@
       },
       {
         "name": "Net spend change",
-        "value": -0.19159999999999988,
+        "value": -0.2255999999999999,
         "unit": "%",
         "target": "~ -30%",
         "met": false,
@@ -69,30 +69,30 @@
       },
       {
         "name": "False interventions",
-        "value": 0.6815286624203821,
+        "value": 0.0,
         "unit": "%",
         "target": "<= 2%",
-        "met": false,
+        "met": true,
         "ci": [
-          0.6050622712930709,
-          0.7493236587150862
+          0.0,
+          0.02670715564899167
         ],
-        "numerator": 107,
-        "denominator": 157,
+        "numerator": 0,
+        "denominator": 140,
         "note": "measured ONLY over cases that deserved no intervention"
       },
       {
         "name": "  ...of those, disruptive",
-        "value": 0.6815286624203821,
+        "value": 0.0,
         "unit": "%",
         "target": "(no separate target)",
         "met": null,
         "ci": [
-          0.6050622712930709,
-          0.7493236587150862
+          0.0,
+          0.02670715564899167
         ],
-        "numerator": 107,
-        "denominator": 157,
+        "numerator": 0,
+        "denominator": 140,
         "note": "excludes L1_annotate, which ships the answer unchanged with a citation"
       },
       {
@@ -103,7 +103,7 @@
         "met": null,
         "ci": null,
         "numerator": 0,
-        "denominator": 23,
+        "denominator": 20,
         "note": "disruptive 0%"
       },
       {
@@ -114,30 +114,30 @@
         "met": null,
         "ci": null,
         "numerator": 0,
-        "denominator": 27,
+        "denominator": 26,
         "note": "disruptive 0%"
       },
       {
         "name": "  ...Rs.1,000-10,000",
-        "value": 1.0,
+        "value": 0.0,
         "unit": "%",
         "target": "",
         "met": null,
         "ci": null,
-        "numerator": 7,
-        "denominator": 7,
-        "note": "disruptive 100%"
+        "numerator": 0,
+        "denominator": 4,
+        "note": "disruptive 0%"
       },
       {
         "name": "  ...Rs.10,000+",
-        "value": 1.0,
+        "value": 0.0,
         "unit": "%",
         "target": "",
         "met": null,
         "ci": null,
-        "numerator": 100,
-        "denominator": 100,
-        "note": "disruptive 100%"
+        "numerator": 0,
+        "denominator": 90,
+        "note": "disruptive 0%"
       },
       {
         "name": "Twin pairs treated alike",
@@ -152,16 +152,15 @@
       }
     ],
     "notes": [
-      "Net spend is -19.2% against a ~-30% target, and the gap has two stated causes rather than one unknown. (1) Only 69 of 200 requests routed cheap, because 57% of this seeded set is Rs.10,000+ traffic that the stakes threshold forces to the strong tier -- a corpus artefact, not a router failure. (2) No cache hit is modelled at all; the plan's conservative 20-45% range is deliberately not claimed because nothing in this build has measured one.",
-      "Generation is held fixed across both arms: identical model output, so every difference is Interlock's. Generation latency and billing are NOT observed.",
-      "All clean cases above Rs.10,000 still receive an intervention. Under the reviewed F-019 policy, those actions reduce modelled expected loss by at least 50% versus passing; weaker gains now abstain. The remaining rate is a measured high-stakes policy tradeoff, not a stale detector-threshold claim."
+      "Net spend is -22.6% against a ~-30% target, and the gap has two stated causes rather than one unknown. (1) Only 69 of 200 requests routed cheap, because 57% of this seeded set is Rs.10,000+ traffic that the stakes threshold forces to the strong tier -- a corpus artefact, not a router failure. (2) No cache hit is modelled at all; the plan's conservative 20-45% range is deliberately not claimed because nothing in this build has measured one.",
+      "Generation is held fixed across both arms: identical model output, so every difference is Interlock's. Generation latency and billing are NOT observed."
     ]
   },
   "actions": {
-    "L5_block": 21,
-    "L2_repair": 101,
-    "L4_hold": 23,
-    "L0_pass": 55
+    "L5_block": 24,
+    "L2_repair": 16,
+    "L0_pass": 155,
+    "L4_hold": 5
   },
   "misses": []
 }

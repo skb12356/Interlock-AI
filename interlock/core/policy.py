@@ -133,6 +133,7 @@ class Policy(_Strict):
     version: str
     currency: str = "INR"
     lambda_time_inr_per_second: float = Field(ge=0)
+    minimum_action_probability: float = Field(default=0.0, ge=0.0, lt=1.0)
     minimum_relative_action_gain: float = Field(default=0.0, ge=0.0, lt=1.0)
     stakes: StakesPolicy
     nuisance_inr: dict[Action, float]

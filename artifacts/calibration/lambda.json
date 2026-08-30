@@ -1,10 +1,10 @@
 {
-  "threshold": 0.015,
+  "threshold": 0.37,
   "alpha": 0.01,
   "delta": 0.1,
   "n_eval": 840,
-  "escape_rate": 0.0,
-  "intervention_rate": 1.0,
+  "escape_rate": 0.0035714285714285713,
+  "intervention_rate": 0.0922,
   "candidates": [
     {
       "threshold": 0.0,
@@ -16,7 +16,7 @@
     },
     {
       "threshold": 0.005,
-      "intervention_rate": 1.0,
+      "intervention_rate": 0.1,
       "escape_rate": 0.0,
       "n_eval": 840,
       "p_value": 0.0005859464721922626,
@@ -24,7 +24,7 @@
     },
     {
       "threshold": 0.01,
-      "intervention_rate": 1.0,
+      "intervention_rate": 0.1,
       "escape_rate": 0.0,
       "n_eval": 840,
       "p_value": 0.0005859464721922626,
@@ -32,7 +32,7 @@
     },
     {
       "threshold": 0.015,
-      "intervention_rate": 1.0,
+      "intervention_rate": 0.1,
       "escape_rate": 0.0,
       "n_eval": 840,
       "p_value": 0.0005859464721922626,
@@ -40,14 +40,580 @@
     },
     {
       "threshold": 0.02,
-      "intervention_rate": 0.0673,
-      "escape_rate": 0.1988095238095238,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
       "n_eval": 840,
-      "p_value": 1.0,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.025,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.03,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.035,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.04,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.045,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.05,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.055,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.06,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.065,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.07,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.075,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.08,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.085,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.09,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.095,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.1,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.105,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.11,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.115,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.12,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.125,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.13,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.135,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.14,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.145,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.15,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.155,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.16,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.165,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.17,
+      "intervention_rate": 0.1,
+      "escape_rate": 0.0,
+      "n_eval": 840,
+      "p_value": 0.0005859464721922626,
+      "rejected": true
+    },
+    {
+      "threshold": 0.175,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.18,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.185,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.19,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.195,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.2,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.205,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.21,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.215,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.22,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.225,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.23,
+      "intervention_rate": 0.0998,
+      "escape_rate": 0.002380952380952381,
+      "n_eval": 840,
+      "p_value": 0.026624424841605387,
+      "rejected": true
+    },
+    {
+      "threshold": 0.235,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.24,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.245,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.25,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.255,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.26,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.265,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.27,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.275,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.28,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.285,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.29,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.295,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.3,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.305,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.31,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.315,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.32,
+      "intervention_rate": 0.0997,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.325,
+      "intervention_rate": 0.097,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.33,
+      "intervention_rate": 0.097,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.335,
+      "intervention_rate": 0.097,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.34,
+      "intervention_rate": 0.0922,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.345,
+      "intervention_rate": 0.0922,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.35,
+      "intervention_rate": 0.0922,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.355,
+      "intervention_rate": 0.0922,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.36,
+      "intervention_rate": 0.0922,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.365,
+      "intervention_rate": 0.0922,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.37,
+      "intervention_rate": 0.0922,
+      "escape_rate": 0.0035714285714285713,
+      "n_eval": 840,
+      "p_value": 0.08606546153097976,
+      "rejected": true
+    },
+    {
+      "threshold": 0.375,
+      "intervention_rate": 0.092,
+      "escape_rate": 0.005952380952380952,
+      "n_eval": 840,
+      "p_value": 0.42388868671559077,
       "rejected": false
     }
   ],
-  "notes": [
-    "certified, but it intervenes on 100% of traffic. The bound holds; whether the product survives that rate is a separate question, and the false-intervention metric is where it gets answered."
-  ]
+  "notes": []
 }

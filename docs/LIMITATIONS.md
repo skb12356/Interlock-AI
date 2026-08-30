@@ -2,27 +2,31 @@
 
 ## Current Scorecard Misses
 
-The 2026-08-30 three-seed evaluation still misses two release targets and is on the
-boundary of a third:
+The 2026-08-30 three-seed evaluation now misses one release target:
 
-- Verification cost: 4.95%, 5.18%, 4.87% (mean 5.00%)
-- Net spend: -19.16%, -17.01%, -16.99% (mean -17.72%)
-- False interventions: 68.15%, 68.79%, 69.43% (mean 68.79%)
+- Verification cost: 0.78%, 0.48%, 0.62% (all pass)
+- Net spend: -22.56%, -20.67%, -20.81% (all miss the approximately -30% target)
+- False interventions: 0/140 on every seed (point target passes)
 
-F-019 is resolved with an explicit 50% minimum relative action-gain policy. Across all
-three seeds it preserves 100% pre-action catch and 0% empirical ungrounded escapes. On
-the 300 labelled anchors it preserves the baseline 96.67% catch and 3.33% escape rate,
-while reducing false interventions from 94.81% to 51.11%. This is calibration-split
-evidence, not an independent holdout. The global 2% target remains missed because every
-clean case above Rs.10,000 still crosses the material-gain boundary.
+F-019 is resolved with a calibrated 1% minimum defect-probability floor followed by a
+50% minimum relative action-gain policy. Across all three seeds it preserves 100%
+pre-action catch and 0% empirical ungrounded escapes. It also records 0/270 false
+interventions and 100% catch on the 300 labelled anchors, although those anchors are a
+calibration split rather than an independent holdout.
+
+Zero observed false interventions is not a production-zero claim. The 95% Wilson upper
+bound for 0/140 is 2.67%, so a larger untouched clean set is still required to show the
+2% target with 95% confidence. The near-perfect induced-defect separation also needs
+confirmation on naturally occurring defects.
 
 ## Impact Model
 
 The policy charges the full request impact to each sentence-level decision. That remains
-conservative and can over-price multi-sentence answers. The selected margin does not
-change impact accounting; it abstains when the cheapest intervention improves expected
-loss by less than 50% versus passing. Request-level impact accounting still needs an
-evaluation harness that models multiple sentence decisions per request.
+conservative and can over-price multi-sentence answers. The selected probability floor
+and relative-gain check do not change impact accounting; they abstain only when measured
+risk is below the governed floor or the intervention has too little expected benefit.
+Request-level impact accounting still needs a harness that models multiple sentence
+decisions per request.
 
 ## Efficacy
 

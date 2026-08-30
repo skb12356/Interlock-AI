@@ -98,27 +98,28 @@ async def test_an_unforced_sentence_passes(engine: StubRiskEngine) -> None:
     assert decision.probs == {}
 
 
-def test_a_nonzero_baseline_would_intervene_on_everything_at_high_stakes(
+def test_probability_floor_prevents_nonzero_baseline_from_intervening_on_everything(
     policy: Policy,
 ) -> None:
-    """Documents the sensitivity the false-intervention target (<= 2%) has to discipline.
-
-    At Rs.40,000 impact even a 0.1% chance of being ungrounded puts Rs.100 of expected
-    harm against a repair costing Rs.2.18 that removes 80% of it -- so the optimiser
-    repairs *every* sentence. Arithmetically correct, operationally unusable. The real
-    defences are the conformal feasibility filter (D3-B1) and measured efficacy
-    (D3-B6); this test exists so that if either regresses, someone notices here first.
-    """
+    """High monetary impact cannot amplify an immaterial calibrated residual."""
     from interlock.risk.objective import choose_action
 
-    choice = choose_action(
+    below_floor = choose_action(
         probs={"ungrounded": 0.001},
         stakes=Stakes(
             impact_inr=40_000, reversibility="costly", domain="loan_terms", confidence=0.9
         ),
         policy=policy,
     )
-    assert choice.action != "L0_pass"
+    above_floor = choose_action(
+        probs={"ungrounded": 0.02},
+        stakes=Stakes(
+            impact_inr=40_000, reversibility="costly", domain="loan_terms", confidence=0.9
+        ),
+        policy=policy,
+    )
+    assert below_floor.action == "L0_pass"
+    assert above_floor.action != "L0_pass"
 
 
 async def test_a_forced_defect_produces_an_intervention(engine: StubRiskEngine) -> None:

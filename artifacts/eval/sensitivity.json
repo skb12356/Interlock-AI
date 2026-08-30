@@ -4,7 +4,8 @@
   "n_cases": 200,
   "n_defective": 43,
   "defect_ceiling": 0.95,
-  "policy_version": "banking-v3@sha256:218a79e602a71ac3",
+  "current_clean_mean_probability": 0.0025678784373226785,
+  "policy_version": "banking-v3@sha256:4b63a6b7b5416683",
   "break_even_by_band": [
     {
       "impact_inr": 50,
@@ -19,17 +20,17 @@
     {
       "impact_inr": 3000,
       "domain": "fees",
-      "break_even_floor": 0.003354174067495559
+      "break_even_floor": 0.009999999999999998
     },
     {
       "impact_inr": 12000,
       "domain": "claims",
-      "break_even_floor": 0.0008391024216840692
+      "break_even_floor": 0.009999999999999998
     },
     {
       "impact_inr": 40000,
       "domain": "prepayment",
-      "break_even_floor": 0.0002517698820078658
+      "break_even_floor": 0.009999999999999998
     }
   ],
   "sweep": [
@@ -59,52 +60,52 @@
     },
     {
       "clean_floor": 0.0003,
-      "false_intervention_rate_any": 0.47770700636942676,
-      "false_intervention_rate_disruptive": 0.47770700636942676,
+      "false_intervention_rate_any": 0.0,
+      "false_intervention_rate_disruptive": 0.0,
       "catch_rate": 1.0,
-      "meets_targets_counting_annotation": false,
-      "meets_targets_disruptive_only": false
+      "meets_targets_counting_annotation": true,
+      "meets_targets_disruptive_only": true
     },
     {
       "clean_floor": 0.001,
-      "false_intervention_rate_any": 0.6369426751592356,
-      "false_intervention_rate_disruptive": 0.6369426751592356,
+      "false_intervention_rate_any": 0.0,
+      "false_intervention_rate_disruptive": 0.0,
       "catch_rate": 1.0,
-      "meets_targets_counting_annotation": false,
-      "meets_targets_disruptive_only": false
+      "meets_targets_counting_annotation": true,
+      "meets_targets_disruptive_only": true
     },
     {
       "clean_floor": 0.003,
-      "false_intervention_rate_any": 0.6369426751592356,
-      "false_intervention_rate_disruptive": 0.6369426751592356,
+      "false_intervention_rate_any": 0.0,
+      "false_intervention_rate_disruptive": 0.0,
       "catch_rate": 1.0,
-      "meets_targets_counting_annotation": false,
-      "meets_targets_disruptive_only": false
+      "meets_targets_counting_annotation": true,
+      "meets_targets_disruptive_only": true
     },
     {
       "clean_floor": 0.01,
-      "false_intervention_rate_any": 0.6815286624203821,
-      "false_intervention_rate_disruptive": 0.6815286624203821,
+      "false_intervention_rate_any": 0.6714285714285714,
+      "false_intervention_rate_disruptive": 0.6714285714285714,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     },
     {
       "clean_floor": 0.019,
-      "false_intervention_rate_any": 0.6815286624203821,
-      "false_intervention_rate_disruptive": 0.6815286624203821,
+      "false_intervention_rate_any": 0.6714285714285714,
+      "false_intervention_rate_disruptive": 0.6714285714285714,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     },
     {
       "clean_floor": 0.05,
-      "false_intervention_rate_any": 0.7133757961783439,
-      "false_intervention_rate_disruptive": 0.7133757961783439,
+      "false_intervention_rate_any": 0.7071428571428572,
+      "false_intervention_rate_disruptive": 0.7071428571428572,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     }
   ],
-  "verdict": "disruptive target achievable below a clean floor of 0.0001"
+  "verdict": "disruptive target achievable below a clean floor of 0.003"
 }

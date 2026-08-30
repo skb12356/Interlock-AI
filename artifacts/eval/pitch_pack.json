@@ -1,5 +1,5 @@
 {
-  "policy_version": "banking-v3@sha256:218a79e602a71ac3",
+  "policy_version": "banking-v3@sha256:4b63a6b7b5416683",
   "metrics": [
     {
       "name": "Pre-Action Catch Rate",
@@ -43,21 +43,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 15.0,
+          "value": 16.0,
           "unit": "ms",
           "ci": null,
           "met": true
         },
         {
           "seed": 20260827,
-          "value": 15.0,
+          "value": 16.0,
           "unit": "ms",
           "ci": null,
           "met": true
         },
         {
           "seed": 20260828,
-          "value": 15.0,
+          "value": 16.0,
           "unit": "ms",
           "ci": null,
           "met": true
@@ -70,21 +70,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 0.049509803921568625,
+          "value": 0.00784313725490196,
           "unit": "%",
           "ci": null,
           "met": true
         },
         {
           "seed": 20260827,
-          "value": 0.05175718849840256,
+          "value": 0.004777070063694267,
           "unit": "%",
           "ci": null,
-          "met": false
+          "met": true
         },
         {
           "seed": 20260828,
-          "value": 0.048726114649681525,
+          "value": 0.00623003194888179,
           "unit": "%",
           "ci": null,
           "met": true
@@ -97,21 +97,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": -0.19159999999999988,
+          "value": -0.2255999999999999,
           "unit": "%",
           "ci": null,
           "met": false
         },
         {
           "seed": 20260827,
-          "value": -0.17013333333333316,
+          "value": -0.20666666666666647,
           "unit": "%",
           "ci": null,
           "met": false
         },
         {
           "seed": 20260828,
-          "value": -0.1698666666666665,
+          "value": -0.2081333333333332,
           "unit": "%",
           "ci": null,
           "met": false
@@ -160,33 +160,33 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 0.6815286624203821,
+          "value": 0.0,
           "unit": "%",
           "ci": [
-            0.6050622712930709,
-            0.7493236587150862
+            0.0,
+            0.02670715564899167
           ],
-          "met": false
+          "met": true
         },
         {
           "seed": 20260827,
-          "value": 0.6878980891719745,
+          "value": 0.0,
           "unit": "%",
           "ci": [
-            0.6116608473742693,
-            0.7551596766692616
+            0.0,
+            0.02670715564899167
           ],
-          "met": false
+          "met": true
         },
         {
           "seed": 20260828,
-          "value": 0.6942675159235668,
+          "value": 0.0,
           "unit": "%",
           "ci": [
-            0.6182747149629643,
-            0.7609804031159407
+            0.0,
+            0.02670715564899167
           ],
-          "met": false
+          "met": true
         }
       ]
     },
@@ -196,31 +196,31 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 0.6815286624203821,
+          "value": 0.0,
           "unit": "%",
           "ci": [
-            0.6050622712930709,
-            0.7493236587150862
+            0.0,
+            0.02670715564899167
           ],
           "met": null
         },
         {
           "seed": 20260827,
-          "value": 0.6878980891719745,
+          "value": 0.0,
           "unit": "%",
           "ci": [
-            0.6116608473742693,
-            0.7551596766692616
+            0.0,
+            0.02670715564899167
           ],
           "met": null
         },
         {
           "seed": 20260828,
-          "value": 0.6942675159235668,
+          "value": 0.0,
           "unit": "%",
           "ci": [
-            0.6182747149629643,
-            0.7609804031159407
+            0.0,
+            0.02670715564899167
           ],
           "met": null
         }
@@ -286,21 +286,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
         },
         {
           "seed": 20260827,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
         },
         {
           "seed": 20260828,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
@@ -313,21 +313,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
         },
         {
           "seed": 20260827,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
         },
         {
           "seed": 20260828,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null

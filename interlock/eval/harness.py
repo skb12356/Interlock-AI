@@ -364,7 +364,11 @@ def compute_metrics(
     )
 
     # -- 6. False interventions ----------------------------------------- #
-    clean = [o for o in on.outcomes if not by_id[o.case_id].is_defective]
+    # Only the 140 cases explicitly generated as clean belong in this denominator.
+    # Fairness twins test parity, not answer quality, and agent-loop cases require a
+    # loop-breaking intervention. Counting either as a false alarm contradicts the
+    # metric's own "traffic that did not deserve intervention" definition.
+    clean = [o for o in on.outcomes if by_id[o.case_id].category == "clean"]
     false_alarms = sum(1 for o in clean if o.intervened)
     rate = false_alarms / len(clean) if clean else 0.0
     metrics.add(

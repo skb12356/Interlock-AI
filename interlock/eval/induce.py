@@ -99,6 +99,16 @@ _SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(])")
 MAX_CHUNK_ATTEMPTS = 25
 
 
+def _numeric_key(value: str) -> str:
+    """Canonical comparison key for generated numeric collisions."""
+    cleaned = value.replace(",", "")
+    try:
+        number = float(cleaned)
+    except ValueError:
+        return cleaned
+    return str(int(number)) if number == int(number) else str(number)
+
+
 def _shift_clause(reference: str) -> str:
     """Nudge a clause number to a neighbour that plausibly exists.
 
@@ -289,8 +299,19 @@ class TripleGenerator:
         match = _NUMBER.search(sentence)
         assert match is not None
         original = match.group(1)
-        corrupted = self._corrupt_number(original)
-        if corrupted == original:
+        # The category contract says the corrupted figure appears in no retrieved
+        # passage. Enumeration-heavy documents can contain the replacement elsewhere
+        # (for example 2 -> 1 while item 1 is also present), which creates a labelled
+        # defect the numeric detector is mathematically unable to see. Try the bounded
+        # set of plausible factors until the replacement is genuinely absent.
+        present = {_numeric_key(value) for value in _NUMBER.findall(chunk.text)}
+        corrupted = ""
+        for _ in range(12):
+            candidate = self._corrupt_number(original)
+            if candidate != original and _numeric_key(candidate) not in present:
+                corrupted = candidate
+                break
+        if not corrupted:
             return None
         broken = sentence[: match.start(1)] + corrupted + sentence[match.end(1) :]
         return (

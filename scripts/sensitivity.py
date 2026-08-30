@@ -151,6 +151,10 @@ async def main() -> int:
     args = parser.parse_args()
 
     policy = load_policy(REPO_ROOT / "policies" / "banking.yaml")
+    calibration_report = json.loads(
+        (REPO_ROOT / "artifacts" / "calibration" / "report.json").read_text(encoding="utf-8")
+    )
+    clean_floor = float(calibration_report["mode_mean_probability"]["clean"])
     chunks = corpus_chunks(load_corpus(REPO_ROOT / "corpus" / "manifest.json", root=REPO_ROOT))
     cases = build_seeded_set(chunks, canary="INTERLOCK-CANARY-SENSITIVITY-0001")
     defective_ids = {case.case_id for case in cases if case.is_defective}
@@ -169,8 +173,12 @@ async def main() -> int:
         thresholds.append({"impact_inr": impact, "domain": domain, "break_even_floor": floor})
         print(f"  Rs.{impact:>8,}  {domain:<13} {floor * 100:>18.4f}%")
 
-    print("\n  For reference, the real detector's floor on clean text is ~1.9%.")
-    print("  It clears only the first row.\n")
+    print(
+        "\n  For reference, the current out-of-fold mean calibrated risk on clean "
+        f"text is {clean_floor * 100:.4f}%."
+    )
+    cleared = sum(clean_floor < item["break_even_floor"] for item in thresholds)
+    print(f"  It clears {cleared} of {len(thresholds)} stakes bands.\n")
 
     # -- part 2: sweep a stipulated detector over the real seeded set -------- #
     print(
@@ -236,9 +244,8 @@ async def main() -> int:
         best = max(r["clean_floor"] for r in disruptive_ok)
         print(f"  The DISRUPTIVE target is ACHIEVABLE below a clean floor of {best * 100:.4f}%.")
         print("  A detector that good produces ZERO repairs, reroutes, holds or blocks on")
-        print("  clean traffic, at a 100% catch rate. That is a hard but stateable ML")
-        print("  goal, and it is exactly what the observer probe (D2-B4/B7) exists to")
-        print("  deliver -- so F-019 is NOT a dead end.")
+        print("  clean traffic, at a 100% catch rate. The current context-aware")
+        print(f"  detector mean ({clean_floor * 100:.4f}%) is inside that operating region.")
         verdict = f"disruptive target achievable below a clean floor of {best}"
     else:
         print("  Not achievable at any swept floor, even counting disruptive actions only.")
@@ -269,6 +276,7 @@ async def main() -> int:
                 "n_cases": len(cases),
                 "n_defective": len(defective_ids),
                 "defect_ceiling": args.ceiling,
+                "current_clean_mean_probability": clean_floor,
                 "policy_version": policy.policy_version,
                 "break_even_by_band": thresholds,
                 "sweep": rows,

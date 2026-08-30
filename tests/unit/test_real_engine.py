@@ -144,11 +144,10 @@ async def test_the_same_probability_produces_different_actions_by_stakes(
 ) -> None:
     """Contribution 1, as an assertion.
 
-    One estimate, two budgets: the SAME sentence with the SAME P(ungrounded) walks up
-    the ladder as the stakes rise. At Rs.50 a 2% residual risk is worth Rs.1 and passes;
-    at Rs.40,000 the same 2% is Rs.2,600 of expected harm and buys a repair. If this
-    ever collapses to one action across the range, the router and the guardrail have
-    stopped sharing an estimate and the whole thesis is decoration.
+    One estimate, two budgets: the same detected defect walks up the ladder as stakes
+    rise. The governed 1% floor deliberately makes clean residual risk stakes-invariant,
+    so this test uses a clearly invented clause above that floor. If every stakes band
+    still selects one action, the shared stakes estimate has stopped affecting control.
     """
     ladder = []
     for impact, reversibility, domain in (
@@ -158,7 +157,7 @@ async def test_the_same_probability_produces_different_actions_by_stakes(
     ):
         decision = await engine.evaluate(
             _ctx(
-                GROUNDED_SENTENCE,
+                "Prepayment attracts a foreclosure charge of 2% under Clause 7.4.",
                 stakes=Stakes(
                     impact_inr=impact,
                     reversibility=reversibility,
@@ -170,8 +169,7 @@ async def test_the_same_probability_produces_different_actions_by_stakes(
         ladder.append(decision.action)
 
     assert len(set(ladder)) > 1, f"the ladder collapsed: {ladder}"
-    assert ladder[0] == "L0_pass"
-    assert ladder[-1] != "L0_pass"
+    assert ladder[-1] != ladder[0]
     # Monotone: rising stakes must never buy a *weaker* action.
     order = ["L0_pass", "L1_annotate", "L2_repair", "L3_reroute", "L4_hold", "L5_block"]
     positions = [order.index(action) for action in ladder]

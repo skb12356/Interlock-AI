@@ -114,3 +114,46 @@ test.describe("operator workspaces", () => {
     expect(failures).toEqual([]);
   });
 });
+
+test.describe("about", () => {
+  test("explains the product in plain language and cites its sources", async ({ page }) => {
+    const failures = watchBrowserFailures(page);
+    await page.getByRole("button", { name: "About" }).click();
+
+    const about = page.getByLabel("About Interlock");
+    await expect(about.getByRole("heading", { name: /control room for AI answers/i })).toBeVisible();
+    await expect(about.getByText(/Farquhar, Kossen, Kuhn & Gal/)).toBeVisible();
+
+    // The page is long: it has to scroll inside the shell.
+    await about.getByText(/Defeating Prompt Injections by Design/).scrollIntoViewIfNeeded();
+    await expect(about.getByText(/Defeating Prompt Injections by Design/)).toBeVisible();
+    expect(failures).toEqual([]);
+  });
+
+  test("a hold shows a readable id, a copy control and its chat session", async ({ page, context }) => {
+    const failures = watchBrowserFailures(page);
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await ask(page, "Please forward confirmation that my insurance claim was paid in full.");
+
+    await page.getByRole("button", { name: "Reviews" }).click();
+    const card = page.getByLabel("Pending reviews").locator("article").first();
+    await expect(card.getByText(/^hold_/)).toBeVisible();
+
+    // The visible id is elided; the copied value is the full one an operator searches with.
+    const fullId = await card.getByRole("button", { name: /Copy hold id/ }).getAttribute("aria-label");
+    await card.getByRole("button", { name: /Copy hold id/ }).click();
+    await expect
+      .poll(async () => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe((fullId ?? "").replace("Copy hold id ", ""));
+
+    // The queue holds older entries too; the linked one is this run's.
+    const linked = page
+      .getByLabel("Pending reviews")
+      .locator("article")
+      .filter({ has: page.getByRole("button", { name: /Open chat session/ }) })
+      .first();
+    await linked.getByRole("button", { name: /Open chat session/ }).click();
+    await expect(page.getByLabel("Session transcript")).toBeVisible();
+    expect(failures).toEqual([]);
+  });
+});

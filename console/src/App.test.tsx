@@ -144,6 +144,18 @@ describe("console shell", () => {
     expect(await screen.findByText(/checked in \d+\.\d+ s/)).toBeInTheDocument();
   });
 
+  it("explains itself in plain language and cites its sources", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "About" }));
+    const about = await screen.findByLabelText("About Interlock");
+    expect(within(about).getByRole("heading", { name: /control room for AI answers/i })).toBeInTheDocument();
+    expect(within(about).getByText(/Farquhar, Kossen, Kuhn & Gal/)).toBeInTheDocument();
+    expect(within(about).getByText(/MiniCheck/)).toBeInTheDocument();
+    expect(within(about).getByText(/CaMeL/)).toBeInTheDocument();
+  });
+
   it("reaches the reviews and evidence workspaces from the navbar", async () => {
     const user = userEvent.setup();
     render(<App />);

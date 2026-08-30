@@ -29,6 +29,18 @@ export interface LiveOverlay {
   finished: boolean;
 }
 
+/**
+ * Some upstream models stream a `<think>` block before the answer. It is part of
+ * the raw generation (stage 02 shows it verbatim), but it is not what the
+ * customer was shown, so the released text drops it.
+ */
+export function releasedText(raw: string): string {
+  return raw
+    .replace(/<think>[\s\S]*?<\/think>/g, "")
+    .replace(/<think>[\s\S]*$/g, "")
+    .trim();
+}
+
 export function emptyOverlay(prompt: string): LiveOverlay {
   return {
     prompt,
@@ -179,6 +191,7 @@ export function deriveLiveScene(overlay: LiveOverlay): Scene {
   const tone: SurfaceTone = action ? ACTION_TONE[action] : "active";
   const { costs, costMeta } = liveCosts(overlay);
   const held = overlay.hold !== null;
+  const released = releasedText(overlay.assistantText);
 
   const summary: Scene["summary"] = [
     {
@@ -249,7 +262,7 @@ export function deriveLiveScene(overlay: LiveOverlay): Scene {
         ? `chosen loss ${overlay.decision.chosen_loss.toFixed(2)} · runner-up ${overlay.decision.runner_up ?? "none"} · margin ${overlay.decision.margin?.toFixed(2) ?? "—"}`
         : "waiting for interlock.decision",
     gate: {
-      committed: overlay.assistantText || "— nothing released yet —",
+      committed: released || "— nothing released yet —",
       buffered: held ? (overlay.hold?.reason ?? "held") : "— no sentence is being held —",
       title: held ? "frozen at the interlock" : "buffer",
       tone: held ? "fail" : "pass",
@@ -259,7 +272,7 @@ export function deriveLiveScene(overlay: LiveOverlay): Scene {
           ? "The gate released every sentence it checked."
           : "holding one sentence behind generation…",
     },
-    final: overlay.assistantText || "— no content was released —",
+    final: released || "— no content was released —",
     stamp: action ? ACTION_STAMP[action] : "IN FLIGHT",
     stampTone: tone,
     counterfactual:

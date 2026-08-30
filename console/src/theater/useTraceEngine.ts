@@ -24,7 +24,7 @@ export function useTraceEngine(settings: Partial<EngineSettings> = {}): {
 
   useEffect(() => {
     engine.updateSettings(settingsRef.current);
-  }, [engine, settings.pace, settings.autoplay, settings.currency, settings.reducedMotion]);
+  }, [engine, settings.currency, settings.reducedMotion]);
 
   useEffect(() => () => engine.destroy(), [engine]);
 

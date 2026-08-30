@@ -1,17 +1,16 @@
-import { LADDER, LAST_STAGE, STAGES, type Level, type StageKey } from "./stages";
-import { SCENES, type NodeState, type Scene, type SceneId } from "./scenes";
+import { LADDER, LAST_STAGE, STAGES, type Level } from "./stages";
+import type { NodeState, Scene } from "./scenes";
 import { ACTION_LEVEL, deriveLiveScene, emptyOverlay, type LiveOverlay } from "./liveScene";
 import type { SurfaceTone } from "./tokens";
 
 /**
- * The trace engine drives the stage choreography. It is deliberately free of
- * React so the timings can be tested directly with fake timers: every schedule
- * in the design is a number in one place, and every timeout it starts is
- * registered so a stage jump can cancel a half-finished sequence.
+ * The trace engine turns one gateway stream into the seven-stage view. It is
+ * deliberately free of React so its behaviour can be tested directly, and it is
+ * live-only: there is no scripted timeline, so every stage a viewer sees is a
+ * frame the backend actually sent.
  */
 
-export type Phase = "hero" | "run";
-export type Mode = "demo" | "live";
+export type Phase = "idle" | "run";
 /** `active` is transient (a check in flight); the rest are terminal. */
 export type NodeRuntimeState = NodeState | "active";
 export type LadderRowState = "pricing" | "priced";
@@ -23,11 +22,8 @@ export interface BoardState {
 
 export interface TraceUiState {
   phase: Phase;
-  mode: Mode;
-  scene: SceneId;
   prompt: string;
   stage: number;
-  paused: boolean;
   railOpen: boolean;
   nodeSt: Record<string, NodeRuntimeState>;
   genText: string;
@@ -37,25 +33,21 @@ export interface TraceUiState {
   board: BoardState | null;
   boardTone: SurfaceTone;
   counts: Record<number, number>;
+  /** Milliseconds since submit; frozen once the run finishes. */
   elapsed: number;
-  /** Milliseconds spent inside the current stage, for the footer progress bar. */
-  stageElapsed: number;
-  /** Present only in live mode: what the gateway stream has reported so far. */
+  /** Wall-clock duration of the finished run; null while it is still streaming. */
+  durationMs: number | null;
+  /** What the gateway stream has reported so far. */
   live: LiveOverlay | null;
   log: string[];
 }
 
 export interface EngineSettings {
-  /** Multiplies every scheduled delay. 0.5–2 in the UI. */
-  pace: number;
-  autoplay: boolean;
   reducedMotion: boolean;
   currency: "rupee" | "dollar";
 }
 
 export const DEFAULT_SETTINGS: EngineSettings = {
-  pace: 1,
-  autoplay: true,
   reducedMotion: false,
   currency: "rupee",
 };
@@ -86,14 +78,11 @@ const defaultClock: EngineClock = {
   random: () => Math.random(),
 };
 
-export function initialTraceState(scene: SceneId = "scene1"): TraceUiState {
+export function initialTraceState(): TraceUiState {
   return {
-    phase: "hero",
-    mode: "demo",
-    scene,
-    prompt: SCENES[scene].prompt,
+    phase: "idle",
+    prompt: "",
     stage: 0,
-    paused: false,
     railOpen: false,
     nodeSt: {},
     genText: "",
@@ -104,7 +93,7 @@ export function initialTraceState(scene: SceneId = "scene1"): TraceUiState {
     boardTone: "active",
     counts: {},
     elapsed: 0,
-    stageElapsed: 0,
+    durationMs: null,
     live: null,
     log: [],
   };
@@ -129,11 +118,7 @@ export function boardTarget(message: string): string[][] {
  * One frame of the split-flap animation. Cell (r, c) of a `w`-wide grid starts
  * flipping at tick `(r*w + c) * 0.5` and locks 7 ticks later.
  */
-export function boardFrame(
-  target: string[][],
-  tick: number,
-  random: () => number,
-): BoardState {
+export function boardFrame(target: string[][], tick: number, random: () => number): BoardState {
   const width = target[0]?.length ?? 0;
   let done = true;
   const cur = target.map((row, ri) =>
@@ -157,21 +142,14 @@ export class TraceEngine {
   private settings: EngineSettings;
   private readonly clock: EngineClock;
 
-  private timers: number[] = [];
   private boardTimer: number | null = null;
   private clockTimer: number | null = null;
-  private autoplayTimer: number | null = null;
   private startedAt = 0;
-  private stageStartedAt = 0;
 
-  constructor(
-    settings: Partial<EngineSettings> = {},
-    clock: EngineClock = defaultClock,
-    scene: SceneId = "scene1",
-  ) {
+  constructor(settings: Partial<EngineSettings> = {}, clock: EngineClock = defaultClock) {
     this.settings = { ...DEFAULT_SETTINGS, ...settings };
     this.clock = clock;
-    this.state = initialTraceState(scene);
+    this.state = initialTraceState();
   }
 
   /* ---- store surface ---- */
@@ -196,61 +174,34 @@ export class TraceEngine {
     return this.settings;
   }
 
+  /** The render contract, always derived from what the stream reported. */
   get scene(): Scene {
-    return this.state.live ? deriveLiveScene(this.state.live) : SCENES[this.state.scene];
-  }
-
-  /* ---- timers ---- */
-
-  private at(ms: number, fn: () => void): void {
-    this.timers.push(this.clock.setTimeout(fn, ms * this.settings.pace));
-  }
-
-  private clearStageTimers(): void {
-    this.timers.forEach((id) => this.clock.clearTimeout(id));
-    this.timers = [];
-    if (this.autoplayTimer !== null) this.clock.clearTimeout(this.autoplayTimer);
-    this.autoplayTimer = null;
-  }
-
-  private scheduleAutoplay(index: number, delayMs: number): void {
-    if (this.autoplayTimer !== null) this.clock.clearTimeout(this.autoplayTimer);
-    this.autoplayTimer = this.clock.setTimeout(() => {
-      this.autoplayTimer = null;
-      if (!this.state.paused && this.state.stage === index) this.go(index + 1);
-    }, Math.max(0, delayMs));
+    return deriveLiveScene(this.state.live ?? emptyOverlay(this.state.prompt));
   }
 
   private log(line: string): void {
     this.set({ log: this.state.log.concat(line).slice(-40) });
   }
 
-  /** Stops every timer. Call on unmount. */
-  destroy(): void {
-    this.clearStageTimers();
-    if (this.boardTimer !== null) this.clock.clearInterval(this.boardTimer);
+  private stopClock(): void {
     if (this.clockTimer !== null) this.clock.clearInterval(this.clockTimer);
-    this.boardTimer = null;
     this.clockTimer = null;
-    this.listeners.clear();
   }
 
-  /* ---- hero controls ---- */
+  private stopBoard(): void {
+    if (this.boardTimer !== null) this.clock.clearInterval(this.boardTimer);
+    this.boardTimer = null;
+  }
 
-  setScene(scene: SceneId): void {
-    this.set({ scene, prompt: SCENES[scene].prompt });
+  /** Stops every timer. Call on unmount. */
+  destroy(): void {
+    this.stopClock();
+    this.stopBoard();
+    this.listeners.clear();
   }
 
   setPrompt(prompt: string): void {
     this.set({ prompt });
-  }
-
-  setMode(mode: Mode): void {
-    this.set({ mode });
-  }
-
-  toggleMode(): void {
-    this.setMode(this.state.mode === "demo" ? "live" : "demo");
   }
 
   setRailOpen(railOpen: boolean): void {
@@ -259,83 +210,69 @@ export class TraceEngine {
 
   /* ---- run control ---- */
 
-  /** `live` starts a real gateway request; the demo path replays fixtures. */
-  submit(live = false): void {
-    this.clearStageTimers();
-    if (this.clockTimer !== null) this.clock.clearInterval(this.clockTimer);
+  /** Starts a run. The console only ever streams from the gateway. */
+  submit(prompt = this.state.prompt): void {
+    this.stopClock();
     this.startedAt = this.clock.now();
-    this.stageStartedAt = this.startedAt;
     this.clockTimer = this.clock.setInterval(
-      () =>
-        this.set({
-          elapsed: this.clock.now() - this.startedAt,
-          stageElapsed: this.clock.now() - this.stageStartedAt,
-        }),
+      () => this.set({ elapsed: this.clock.now() - this.startedAt }),
       CLOCK_TICK_MS,
     );
     this.set({
       phase: "run",
+      prompt,
       stage: 0,
-      paused: false,
       log: [],
       nodeSt: {},
       counts: {},
       elapsed: 0,
-      stageElapsed: 0,
       genText: "",
       ladderSt: {},
       chosenShown: false,
       gateStep: 0,
-      live: live ? emptyOverlay(this.state.prompt) : null,
+      live: emptyOverlay(prompt),
+      durationMs: null,
     });
     this.enter(0);
   }
 
-  replay(): void {
-    this.submit(this.state.live !== null);
+  /** Reopens a finished trace for inspection. No timers, nothing left running. */
+  loadTrace(overlay: LiveOverlay, durationMs: number | null): void {
+    this.stopClock();
+    this.set({
+      phase: "run",
+      prompt: overlay.prompt,
+      stage: 0,
+      log: [
+        overlay.error
+          ? `reopened · stream failed · ${overlay.error}`
+          : `reopened · ${overlay.decision?.action ?? "no decision recorded"}`,
+      ],
+      nodeSt: {},
+      counts: {},
+      elapsed: durationMs ?? 0,
+      durationMs,
+      live: overlay,
+    });
+    this.enter(0);
   }
 
   reset(): void {
-    this.clearStageTimers();
-    if (this.boardTimer !== null) this.clock.clearInterval(this.boardTimer);
-    if (this.clockTimer !== null) this.clock.clearInterval(this.clockTimer);
-    this.boardTimer = null;
-    this.clockTimer = null;
-    this.set({ phase: "hero", board: null, stage: 0, elapsed: 0 });
+    this.stopClock();
+    this.stopBoard();
+    this.set({ phase: "idle", board: null, stage: 0, elapsed: 0, durationMs: null, live: null });
   }
 
   go(index: number): void {
     if (index < 0 || index > LAST_STAGE) return;
-    this.clearStageTimers();
     this.set({ stage: index });
     this.enter(index);
-  }
-
-  next(): void {
-    this.go(this.state.stage + 1);
-  }
-
-  prev(): void {
-    this.go(this.state.stage - 1);
-  }
-
-  togglePause(): void {
-    const resuming = this.state.paused;
-    this.set({ paused: !resuming });
-    if (!this.settings.autoplay || this.state.live || this.state.stage >= LAST_STAGE) return;
-    if (!resuming) {
-      if (this.autoplayTimer !== null) this.clock.clearTimeout(this.autoplayTimer);
-      this.autoplayTimer = null;
-      return;
-    }
-    const elapsed = this.clock.now() - this.stageStartedAt;
-    this.scheduleAutoplay(this.state.stage, STAGES[this.state.stage].dwell * this.settings.pace - elapsed);
   }
 
   /* ---- split-flap board ---- */
 
   private startBoard(message: string, tone: SurfaceTone): void {
-    if (this.boardTimer !== null) this.clock.clearInterval(this.boardTimer);
+    this.stopBoard();
     const target = boardTarget(message);
     if (this.settings.reducedMotion) {
       this.set({ board: { cur: target, done: true }, boardTone: tone });
@@ -352,35 +289,18 @@ export class TraceEngine {
       const tick = Math.floor((this.clock.now() - startedAt) / BOARD_TICK_MS) + 1;
       const frame = boardFrame(target, tick, this.clock.random);
       this.set({ board: frame });
-      if (frame.done && this.boardTimer !== null) {
-        this.clock.clearInterval(this.boardTimer);
-        this.boardTimer = null;
-      }
+      if (frame.done) this.stopBoard();
     }, BOARD_TICK_MS);
   }
-
-  /* ---- per-stage choreography ---- */
 
   private enter(index: number): void {
     const stage = STAGES[index];
     const scene = this.scene;
-    this.stageStartedAt = this.clock.now();
-    this.set({ stageElapsed: 0 });
     this.startBoard(scene.board[stage.key], scene.boardTone[stage.key]);
-
-    if (!this.state.live && this.settings.autoplay && !this.state.paused && index < LAST_STAGE) {
-      this.scheduleAutoplay(index, stage.dwell * this.settings.pace);
-    }
-
-    if (this.state.live) {
-      // Live stages are filled by the stream, never by a scripted timeline.
-      this.syncLiveNodes();
-      return;
-    }
-    this.stageChoreography(stage.key, scene);
+    this.syncLiveNodes();
   }
 
-  /* ---- live mode ---- */
+  /* ---- stream application ---- */
 
   private updateLive(mutate: (overlay: LiveOverlay) => LiveOverlay): void {
     const current = this.state.live;
@@ -389,10 +309,7 @@ export class TraceEngine {
     this.syncLiveNodes();
   }
 
-  /**
-   * Mirrors whatever the stream has delivered into the same view state the demo
-   * path animates, so every stage component stays source-agnostic.
-   */
+  /** Mirrors whatever the stream delivered into the state the stages render. */
   private syncLiveNodes(): void {
     const overlay = this.state.live;
     if (!overlay) return;
@@ -404,6 +321,9 @@ export class TraceEngine {
     scene.laneB.forEach((node, index) => {
       nodeSt[`b${index}`] = node.st;
     });
+    if (overlay.finished) {
+      for (let index = 0; index < 4; index += 1) nodeSt[`c${index}`] = "pass";
+    }
     const ladderSt: Partial<Record<Level, LadderRowState>> = {};
     if (overlay.lossTable) {
       overlay.lossTable.forEach((row) => {
@@ -468,130 +388,17 @@ export class TraceEngine {
     this.advanceTo(4);
   }
 
+  /**
+   * Ends the run. The clock stops here and the elapsed reading freezes, so the
+   * header can report the time the request actually took rather than counting
+   * on into a run that finished minutes ago.
+   */
   finishLive(error: string | null = null): void {
+    const durationMs = this.clock.now() - this.startedAt;
+    this.stopClock();
     this.updateLive((overlay) => ({ ...overlay, finished: true, error }));
+    this.set({ elapsed: durationMs, durationMs });
     this.log(error ? `stream failed · ${error}` : "stream complete");
-    this.advanceTo(error ? 4 : 5);
-  }
-
-  private stageChoreography(key: StageKey, scene: Scene): void {
-    switch (key) {
-      case "laneA":
-        return this.runLaneA(scene);
-      case "gen":
-        return this.runGen(scene);
-      case "laneB":
-        return this.runLaneB(scene);
-      case "ladder":
-        return this.runLadder(scene);
-      case "gate":
-        return this.runGate(scene);
-      case "release":
-        return this.runRelease(scene);
-      case "laneC":
-        return this.runLaneC();
-    }
-  }
-
-  private runLaneA(scene: Scene): void {
-    this.set({ nodeSt: {}, genText: "" });
-    scene.laneA.forEach((node, k) => {
-      this.at(300 + k * 300, () => {
-        this.set({ nodeSt: { ...this.state.nodeSt, [`a${k}`]: "active" } });
-      });
-      this.at(300 + k * 300 + 220, () => {
-        this.set({ nodeSt: { ...this.state.nodeSt, [`a${k}`]: node.st } });
-        this.log(`lane_a · ${node.label.toLowerCase()} · ${node.v}`);
-      });
-    });
-  }
-
-  private runGen(scene: Scene): void {
-    if (this.settings.reducedMotion) {
-      this.set({ genText: scene.gen });
-    } else {
-      this.set({ genText: "" });
-      let cursor = 0;
-      const step = () => {
-        cursor = Math.min(scene.gen.length, cursor + 2);
-        this.set({ genText: scene.gen.slice(0, cursor) });
-        if (cursor < scene.gen.length) this.at(24, step);
-      };
-      this.at(500, step);
-    }
-    this.log(`generation · streaming from ${scene.stakes.model}`);
-  }
-
-  private runLaneB(scene: Scene): void {
-    this.set({ genText: scene.gen });
-    scene.laneB.forEach((node, k) => {
-      this.at(500 + k * 900, () => {
-        this.set({ nodeSt: { ...this.state.nodeSt, [`b${k}`]: "active" } });
-      });
-      this.at(500 + k * 900 + 600, () => {
-        this.set({ nodeSt: { ...this.state.nodeSt, [`b${k}`]: node.st } });
-        this.log(`lane_b · ${node.label.toLowerCase()} · ${node.v}`);
-      });
-    });
-  }
-
-  private runLadder(scene: Scene): void {
-    this.set({ ladderSt: {}, chosenShown: false });
-    this.at(250, () => {
-      const pricing: Partial<Record<Level, LadderRowState>> = {};
-      LADDER.forEach((row) => {
-        pricing[row.lv] = "pricing";
-      });
-      this.set({ ladderSt: pricing });
-    });
-    LADDER.forEach((row, k) => {
-      this.at(1100 + k * 260, () => {
-        this.set({ ladderSt: { ...this.state.ladderSt, [row.lv]: "priced" } });
-        this.log(
-          `control_plane · priced ${row.lv} · ${formatMoney(scene.costs[row.lv], this.settings.currency)}`,
-        );
-      });
-    });
-    this.at(3100, () => {
-      this.set({ chosenShown: true });
-      this.log(`control_plane · chosen ${scene.chosen}`);
-    });
-  }
-
-  private runGate(scene: Scene): void {
-    this.set({ gateStep: 0 });
-    this.at(1400, () => {
-      this.set({ gateStep: 1 });
-      this.log(`commit_gate · ${scene.chosen} applied`);
-    });
-  }
-
-  private runRelease(scene: Scene): void {
-    this.set({ counts: {} });
-    scene.summary.forEach((card, k) => {
-      const duration = 900;
-      const startAt = this.clock.now() + (300 + k * 120) * this.settings.pace;
-      const tick = () => {
-        const progress = Math.min(1, (this.clock.now() - startAt) / duration);
-        if (progress < 0) {
-          this.at(30, tick);
-          return;
-        }
-        const eased = 1 - Math.pow(1 - progress, 3);
-        this.set({ counts: { ...this.state.counts, [k]: card.v * eased } });
-        if (progress < 1) this.at(30, tick);
-      };
-      this.at(300 + k * 120, tick);
-    });
-    this.log(`released · ${scene.stamp}`);
-  }
-
-  private runLaneC(): void {
-    for (let k = 0; k < 4; k += 1) {
-      this.at(400 + k * 400, () => {
-        this.set({ nodeSt: { ...this.state.nodeSt, [`c${k}`]: "pass" } });
-      });
-    }
-    this.log("lane_c · sampled, non-blocking");
+    this.advanceTo(error ? 4 : 6);
   }
 }

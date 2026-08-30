@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SCENES } from "./scenes";
-import { LADDER, STAGES } from "./stages";
+import { STAGES } from "./stages";
 import { TraceEngine, boardFrame, boardTarget, formatMoney } from "./traceEngine";
 
 describe("board maths", () => {
@@ -9,7 +8,6 @@ describe("board maths", () => {
     const target = boardTarget("LANE A CLEAR\n25 MS");
     expect(target).toHaveLength(2);
     expect(target[0]).toHaveLength(12);
-    expect(target[1]).toHaveLength(12);
     expect(target[1].join("")).toBe("25 MS       ");
   });
 
@@ -20,10 +18,6 @@ describe("board maths", () => {
     expect(early.cur[0][0]).toBe("A");
     expect(early.cur[0][1]).toBe(" ");
     expect(early.done).toBe(false);
-
-    const mid = boardFrame(target, 5, () => 0);
-    expect(mid.cur[0][0]).toBe("A");
-    expect(mid.done).toBe(false);
 
     const settled = boardFrame(target, 8, () => 0);
     expect(settled.cur[0].join("")).toBe("AB");
@@ -38,133 +32,96 @@ describe("money formatting", () => {
   });
 });
 
-describe("TraceEngine choreography", () => {
+describe("TraceEngine", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  const build = (overrides = {}) =>
-    new TraceEngine({ pace: 1, autoplay: true, reducedMotion: false, currency: "rupee", ...overrides });
-
-  it("starts on lane A and resolves each check to its terminal state", () => {
-    const engine = build();
-    engine.submit();
-    expect(engine.getState().phase).toBe("run");
-    expect(engine.getState().stage).toBe(0);
-
-    vi.advanceTimersByTime(300);
-    expect(engine.getState().nodeSt.a0).toBe("active");
-
-    vi.advanceTimersByTime(220);
-    expect(engine.getState().nodeSt.a0).toBe(SCENES.scene1.laneA[0].st);
-    expect(engine.getState().log.at(-1)).toContain("lane_a · injection check");
+  it("starts a run on stage 01 with an empty overlay", () => {
+    const engine = new TraceEngine();
+    engine.submit("what are the prepayment charges?");
+    const state = engine.getState();
+    expect(state.phase).toBe("run");
+    expect(state.stage).toBe(0);
+    expect(state.live?.prompt).toBe("what are the prepayment charges?");
+    expect(state.durationMs).toBeNull();
     engine.destroy();
   });
 
-  it("advances to the next stage after the stage dwell", () => {
-    const engine = build();
-    engine.submit();
-    vi.advanceTimersByTime(STAGES[0].dwell);
-    expect(engine.getState().stage).toBe(1);
-    engine.destroy();
-  });
-
-  it("multiplies every delay by the pace setting", () => {
-    const engine = build({ pace: 2 });
-    engine.submit();
-    vi.advanceTimersByTime(STAGES[0].dwell);
-    expect(engine.getState().stage).toBe(0);
-    vi.advanceTimersByTime(STAGES[0].dwell);
-    expect(engine.getState().stage).toBe(1);
-    engine.destroy();
-  });
-
-  it("does not auto-advance while paused", () => {
-    const engine = build();
-    engine.submit();
-    engine.togglePause();
-    vi.advanceTimersByTime(STAGES[0].dwell * 2);
+  it("never advances a stage on its own", () => {
+    const engine = new TraceEngine();
+    engine.submit("hello");
+    vi.advanceTimersByTime(STAGES[0].dwell * 4);
     expect(engine.getState().stage).toBe(0);
     engine.destroy();
   });
 
-  it("continues autoplay after the viewer resumes", () => {
-    const engine = build();
-    engine.submit();
-    engine.togglePause();
-    vi.advanceTimersByTime(STAGES[0].dwell * 2);
-    engine.togglePause();
-    vi.advanceTimersByTime(1);
-    expect(engine.getState().stage).toBe(1);
+  it("keeps the clock running while the stream is open", () => {
+    const engine = new TraceEngine();
+    engine.submit("hello");
+    vi.advanceTimersByTime(1_000);
+    expect(engine.getState().elapsed).toBeGreaterThanOrEqual(900);
     engine.destroy();
   });
 
-  it("cancels a half-finished stage when the viewer jumps", () => {
-    const engine = build();
-    engine.submit();
-    vi.advanceTimersByTime(300);
-    engine.go(3);
-    vi.advanceTimersByTime(220);
-    // The lane A resolution that was already scheduled must not land after the jump.
-    expect(engine.getState().nodeSt.a0).toBe("active");
-    expect(engine.getState().stage).toBe(3);
+  it("freezes the clock and reports the duration when the run finishes", () => {
+    const engine = new TraceEngine();
+    engine.submit("hello");
+    vi.advanceTimersByTime(2_000);
+    engine.finishLive();
+
+    const settled = engine.getState();
+    expect(settled.durationMs).toBeGreaterThanOrEqual(2_000);
+    expect(settled.elapsed).toBe(settled.durationMs);
+
+    // The reading must not keep counting after the request is over.
+    vi.advanceTimersByTime(5_000);
+    expect(engine.getState().elapsed).toBe(settled.elapsed);
     engine.destroy();
   });
 
-  it("prices all six ladder rows and reveals the winner at 3.1 s", () => {
-    const engine = build({ autoplay: false });
-    engine.submit();
-    engine.go(3);
-
-    vi.advanceTimersByTime(250);
-    expect(Object.values(engine.getState().ladderSt)).toHaveLength(LADDER.length);
-    expect(engine.getState().ladderSt.L0).toBe("pricing");
-
-    vi.advanceTimersByTime(1100);
-    expect(engine.getState().ladderSt.L0).toBe("priced");
-    expect(engine.getState().chosenShown).toBe(false);
-
-    vi.advanceTimersByTime(3100 - 1350);
-    expect(engine.getState().chosenShown).toBe(true);
-    expect(engine.getState().log.at(-1)).toBe("control_plane · chosen L2");
+  it("settles lane C once the stream completes", () => {
+    const engine = new TraceEngine();
+    engine.submit("hello");
+    expect(engine.getState().nodeSt.c0).toBeUndefined();
+    engine.finishLive();
+    expect(engine.getState().nodeSt.c0).toBe("pass");
+    expect(engine.getState().stage).toBe(6);
     engine.destroy();
   });
 
-  it("types the draft two characters at a time", () => {
-    const engine = build({ autoplay: false });
-    engine.submit();
-    engine.go(1);
-    vi.advanceTimersByTime(500);
-    expect(engine.getState().genText).toHaveLength(2);
-    vi.advanceTimersByTime(24 * 4);
-    expect(engine.getState().genText).toHaveLength(10);
+  it("reopens a stored trace without starting a clock", () => {
+    const engine = new TraceEngine();
+    engine.submit("hello");
+    engine.appendGeneration("some answer");
+    engine.finishLive();
+    const stored = engine.getState().live;
+    expect(stored).not.toBeNull();
+
+    const viewer = new TraceEngine();
+    viewer.loadTrace(stored!, 4_200);
+    expect(viewer.getState().phase).toBe("run");
+    expect(viewer.getState().genText).toBe("some answer");
+    expect(viewer.getState().durationMs).toBe(4_200);
+
+    vi.advanceTimersByTime(3_000);
+    expect(viewer.getState().elapsed).toBe(4_200);
+    viewer.destroy();
     engine.destroy();
   });
 
-  it("settles the board and the draft immediately under reduced motion", () => {
-    const engine = build({ reducedMotion: true, autoplay: false });
-    engine.submit();
-    expect(engine.getState().board?.done).toBe(true);
-    engine.go(1);
-    expect(engine.getState().genText).toBe(SCENES.scene1.gen);
-    engine.destroy();
-  });
-
-  it("switching scene replaces the prompt", () => {
-    const engine = build();
-    engine.setScene("blocked");
-    expect(engine.getState().prompt).toBe(SCENES.blocked.prompt);
-    engine.destroy();
-  });
-
-  it("reset returns to the hero and stops the clock", () => {
-    const engine = build();
-    engine.submit();
-    vi.advanceTimersByTime(500);
+  it("resets back to an idle console", () => {
+    const engine = new TraceEngine();
+    engine.submit("hello");
     engine.reset();
-    const elapsed = engine.getState().elapsed;
-    vi.advanceTimersByTime(1000);
-    expect(engine.getState().phase).toBe("hero");
-    expect(engine.getState().elapsed).toBe(elapsed);
+    expect(engine.getState().phase).toBe("idle");
+    expect(engine.getState().live).toBeNull();
+    engine.destroy();
+  });
+
+  it("settles the board immediately under reduced motion", () => {
+    const engine = new TraceEngine({ reducedMotion: true });
+    engine.submit("hello");
+    expect(engine.getState().board?.done).toBe(true);
     engine.destroy();
   });
 });

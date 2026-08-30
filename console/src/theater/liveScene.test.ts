@@ -70,8 +70,8 @@ describe("live scene derivation", () => {
 
 describe("engine in live mode", () => {
   it("advances forward only as frames arrive and never rewinds", () => {
-    const engine = new TraceEngine({ autoplay: false });
-    engine.submit(true);
+    const engine = new TraceEngine();
+    engine.submit("please forward confirmation");
     expect(engine.getState().stage).toBe(0);
 
     engine.applyStakes(stakes);
@@ -95,8 +95,8 @@ describe("engine in live mode", () => {
   });
 
   it("marks every row the loss table priced", () => {
-    const engine = new TraceEngine({ autoplay: false });
-    engine.submit(true);
+    const engine = new TraceEngine();
+    engine.submit("please forward confirmation");
     engine.applyDecision(decision);
     engine.applyLossTable(lossTable, 15);
     expect(engine.getState().ladderSt.L0).toBe("priced");
@@ -106,16 +106,16 @@ describe("engine in live mode", () => {
   });
 
   it("does not run the fixture choreography while live", () => {
-    const engine = new TraceEngine({ autoplay: false });
-    engine.submit(true);
+    const engine = new TraceEngine();
+    engine.submit("please forward confirmation");
     // Lane A node states come from the overlay, so nothing is "checking".
     expect(Object.values(engine.getState().nodeSt)).not.toContain("active");
     engine.destroy();
   });
 
   it("finishes the run when the stream fails", () => {
-    const engine = new TraceEngine({ autoplay: false });
-    engine.submit(true);
+    const engine = new TraceEngine();
+    engine.submit("please forward confirmation");
     engine.finishLive("connection reset");
     expect(engine.getState().live?.error).toBe("connection reset");
     expect(engine.getState().log.at(-1)).toContain("connection reset");

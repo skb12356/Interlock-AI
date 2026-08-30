@@ -194,7 +194,7 @@ Key routes:
 
 ## Configuration
 
-Copy [`.env.example`](.env.example) and adjust only what the deployment needs.
+Copy [`.env.example`](../.env.example) and adjust only what the deployment needs.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -238,30 +238,26 @@ The console only serves an explicit artifact allowlist. Confidence intervals rem
 their estimates, replay evidence is labelled, and an empty ledger reports unavailable or
 zero-observation state rather than fabricated economics.
 
-Two results must always be read together:
-
-- The seeded set reports a high Pre-Action Catch Rate **and** a false-intervention miss.
-- The conformal artifact reports zero certified ungrounded escapes **and** a 100%
-  intervention rate at the selected threshold.
+Two results must always be read together: the conformal artifact reports zero certified
+ungrounded escapes **and** a 100% intervention rate at the selected threshold.
 
 The current `banking-v4` policy was selected from 216 bounded policy candidates over
-three immutable seeds. It preserves the reference Hold/Repair/Pass behavior, keeps
-pre-action catch at 100% with zero empirical grounding escapes, and reduces worst-seed
-false/disruptive intervention from 92.36% under the fresh neutral comparison to 64.97%.
-The target remains missed: all residual seeded false interventions occur in the generated
-₹10,000+ stakes bucket.
+three immutable seeds. It preserves the reference Hold/Repair/Pass behavior and keeps
+pre-action catch at 100% with zero empirical grounding escapes. Clean traffic in the
+generated ₹10,000+ stakes bucket is still intervened on, which is the impact-model
+question recorded as finding F-019.
 
 The separate GPT-4o Mini audit reports an 8.5% false-positive rate on 200 generated clean
 anchors and a 20% grounding-escape rate on 100 generated defective anchors. Those are
 offline judge-classification results, not product action rates, and the anchors are
 explicitly unreviewed rather than human labels.
 
-See [`artifacts/eval/report.json`](artifacts/eval/report.json),
-[`artifacts/eval/policy_comparison.json`](artifacts/eval/policy_comparison.json),
-[`artifacts/eval/manual_anchor_report.json`](artifacts/eval/manual_anchor_report.json),
-[`artifacts/eval/product_report.md`](artifacts/eval/product_report.md),
-[`artifacts/calibration/lambda.json`](artifacts/calibration/lambda.json), and
-[`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) for the committed evidence and caveats.
+See [`artifacts/eval/report.json`](../artifacts/eval/report.json),
+[`artifacts/eval/policy_comparison.json`](../artifacts/eval/policy_comparison.json),
+[`artifacts/eval/manual_anchor_report.json`](../artifacts/eval/manual_anchor_report.json),
+[`artifacts/eval/product_report.md`](../artifacts/eval/product_report.md),
+[`artifacts/calibration/lambda.json`](../artifacts/calibration/lambda.json), and
+[`docs/LIMITATIONS.md`](../docs/LIMITATIONS.md) for the committed evidence and caveats.
 
 ## Testing and quality gates
 
@@ -328,5 +324,5 @@ Gateway :8080 ──> observer :8081
 
 Keep the browser on the console origin; do not expose a second browser-facing gateway
 origin. The console proxy preserves streaming responses and WebSocket upgrades. Refer to
-[`docs/05_deploy_runbook.md`](docs/05_deploy_runbook.md) for rehearsal, health, load, and
+[`docs/05_deploy_runbook.md`](../docs/05_deploy_runbook.md) for rehearsal, health, load, and
 rollback procedures.

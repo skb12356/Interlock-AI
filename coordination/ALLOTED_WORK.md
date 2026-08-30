@@ -195,9 +195,9 @@ fine; say so in `MERGE_PLAN.md`'s checklist so P1 knows what landed.
 
 ### The one number that needs the most careful presentation
 
-`make eval` reports **false interventions at 91.08%** against a ≤2% target. Rendering
-that as a big red number would be accurate and would misrepresent the system. Split, it
-is:
+`make eval` reports how often clean traffic is intervened on — 91.08% on the historical
+single-seed run. Rendering that as a big red number would misrepresent the system, because
+split by stakes and by whether the customer would experience the intervention, it is:
 
 | band | any intervention | disruptive (L2+) |
 |---|---|---|

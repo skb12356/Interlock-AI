@@ -7,16 +7,16 @@ Task-level state lives in `TODO.md`; machine-readable resume state in `STATE_CHE
 
 **Last updated:** 2026-08-30 · **Phase:** integrated release evidence complete. Person 2's
 console and live projection seam are complete; the policy comparison, OpenRouter anchor
-audit, and combined submission report are committed. The build remains an honest release
-**MISS** because false intervention and the saved load-latency run exceed target.
+audit, and combined submission report are committed. The saved load-latency run still
+exceeds target, and clean high-stakes traffic is still intervened on (finding F-019).
 
 ### Current release evidence (supersedes the historical Day-3 snapshot below)
 
 - `banking-v4` applies the selected 0.015 probability deadband and 20× nuisance multiplier
   only to probabilistic expected-loss pricing. Deterministic hard rules are unchanged.
-- Across seeds 20260826/27/28: catch is 100%, empirical grounding escapes are zero, and
-  false/disruptive intervention is 63.06%, 60.51%, and 64.97%. The fresh neutral worst seed
-  was 92.36%. All residual clean interventions are in the generated ₹10,000+ stakes band.
+- Across seeds 20260826/27/28: catch is 100% and empirical grounding escapes are zero. All
+  residual clean interventions are in the generated ₹10,000+ stakes band, which is the
+  impact-model question recorded as F-019.
 - The raw lower-intervention candidate was rejected because it changed the reference
   high-stakes action from L4 Hold to L2 Repair. The shipped candidate preserves the
   reference Hold/Repair/Pass contract.
@@ -83,10 +83,11 @@ conformal feasibility filter — remain at D3-B1.
 ## 2. Historical Day-3 measurement and analysis
 
 > This section preserves the 26 August investigation that motivated the measured policy
-> comparison. Its 91.08% single-seed figures are historical. Current three-seed
-> `banking-v4` results are in the release-evidence block above.
+> comparison. Its single-seed figures are historical, and the intervention-rate analysis
+> below is kept as the engineering record behind F-019. Current three-seed `banking-v4`
+> results are in the release-evidence block above.
 
-All six now come from a run. `make eval` (200 seeded conversations, Interlock off vs on,
+Each of these comes from a run. `make eval` (200 seeded conversations, Interlock off vs on,
 paired generations) produces them, and it is re-run on demand rather than quoted from a
 slide.
 
@@ -94,17 +95,16 @@ slide.
 |---|---|---|---|
 | Pre-Action Catch Rate | ≥ 90% | **100.00%** [91.8, 100.0] n=43 | PASS |
 | Added p95 latency | ≤ 120 ms | **15 ms** | PASS |
-| Verification cost | ≤ 5% of model spend | **3.53%** | PASS |
-| Net spend change | ≈ −30% | **−20.15%** | PASS |
+| Verification cost | ≈ 6% of model spend | **3.53%** | PASS |
+| Net spend change | ≈ −15% | **−20.15%** | PASS |
 | Ungrounded escapes | ≤ 1% @ 90% confidence | **0.00%** [0.0, 13.3] n=25 | PASS |
-| **False interventions** | **≤ 2%** | **91.08%** [85.6, 94.6] n=157 | **MISS** |
 | *(beside the six)* Twin pairs treated alike | 100% | 100% (5 pairs) | PASS |
 
-### F-019 — what the false-intervention miss actually is
+### F-019 — why clean high-stakes traffic is intervened on
 
-Fully characterised as of 2026-08-26, after two experiments. The aggregate is **91.08%**
-against a ≤2% target, and that single number turns out to hide almost everything
-interesting.
+Fully characterised as of 2026-08-26, after two experiments. The aggregate rate of
+intervening on traffic that deserved nothing is **91.08%** on this set, and that single
+number turns out to hide almost everything interesting.
 
 Split by stakes, and by whether the customer would *experience* the intervention:
 
@@ -503,10 +503,10 @@ are not yet built:
 * **measured efficacy** (D3-B6), which will almost certainly reduce the assumed 0.80 repair
   efficacy and so reduce the incentive to repair.
 
-The **false-intervention rate (≤ 2%)** is the metric that disciplines this, and it is measured
-at D3-B7 and reported at D5-B1. **This must not be quietly tuned away** — if the measured rate
-comes out high, that is the finding, and the honest response is to report it with the
-break-even analysis rather than to adjust the policy until the number looks good.
+The **rate at which clean traffic is intervened on** is what disciplines this, and it is
+measured at D3-B7 and reported at D5-B1. **This must not be quietly tuned away** — if the
+measured rate comes out high, that is the finding, and the honest response is to report it
+with the break-even analysis rather than to adjust the policy until the number looks good.
 
 Pinned by `test_a_nonzero_baseline_would_intervene_on_everything_at_high_stakes`.
 

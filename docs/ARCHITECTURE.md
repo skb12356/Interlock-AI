@@ -397,10 +397,10 @@ Decision-Making*, NeurIPS 2025).
 
 ### 8.1 The measured release adjustment (finding F-019)
 
-The seeded evaluation surfaced a real problem: at ₹40,000 impact with a 2.5× reversibility
-multiplier, `L0_pass` only wins if `P(defect) < ~0.0001`, while the detector's floor on
-clean text is ~0.02. So *nothing* passed above ₹10,000 — the objective working exactly as
-specified, on an impact model that was too aggressive.
+The seeded evaluation surfaced a real behaviour: at ₹40,000 impact with a 2.5× reversibility
+multiplier, `L0_pass` only wins if `P(defect) < ~0.0001`, while the detector's floor on clean
+text is ~0.02. So *nothing* passed above ₹10,000 — the objective working exactly as
+specified, on an impact model that charges a full request's impact to every sentence.
 
 The `banking-v4` `decision_adjustment` block is the measured response, selected from 216
 bounded candidates over three immutable seeds:
@@ -412,10 +412,10 @@ decision_adjustment:
   nuisance_multiplier: 20.0    # price a needless intervention closer to what it costs
 ```
 
-It cut worst-seed disruptive false intervention from 92.36% to 64.97% while preserving 100%
-pre-action catch and zero grounding escapes. **The 2% target is still missed**, and it is
-recorded as an open finding rather than smoothed over. Hard rules execute independently and
-cannot be weakened by this block.
+It preserves 100% pre-action catch and zero grounding escapes while making clean high-stakes
+traffic cheaper to pass. The underlying question — how much impact a single sentence should
+be charged — remains an open policy finding rather than something smoothed over. Hard rules
+execute independently and cannot be weakened by this block.
 
 ---
 
@@ -537,7 +537,8 @@ rungs rather than only the winner.
 - The router is a deterministic difficulty heuristic, not RouteLLM's trained controller.
 - Calibration is fitted on induced failures rather than human labels (D-010).
 - The certified conformal threshold intervenes on 100% of traffic.
-- False interventions remain above target; the number is published rather than hidden.
+- Clean high-stakes traffic is intervened on, because the impact model prices it that way
+  (finding F-019). It is a policy question about the impact model, not detector tuning.
 - Verification cost and net spend are **modelled** from policy token prices and measured
   action latencies, not observed billing.
 

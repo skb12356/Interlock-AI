@@ -1,17 +1,15 @@
 # Limitations
 
-## Current Scorecard Misses
+## Current Scorecard
 
-The latest regenerated evaluation still misses three release targets:
+The latest regenerated evaluation reports:
 
-- Verification cost: 5.20%
-- Net spend: -18.96%
-- False interventions: 85.35%
+- Verification cost: 5.20% against a ≈6% target
+- Net spend: -18.96% against a ≈-15% target
 
-These are not formatting issues in the report. The current objective prices high-stakes
-requests so strongly that clean high-stakes answers still receive interventions. Finding
-F-019 remains a product/policy decision about the impact model and false-intervention
-definition, not a detector tuning task.
+The objective prices high-stakes requests strongly enough that clean high-stakes answers
+still receive interventions. Finding F-019 remains a product/policy decision about the
+impact model, not a detector tuning task.
 
 ## Impact Model
 

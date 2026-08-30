@@ -65,7 +65,7 @@ audit, and combined submission report are committed. The build remains an honest
 | **Observer (real weights)** | optional profile | implementation exists; two tests skip without torch/weights |
 | Generated anchor audit (300) | **built/measured** | OpenRouter GPT-4o Mini; explicitly unreviewed, not human labels |
 | Demo app UI | **built** | deterministic replay plus live SSE/projection paths |
-| Operator console (stage-flow rebuild) | **built** | `console/src/theater/`; 67 vitest cases, demo + live paths |
+| Operator console (chat front door + stage trace) | **built** | `console/src/chat/` + `console/src/theater/`; 77 vitest cases, 12 browser journeys, live path only |
 | Governor / degradation order | **built** | D2-A6 — invariant 4 asserted in both directions; `/admin/governor` |
 | **Governor / Lane C / console** | **built** | live projections, offline fairness, evidence and operator workspaces |
 
@@ -396,6 +396,34 @@ on the server. The design's tokens, geometry, timings and copy are reproduced ex
 only the framework underneath differs. `@xyflow/react` was not added (the design is a
 stage machine, not a node canvas) and `recharts` was removed with the old evidence
 charts.
+
+### D-016 — The console's front door is a chat workspace, and demo mode is gone
+**Reality:** the console opens on a chat session list, the way an assistant product
+does. A prompt runs one real gateway request; the answer carries the seven Interlock
+stages that produced it and a **see it live** link into the full stage trace.
+
+Three consequences, all deliberate:
+
+- **The demo/live switch and the seeded fixtures were deleted.** The console has one
+  mode. Nothing on screen is a replayed script any more, so nothing can be mistaken for
+  one. This supersedes the demo half of D-012's build; the replay *backend* is still how
+  the console is exercised without Ollama, but that is the backend replaying recorded
+  streams, not the front end animating a fixture.
+- **Playback controls went with it.** There is no pause and no step forward or back,
+  because there is no timeline to scrub: stages advance when frames arrive. The rail
+  still jumps between stages of a finished trace.
+- **The elapsed clock stops.** It froze the reading and reports the time the request
+  actually took; it used to keep counting after the stream had ended.
+
+Finished traces are kept per turn in `localStorage` so the stage view can be reopened
+without asking the backend to run the request again. That store is a convenience only —
+the authoritative record of any request is the trace the gateway wrote.
+
+### D-017 — The transcript hides the model's `<think>` block
+**Reality:** some upstream models stream a `<think>` preamble. Stage 02 shows the raw
+generation verbatim, because that is the provider's own bytes, but the chat answer and
+the release card show the text with that block removed — it is not what the customer
+was shown.
 
 ### D-013 — Live mode never fabricates a per-check latency
 **Design handoff:** lane A shows six checks, each with its own millisecond figure.

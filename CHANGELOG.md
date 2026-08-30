@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-30 (later)
+
+- Rebuilt the console front door as a chat workspace: sessions in a sidebar, one real
+  gateway request per prompt, and the seven Interlock stages reported inline beside the
+  answer with a **see it live** link into the full stage trace.
+- Removed demo mode entirely — the mode switch, the seeded scene fixtures and the
+  scripted choreography are gone, and the engine is live-only.
+- Fixed the elapsed clock: it stops when the stream ends and reports the time the
+  request took, instead of counting on afterwards.
+- Removed the pause and step controls from the trace footer, and replaced them with
+  back-to-chat and new-session actions.
+- Redesigned the navbar around a segmented Chat / Trace / Reviews / Evidence control
+  with the gateway health read-out and no mode switch.
+- The decision loss table is now awaited before a trace is stored, so a reopened trace
+  shows its priced ladder rather than an empty stage 04.
+
 ## 2026-08-30
 
 - Compared 216 policy adjustments over three immutable seeds, added catch/escape and

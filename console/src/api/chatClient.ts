@@ -4,7 +4,11 @@ import { getDecisionDetail } from "./consoleClient";
 
 export interface ChatRequest {
   prompt: string;
-  scenario: "clean" | "scene1" | "held" | "blocked";
+  /**
+   * Only used against the replay server, which otherwise picks a recorded trace
+   * from the prompt text. The real gateway ignores it.
+   */
+  scenario?: "clean" | "scene1" | "held" | "blocked";
   replay?: boolean;
   fragments?: RetrievedFragment[];
   signal?: AbortSignal;
@@ -30,7 +34,7 @@ export async function streamChat(
       model: "interlock",
       messages: [{ role: "user", content: request.prompt }],
       stream: true,
-      ...(request.replay === false ? {} : { scenario: request.scenario }),
+      ...(request.replay === false || !request.scenario ? {} : { scenario: request.scenario }),
       ...(request.fragments?.length ? { interlock: { retrieved: request.fragments } } : {}),
     }),
     signal: request.signal,

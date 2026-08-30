@@ -86,6 +86,7 @@ export function StageView({
 
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
         <div
+          className="il-stage-heading"
           style={{
             display: "flex",
             alignItems: "flex-start",
@@ -124,15 +125,19 @@ export function StageView({
           </div>
         </div>
 
-        <div style={{ display: "grid", placeItems: "center", padding: "26px 34px 8px", minHeight: "132px" }}>
+        <div
+          className="il-stage-board"
+          style={{ display: "grid", placeItems: "center", padding: "26px 34px 8px", minHeight: "132px" }}
+        >
           <SplitFlapBoard board={state.board} tone={state.boardTone} />
         </div>
 
-        <div className="il-scroll" style={{ flex: 1, minHeight: 0, padding: "14px 34px 26px" }}>
+        <div className="il-scroll il-stage-scroll" style={{ flex: 1, minHeight: 0, padding: "14px 34px 26px" }}>
           {body}
         </div>
 
         <div
+          className="il-stage-footer"
           style={{
             height: "56px",
             flex: "none",
@@ -163,6 +168,7 @@ export function StageView({
 
           <div
             aria-hidden="true"
+            className="il-stage-progress"
             style={{ flex: 1, height: "3px", borderRadius: "2px", background: "rgba(230,225,215,.08)" }}
           >
             <span
@@ -177,9 +183,11 @@ export function StageView({
             />
           </div>
 
-          <MicroLabel style={{ whiteSpace: "nowrap" }}>
-            {stage.n} / 07 · {state.log.at(-1) ?? "awaiting first event"}
-          </MicroLabel>
+          <span className="il-stage-status">
+            <MicroLabel style={{ whiteSpace: "nowrap" }}>
+              {stage.n} / 07 · {state.log.at(-1) ?? "awaiting first event"}
+            </MicroLabel>
+          </span>
 
           <button
             type="button"

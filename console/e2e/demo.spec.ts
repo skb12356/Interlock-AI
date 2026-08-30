@@ -37,6 +37,12 @@ test.describe("demo traces", () => {
     await jumpToStage(page, "Release");
     await expect(page.getByText("L0 PASS", { exact: true })).toBeVisible();
     await expect(page.getByText("What would have shipped without Interlock")).toBeVisible();
+    const pageWidth = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      content: document.documentElement.scrollWidth,
+    }));
+    const configuredWidth = testInfo.project.name === "mobile" ? 390 : 1440;
+    expect(pageWidth).toEqual({ viewport: configuredWidth, content: configuredWidth });
     await page.screenshot({ path: testInfo.outputPath("release-l0.png"), fullPage: true });
     expect(failures).toEqual([]);
   });

@@ -41,6 +41,33 @@ input {
   scrollbar-color: rgba(230, 225, 215, 0.18) transparent;
 }
 
+@media (max-width: 600px) {
+  .il-stage-heading {
+    gap: 10px !important;
+    padding: 18px 16px 0 !important;
+  }
+
+  .il-stage-board {
+    min-height: 108px !important;
+    padding: 20px 16px 8px !important;
+  }
+
+  .il-stage-scroll {
+    padding: 12px 16px 22px !important;
+  }
+
+  .il-stage-footer {
+    gap: 10px !important;
+    justify-content: space-between;
+    padding: 0 16px !important;
+  }
+
+  .il-stage-progress,
+  .il-stage-status {
+    display: none !important;
+  }
+}
+
 @keyframes ilPulse {
   0%,
   100% {

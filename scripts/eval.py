@@ -17,13 +17,16 @@ import asyncio
 import json
 import sys
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from interlock.core.policy import load_policy  # noqa: E402
 from interlock.eval.harness import run_eval  # noqa: E402
+from interlock.eval.metrics import MetricSet  # noqa: E402
 from interlock.eval.seeded import CASE_COUNTS, build_seeded_set  # noqa: E402
 from interlock.interlock_tools.holds import ToolInterlock  # noqa: E402
 from interlock.ledger.writer import Ledger  # noqa: E402
@@ -33,6 +36,32 @@ from interlock.risk.engine import RealRiskEngine, load_conformal  # noqa: E402
 from interlock.signals.canary import CanaryDetector, CanaryRegistry  # noqa: E402
 
 CALIBRATION_DIR = REPO_ROOT / "artifacts" / "calibration"
+
+
+def build_report_payload(
+    *,
+    seed: int,
+    conformal_filter: bool,
+    n_cases: int,
+    n_defective: int,
+    policy_version: str,
+    metrics: MetricSet,
+    actions: Mapping[str, int],
+    misses: Sequence[Mapping[str, str]],
+) -> dict[str, Any]:
+    """Build the stable flat JSON contract consumed by submission tooling."""
+    metric_payload = metrics.to_dict()
+    return {
+        "seed": seed,
+        "conformal_filter": conformal_filter,
+        "n_cases": n_cases,
+        "n_defective": n_defective,
+        "policy_version": policy_version,
+        "metrics": metric_payload["metrics"],
+        "notes": metric_payload["notes"],
+        "actions": dict(actions),
+        "misses": [dict(miss) for miss in misses],
+    }
 
 
 async def main() -> int:
@@ -120,24 +149,19 @@ async def main() -> int:
             case = by_id[outcome.case_id]
             print(f"    {outcome.case_id:26} {outcome.action:12} {case.note[:70]}")
 
+    report = build_report_payload(
+        seed=args.seed,
+        conformal_filter=args.conformal_filter,
+        n_cases=len(cases),
+        n_defective=defective,
+        policy_version=policy.policy_version,
+        metrics=metrics,
+        actions=dict(Counter(o.action for o in on.outcomes)),
+        misses=[{"case_id": o.case_id, "category": o.category, "action": o.action} for o in misses],
+    )
     args.json.parent.mkdir(parents=True, exist_ok=True)
     args.json.write_text(
-        json.dumps(
-            {
-                "seed": args.seed,
-                "conformal_filter": args.conformal_filter,
-                "n_cases": len(cases),
-                "n_defective": defective,
-                "policy_version": policy.policy_version,
-                "metrics": metrics.to_dict(),
-                "actions": dict(Counter(o.action for o in on.outcomes)),
-                "misses": [
-                    {"case_id": o.case_id, "category": o.category, "action": o.action}
-                    for o in misses
-                ],
-            },
-            indent=2,
-        ),
+        json.dumps(report, indent=2),
         encoding="utf-8",
     )
     print(f"\n  wrote {args.json}")

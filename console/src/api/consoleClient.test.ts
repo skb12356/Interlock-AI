@@ -42,7 +42,7 @@ describe("console client hold operations", () => {
     expect(JSON.stringify(holds)).not.toContain("resume_token");
   });
 
-  it("sends the secret only for approval and no request body for rejection", async () => {
+  it("sends the secret only for approval and an empty JSON object for rejection", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ state: "approved" }), { status: 200 }),
     );
@@ -58,7 +58,7 @@ describe("console client hold operations", () => {
     expect(fetcher).toHaveBeenNthCalledWith(
       2,
       "/gateway/v1/holds/hld_1/reject",
-      expect.not.objectContaining({ body: expect.anything() }),
+      expect.objectContaining({ body: JSON.stringify({}) }),
     );
   });
 
@@ -118,6 +118,7 @@ describe("console client evidence projections", () => {
       evaluation: { metrics: [], notes: ["Generation is held fixed."] },
       latency: [],
       laneC: { n_pairs: 2 },
+      ledger: { request_count: 4, economics: { available: false } },
     });
   });
 

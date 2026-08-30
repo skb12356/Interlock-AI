@@ -118,4 +118,5 @@ export interface EvidenceBundle {
   evaluation: EvaluationReport | null;
   latency: ActionLatency[] | null;
   laneC: LaneCProjection | null;
+  ledger: LedgerSummary | null;
 }

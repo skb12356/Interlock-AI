@@ -4,6 +4,7 @@ import { ConsoleApiError, getEvidenceBundle, getHolds, getStatus, resolveHold } 
 import type { HoldProjection } from "./domain/contracts";
 import type { ConsoleStatus, EvidenceBundle } from "./domain/evidence";
 import { ResumeTokenVault } from "./security/resumeTokens";
+import { useProjectionHistory } from "./state/useProjectionHistory";
 import { EvidencePanel } from "./theater/EvidencePanel";
 import { runLiveTrace } from "./theater/liveRun";
 import { Header, type View } from "./theater/Header";
@@ -21,6 +22,7 @@ const emptyEvidence: EvidenceBundle = {
   evaluation: null,
   latency: null,
   laneC: null,
+  ledger: null,
 };
 
 /** Playback settings are read once from the URL so a demo can be re-paced without a rebuild. */
@@ -38,6 +40,7 @@ function readSettings(): { pace: number; autoplay: boolean; currency: "rupee" | 
 export function App() {
   const [settings] = useState(readSettings);
   const { engine, state } = useTraceEngine(settings);
+  const projection = useProjectionHistory();
   const [view, setView] = useState<View>("live");
 
   const [consoleStatus, setConsoleStatus] = useState<ConsoleStatus | null>(null);
@@ -145,7 +148,7 @@ export function App() {
     state.mode === "demo"
       ? "cached · :8080 idle"
       : consoleStatus
-        ? `gateway :8080 ${consoleStatus.source === "live" ? "connected" : "replay"}`
+        ? `gateway :8080 ${consoleStatus.source === "live" ? "connected" : "replay"} · history ${projection.status} · ${Object.keys(projection.state.requests).length} traces`
         : "gateway :8080 connecting";
 
   return (

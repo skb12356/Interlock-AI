@@ -2,11 +2,7 @@ import type { HoldProjection } from "../domain/contracts";
 import { MicroLabel } from "./primitives";
 import { color, font, radius } from "./tokens";
 
-/**
- * Reviews workspace. Real holds come from the gateway projection; the demo
- * fixtures below stand in when the backend is not attached, so the workspace
- * is never an empty grey box in front of an audience.
- */
+/** Reviews workspace. Every card comes from the durable gateway projection. */
 
 export interface HoldCard {
   id: string;
@@ -22,43 +18,6 @@ export interface HoldCard {
   flaggedSpan: string | null;
   hasToken: boolean;
 }
-
-const DEMO_HOLDS: HoldCard[] = [
-  {
-    id: "HLD-4471",
-    kind: "tool_call",
-    title: "Irreversible transfer requested from an untrusted claim",
-    summary:
-      "The draft asserted a settlement date that no retrieved document supports, then attempted a confirmation email tool call.",
-    tool: "mail.send",
-    sentence: "idx 1",
-    impact: "₹48,000",
-    sla: "SLA 3h 41m",
-    slaExpired: false,
-    evidence: [
-      "claim verifier: settlement date unsupported by d017, d022",
-      "provenance: value originated in user turn, not retrieval",
-      "reversibility: irreversible — outbound customer mail",
-    ],
-    flaggedSpan: "settled in full on 14 August and the\nconfirmation letter has been emailed",
-    hasToken: true,
-  },
-  {
-    id: "HLD-4468",
-    kind: "response",
-    title: "Fee schedule quoted from a superseded document",
-    summary:
-      "Retrieval returned d031, which the corpus manifest marks as replaced. Repair was priced higher than a hold.",
-    tool: "—",
-    sentence: "idx 3",
-    impact: "₹12,500",
-    sla: "SLA expired",
-    slaExpired: true,
-    evidence: [],
-    flaggedSpan: null,
-    hasToken: false,
-  },
-];
 
 function formatSla(hold: HoldProjection): { text: string; expired: boolean } {
   if (hold.expired || hold.sla_deadline_ts === null) return { text: "SLA expired", expired: true };
@@ -105,9 +64,6 @@ export function ReviewsPanel({
   onReject: (holdId: string) => void;
   onRefresh: () => void;
 }) {
-  const usingFixtures = holds.length === 0;
-  const cards = usingFixtures ? DEMO_HOLDS : holds;
-
   return (
     <section
       style={{
@@ -129,8 +85,9 @@ export function ReviewsPanel({
             Pending reviews
           </h2>
           <p style={{ margin: "12px 0 0", maxWidth: "600px", font: `400 14px/1.65 ${font.sans}`, color: color.textDim }}>
-            Two holds are waiting on a human. Resolving a hold needs the resume token issued on its stream — tokens are
-            held in memory only.
+            {holds.length === 0
+              ? "No holds are waiting on a human. The queue is a live durable projection."
+              : `${holds.length} hold${holds.length === 1 ? " is" : "s are"} waiting on a human. Approval uses the initiating stream token; rejection never requires it.`}
           </p>
         </div>
         <button
@@ -159,13 +116,13 @@ export function ReviewsPanel({
         </p>
       ) : null}
 
-      {usingFixtures ? (
-        <MicroLabel tone={color.warn}>
-          Seeded fixtures · no pending hold was returned by the projection
-        </MicroLabel>
+      {holds.length === 0 && !loading ? (
+        <p style={{ margin: 0, padding: "22px", border: `1px solid ${color.line}`, borderRadius: radius.card, color: color.textDim }}>
+          No pending holds.
+        </p>
       ) : null}
 
-      {cards.map((card, index) => (
+      {holds.map((card, index) => (
         <HoldCardView
           key={card.id}
           card={card}
@@ -192,7 +149,7 @@ function HoldCardView({
   onApprove: () => void;
   onReject: () => void;
 }) {
-  const actionable = card.hasToken && !card.slaExpired;
+  const approvalAvailable = card.hasToken && !card.slaExpired;
   const facts = [
     { label: "Hold id", value: card.id },
     { label: "Tool", value: card.tool },
@@ -318,14 +275,14 @@ function HoldCardView({
           <button
             type="button"
             onClick={onReject}
-            disabled={!actionable || resolving}
+            disabled={resolving}
             style={{
               padding: "9px 16px",
               borderRadius: radius.button,
-              cursor: actionable ? "pointer" : "not-allowed",
-              border: `1px solid ${actionable ? "rgba(217,112,95,.5)" : color.line}`,
+              cursor: resolving ? "not-allowed" : "pointer",
+              border: `1px solid ${resolving ? color.line : "rgba(217,112,95,.5)"}`,
               background: "transparent",
-              color: actionable ? color.fail : color.textFaint,
+              color: resolving ? color.textFaint : color.fail,
               font: `600 12px ${font.sans}`,
             }}
           >
@@ -334,14 +291,14 @@ function HoldCardView({
           <button
             type="button"
             onClick={onApprove}
-            disabled={!actionable || resolving}
+            disabled={!approvalAvailable || resolving}
             style={{
               padding: "9px 16px",
               borderRadius: radius.button,
-              cursor: actionable ? "pointer" : "not-allowed",
-              border: `1px solid ${actionable ? color.pass : color.line}`,
-              background: actionable ? color.pass : "transparent",
-              color: actionable ? color.onAccent : color.textFaint,
+              cursor: approvalAvailable && !resolving ? "pointer" : "not-allowed",
+              border: `1px solid ${approvalAvailable ? color.pass : color.line}`,
+              background: approvalAvailable ? color.pass : "transparent",
+              color: approvalAvailable ? color.onAccent : color.textFaint,
               font: `600 12px ${font.sans}`,
             }}
           >

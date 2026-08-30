@@ -21,6 +21,23 @@ describe("console shell", () => {
     expect(screen.getByRole("button", { name: /Canary leak/ })).toBeInTheDocument();
   });
 
+  it("owns the projection WebSocket used for replay and reconnect history", () => {
+    const urls: string[] = [];
+    class FakeWebSocket {
+      onopen: (() => void) | null = null;
+      onmessage: ((event: MessageEvent<string>) => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(url: string) { urls.push(url); }
+      close() {}
+    }
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+
+    render(<App />);
+
+    expect(urls).toEqual(["ws://localhost:3000/console/ws"]);
+  });
+
   it("replaces the prompt when a scene chip is picked", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -48,18 +65,19 @@ describe("console shell", () => {
     expect(await screen.findByRole("heading", { name: "Release" })).toBeInTheDocument();
   });
 
-  it("shows the review queue and the evidence ledger", async () => {
+  it("shows an honest empty review queue and the evidence ledger", async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.click(screen.getByRole("button", { name: /Reviews/ }));
     const reviews = await screen.findByLabelText("Pending reviews");
-    expect(within(reviews).getByText("HLD-4471")).toBeInTheDocument();
+    expect(within(reviews).getByText("No pending holds.")).toBeInTheDocument();
+    expect(within(reviews).queryByText("HLD-4471")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Evidence/ }));
     const evidence = await screen.findByLabelText("Evidence ledger");
     await waitFor(() => expect(within(evidence).getByText("Pre-action catch rate")).toBeInTheDocument());
-    expect(within(evidence).getByText("MISS")).toBeInTheDocument();
+    expect(within(evidence).getAllByText("Unavailable").length).toBeGreaterThan(0);
   });
 
   it("reads real evidence artifacts when the projection answers", async () => {

@@ -81,17 +81,18 @@ async function getOptionalProjection<T>(path: string, fetcher: typeof fetch): Pr
 }
 
 export async function getEvidenceBundle(fetcher: typeof fetch = fetch): Promise<EvidenceBundle> {
-  const [calibration, conformal, evaluationArtifact, latency, laneC] = await Promise.all([
+  const [calibration, conformal, evaluationArtifact, latency, laneC, ledger] = await Promise.all([
     getArtifact<CalibrationReport>("calibration/report.json", fetcher),
     getArtifact<ConformalReport>("calibration/lambda.json", fetcher),
     getArtifact<EvaluationReport | { metrics: EvaluationReport }>("eval/report-guaranteed.json", fetcher),
     getArtifact<ActionLatency[]>("action_latency.json", fetcher),
     getOptionalProjection<LaneCProjection>("/console/lanec", fetcher),
+    getOptionalProjection<LedgerSummary>("/console/ledger/summary", fetcher),
   ]);
   const evaluation = evaluationArtifact && !("notes" in evaluationArtifact)
     ? evaluationArtifact.metrics
     : evaluationArtifact;
-  return { calibration, conformal, evaluation, latency, laneC };
+  return { calibration, conformal, evaluation, latency, laneC, ledger };
 }
 
 export async function resolveHold(
@@ -101,9 +102,12 @@ export async function resolveHold(
   fetcher: typeof fetch = fetch,
 ): Promise<void> {
   const action = state === "approved" ? "approve" : "reject";
-  const init: RequestInit = { method: "POST" };
+  const init: RequestInit = {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  };
   if (state === "approved") {
-    init.headers = { "content-type": "application/json" };
     init.body = JSON.stringify({ resume_token: resumeToken });
   }
   const response = await fetcher(

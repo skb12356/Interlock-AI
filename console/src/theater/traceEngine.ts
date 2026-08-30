@@ -160,6 +160,7 @@ export class TraceEngine {
   private timers: number[] = [];
   private boardTimer: number | null = null;
   private clockTimer: number | null = null;
+  private autoplayTimer: number | null = null;
   private startedAt = 0;
   private stageStartedAt = 0;
 
@@ -208,6 +209,16 @@ export class TraceEngine {
   private clearStageTimers(): void {
     this.timers.forEach((id) => this.clock.clearTimeout(id));
     this.timers = [];
+    if (this.autoplayTimer !== null) this.clock.clearTimeout(this.autoplayTimer);
+    this.autoplayTimer = null;
+  }
+
+  private scheduleAutoplay(index: number, delayMs: number): void {
+    if (this.autoplayTimer !== null) this.clock.clearTimeout(this.autoplayTimer);
+    this.autoplayTimer = this.clock.setTimeout(() => {
+      this.autoplayTimer = null;
+      if (!this.state.paused && this.state.stage === index) this.go(index + 1);
+    }, Math.max(0, delayMs));
   }
 
   private log(line: string): void {
@@ -309,7 +320,16 @@ export class TraceEngine {
   }
 
   togglePause(): void {
-    this.set({ paused: !this.state.paused });
+    const resuming = this.state.paused;
+    this.set({ paused: !resuming });
+    if (!this.settings.autoplay || this.state.live || this.state.stage >= LAST_STAGE) return;
+    if (!resuming) {
+      if (this.autoplayTimer !== null) this.clock.clearTimeout(this.autoplayTimer);
+      this.autoplayTimer = null;
+      return;
+    }
+    const elapsed = this.clock.now() - this.stageStartedAt;
+    this.scheduleAutoplay(this.state.stage, STAGES[this.state.stage].dwell * this.settings.pace - elapsed);
   }
 
   /* ---- split-flap board ---- */
@@ -349,9 +369,7 @@ export class TraceEngine {
     this.startBoard(scene.board[stage.key], scene.boardTone[stage.key]);
 
     if (!this.state.live && this.settings.autoplay && !this.state.paused && index < LAST_STAGE) {
-      this.at(stage.dwell, () => {
-        if (!this.state.paused) this.go(index + 1);
-      });
+      this.scheduleAutoplay(index, stage.dwell * this.settings.pace);
     }
 
     if (this.state.live) {

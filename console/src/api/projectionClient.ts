@@ -20,7 +20,7 @@ interface SocketLike {
   close: () => void;
 }
 
-type ProjectionStatus = "connecting" | "connected" | "reconnecting" | "stopped";
+export type ProjectionStatus = "connecting" | "connected" | "reconnecting" | "stopped";
 
 interface ProjectionConnectionOptions {
   onEnvelope: (envelope: ConsoleEnvelope) => void;

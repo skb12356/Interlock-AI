@@ -87,6 +87,17 @@ describe("TraceEngine choreography", () => {
     engine.destroy();
   });
 
+  it("continues autoplay after the viewer resumes", () => {
+    const engine = build();
+    engine.submit();
+    engine.togglePause();
+    vi.advanceTimersByTime(STAGES[0].dwell * 2);
+    engine.togglePause();
+    vi.advanceTimersByTime(1);
+    expect(engine.getState().stage).toBe(1);
+    engine.destroy();
+  });
+
   it("cancels a half-finished stage when the viewer jumps", () => {
     const engine = build();
     engine.submit();

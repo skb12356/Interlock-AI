@@ -308,12 +308,15 @@ def test_resolving_twice_conflicts(client: TestClient) -> None:
 
 
 @respx.mock
-def test_a_request_with_no_body_on_reject_is_accepted(client: TestClient) -> None:
-    """curl -X POST with no -d is what a human does during a demo."""
+def test_a_request_with_no_body_on_reject_is_refused_but_empty_json_is_accepted(
+    client: TestClient,
+) -> None:
+    """JSON content blocks cross-site form posts without making rejection need a token."""
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=_tool_call_stream()))
     client.post("/v1/chat/completions", json=_request([POISONED_CONTEXT]))
     hold_id = client.get("/v1/holds").json()["holds"][0]["hold_id"]
-    assert client.post(f"/v1/holds/{hold_id}/reject").status_code == 200
+    assert client.post(f"/v1/holds/{hold_id}/reject").status_code == 415
+    assert client.post(f"/v1/holds/{hold_id}/reject", json={}).status_code == 200
 
 
 # --------------------------------------------------------------------------- #

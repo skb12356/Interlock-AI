@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 from fastapi.testclient import TestClient
 
-from interlock.console.app import create_console_app, gateway_websocket_url
+from interlock.console.app import create_console_app, gateway_websocket_url, same_origin_websocket
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -83,6 +83,12 @@ def test_websocket_proxy_uses_the_gateway_console_endpoint() -> None:
     assert gateway_websocket_url("https://bank.example/base") == (
         "wss://bank.example/base/console/ws"
     )
+
+
+def test_production_console_websocket_rejects_cross_site_origins() -> None:
+    assert same_origin_websocket(None, "bank.example")
+    assert same_origin_websocket("https://bank.example", "bank.example")
+    assert not same_origin_websocket("https://evil.example", "bank.example")
 
 
 def test_native_supervisor_builds_react_and_has_no_duplicate_plain_js_console() -> None:

@@ -44,6 +44,13 @@ def gateway_websocket_url(gateway_url: str) -> str:
     return urlunsplit((scheme, parsed.netloc, path, "", ""))
 
 
+def same_origin_websocket(origin: str | None, host: str) -> bool:
+    """WebSocket handshakes are not protected by CORS; enforce browser same-origin."""
+    if not origin:
+        return True
+    return urlsplit(origin.rstrip("/")).netloc == host
+
+
 def _forward_headers(headers: httpx.Headers) -> dict[str, str]:
     return {
         name: value for name, value in headers.items() if name.lower() not in HOP_BY_HOP_HEADERS
@@ -123,6 +130,12 @@ def create_console_app(
 
     @application.websocket("/console/ws")
     async def console_websocket(browser: WebSocket) -> None:
+        if not same_origin_websocket(
+            browser.headers.get("origin"),
+            browser.headers.get("host", ""),
+        ):
+            await browser.close(code=1008, reason="websocket origin is not allowed")
+            return
         await browser.accept()
         try:
             async with connect(gateway_websocket_url(resolved_gateway)) as upstream:

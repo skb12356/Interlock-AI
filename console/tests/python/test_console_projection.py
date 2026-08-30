@@ -11,7 +11,23 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from interlock.gateway.console_ws import ConsoleHub, LiveConsoleSource, router
+from interlock.gateway.console_ws import (
+    ConsoleHub,
+    LiveConsoleSource,
+    router,
+    websocket_origin_allowed,
+)
+
+
+def test_websocket_origin_rejects_cross_site_browsers_and_allows_non_browser_clients() -> None:
+    assert websocket_origin_allowed(None, "bank.example")
+    assert websocket_origin_allowed("https://bank.example", "bank.example")
+    assert not websocket_origin_allowed("https://evil.example", "bank.example")
+    assert websocket_origin_allowed(
+        "http://localhost:5173",
+        "127.0.0.1:8080",
+        configured="http://localhost:5173",
+    )
 
 
 class StaticSource:

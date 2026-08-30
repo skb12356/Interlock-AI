@@ -107,7 +107,7 @@ class Settings:
     upstream_connect_timeout_s: float = 10.0
     upstream_read_timeout_s: float = 120.0
     #: Fraction of strong-tier traffic replayed asynchronously on the cheap tier.
-    shadow_sample_rate: float = 0.05
+    shadow_sample_rate: float = 0.0
 
     # -- storage ------------------------------------------------------------ #
     db_path: Path = REPO_ROOT / "data" / "interlock.db"
@@ -179,7 +179,7 @@ def load_settings() -> Settings:
         lane_a_deadline_ms=_env_float("INTERLOCK_LANE_A_DEADLINE_MS", 120.0),
         observe_deadline_ms=_env_float("INTERLOCK_OBSERVE_DEADLINE_MS", 800.0),
         sentence_watchdog_s=_env_float("INTERLOCK_SENTENCE_WATCHDOG_S", 8.0),
-        shadow_sample_rate=_env_float("INTERLOCK_SHADOW_SAMPLE_RATE", 0.05),
+        shadow_sample_rate=_env_float("INTERLOCK_SHADOW_SAMPLE_RATE", 0.0),
         db_path=Path(_env("INTERLOCK_DB_PATH", str(REPO_ROOT / "data" / "interlock.db"))),
         policy_path=Path(
             _env("INTERLOCK_POLICY_PATH", str(REPO_ROOT / "policies" / "banking.yaml"))

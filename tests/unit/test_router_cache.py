@@ -183,6 +183,21 @@ def test_a_merely_similar_question_misses() -> None:
     assert cosine([1.0, 0.0, 0.0], [0.8, 0.6, 0.0]) < SIMILARITY_THRESHOLD
 
 
+def test_identical_last_question_cannot_cross_full_prompt_scopes() -> None:
+    """Prior/system messages may contain customer secrets even when the final question is generic."""
+    cache = _cache()
+    assert _stored(cache, [1.0, 0.0, 0.0], scope_digest="customer-a-full-prompt")
+    result = cache.lookup(
+        question="What is the annual fee?",
+        embedding=[1.0, 0.0, 0.0],
+        retrieved=[CLEAN],
+        stakes_inr=200.0,
+        scope_digest="customer-b-full-prompt",
+    )
+    assert not result.hit
+    assert "prompt scope" in result.reason
+
+
 def test_a_changed_context_misses_and_says_why() -> None:
     """THE condition people leave out. A clause is superseded, a rate card expires -- an
     answer correct against last month's context is wrong now and looks perfectly

@@ -82,6 +82,7 @@ class CacheEntry:
     action: str
     model: str
     policy_version: str
+    scope_digest: str = ""
     stored_ts: float = 0.0
 
 
@@ -138,6 +139,7 @@ class SemanticCache:
         embedding: Sequence[float],
         retrieved: Sequence[Fragment],
         stakes_inr: float,
+        scope_digest: str = "",
     ) -> CacheLookup:
         """All four conditions, in the order that fails cheapest first."""
         if stakes_inr > self.max_stakes_inr:
@@ -165,6 +167,8 @@ class SemanticCache:
                 continue
             if entry.policy_version != self.policy_version:
                 continue
+            if entry.scope_digest != scope_digest:
+                continue
             best, best_similarity = entry, similarity
 
         if best is None:
@@ -173,7 +177,7 @@ class SemanticCache:
                     "question matched but the retrieved context has changed -- a document "
                     "was superseded or re-uploaded, so the cached answer is stale"
                 )
-            return self._miss("no sufficiently similar question")
+            return self._miss("no sufficiently similar question in the same full prompt scope")
 
         self._entries.move_to_end(next(k for k, v in self._entries.items() if v is best))
         self.hits += 1
@@ -189,6 +193,7 @@ class SemanticCache:
         stakes_inr: float,
         action: str,
         model: str,
+        scope_digest: str = "",
         ts: float = 0.0,
     ) -> bool:
         """Store, if the answer earned it. Returns whether it was stored.
@@ -204,7 +209,9 @@ class SemanticCache:
         if not embedding:
             return False
 
-        key = hashlib.sha256(f"{question}|{context_hash(retrieved)}".encode()).hexdigest()[:32]
+        key = hashlib.sha256(
+            f"{scope_digest}|{question}|{context_hash(retrieved)}".encode()
+        ).hexdigest()[:32]
         self._entries[key] = CacheEntry(
             question=question,
             answer=answer,
@@ -214,6 +221,7 @@ class SemanticCache:
             action=action,
             model=model,
             policy_version=self.policy_version,
+            scope_digest=scope_digest,
             stored_ts=ts,
         )
         self._entries.move_to_end(key)

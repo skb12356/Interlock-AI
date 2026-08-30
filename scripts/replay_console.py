@@ -457,7 +457,9 @@ def build_app(*, token_delay_s: float = TOKEN_DELAY_S) -> FastAPI:
         return {"hold_id": hold_id, "state": "approved"}
 
     @app.post("/v1/holds/{hold_id}/reject")
-    async def reject(hold_id: str) -> Any:
+    async def reject(hold_id: str, request: Request) -> Any:
+        if request.headers.get("content-type", "").split(";", 1)[0].strip() != "application/json":
+            return JSONResponse({"error": {"message": "hold resolution requires JSON"}}, 415)
         if app.state.holds.pop(hold_id, None) is None:
             return JSONResponse({"error": {"message": "no pending hold with that id"}}, 404)
         return {"hold_id": hold_id, "state": "rejected"}

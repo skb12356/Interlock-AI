@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import json
 import math
+import os
 import statistics
 import time
 import uuid
@@ -17,10 +18,17 @@ from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, cast
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
-__all__ = ["ConsoleHub", "ConsoleSource", "LiveConsoleSource", "router"]
+__all__ = [
+    "ConsoleHub",
+    "ConsoleSource",
+    "LiveConsoleSource",
+    "router",
+    "websocket_origin_allowed",
+]
 
 REPLAY_BUFFER = 200
 ARTIFACTS_ROOT = Path(__file__).resolve().parents[2] / "artifacts"
@@ -35,6 +43,30 @@ ALLOWED_ARTIFACTS = frozenset(
         "probes/curve.json",
     }
 )
+
+
+def websocket_origin_allowed(
+    origin: str | None,
+    host: str,
+    *,
+    configured: str | None = None,
+) -> bool:
+    """Allow non-browser clients, same-origin browsers and explicit console origins."""
+    if not origin:
+        return True
+    normalized = origin.rstrip("/")
+    parsed = urlsplit(normalized)
+    if parsed.netloc == host:
+        return True
+    host_name = host.partition(":")[0].strip("[]").lower()
+    if host_name in {"localhost", "127.0.0.1", "::1"} and parsed.hostname in {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+    }:
+        return True
+    allowed = configured if configured is not None else os.getenv("INTERLOCK_CONSOLE_ORIGINS", "")
+    return normalized in {item.strip().rstrip("/") for item in allowed.split(",") if item.strip()}
 
 
 def _without_secrets(value: Any) -> Any:
@@ -361,6 +393,12 @@ def _source(request: Request) -> ConsoleSource:
 
 @router.websocket("/ws")
 async def console_ws(websocket: WebSocket) -> None:
+    if not websocket_origin_allowed(
+        websocket.headers.get("origin"),
+        websocket.headers.get("host", ""),
+    ):
+        await websocket.close(code=1008, reason="websocket origin is not allowed")
+        return
     hub: ConsoleHub = websocket.app.state.console_hub
     await hub.connect(websocket)
     try:

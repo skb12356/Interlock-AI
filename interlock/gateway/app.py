@@ -1043,6 +1043,7 @@ async def _stream_response(
         )
         _store_cache(
             app=app,
+            body=original_body,
             question=_last_user_message(original_body),
             answer="".join(answer_parts).strip(),
             lane=lane,
@@ -1194,6 +1195,7 @@ def _cache_lookup(app: FastAPI, body: dict[str, Any], lane: PreflightResult) -> 
             embedding=embedding,
             retrieved=lane.fragments,
             stakes_inr=lane.stakes.impact_inr,
+            scope_digest=_cache_scope_digest(body),
         )
     except Exception:
         _log.debug("semantic cache lookup failed", exc_info=True)
@@ -1203,6 +1205,7 @@ def _cache_lookup(app: FastAPI, body: dict[str, Any], lane: PreflightResult) -> 
 def _store_cache(
     *,
     app: FastAPI,
+    body: dict[str, Any],
     question: str,
     answer: str,
     lane: PreflightResult,
@@ -1225,9 +1228,17 @@ def _store_cache(
             stakes_inr=lane.stakes.impact_inr,
             action="L0_pass",
             model=model,
+            scope_digest=_cache_scope_digest(body),
         )
     except Exception:
         _log.debug("semantic cache store failed", exc_info=True)
+
+
+def _cache_scope_digest(body: dict[str, Any]) -> str:
+    """Bind a cache entry to the complete effective prompt and request options."""
+    effective = {key: value for key, value in body.items() if key != "stream"}
+    canonical = json.dumps(effective, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 async def _complete_capacity_fallback(
@@ -1550,6 +1561,13 @@ def _usage(result: dict[str, Any], key: str) -> int:
 
 async def _resolve_hold(app: FastAPI, hold_id: str, request: Request, *, state: str) -> Any:
     """Shared approve/reject handling."""
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].strip()
+    if content_type != "application/json":
+        return _error_response(
+            "hold resolution requires application/json",
+            status=415,
+            code="unsupported_media_type",
+        )
     try:
         payload = await request.json()
     except (json.JSONDecodeError, UnicodeDecodeError):

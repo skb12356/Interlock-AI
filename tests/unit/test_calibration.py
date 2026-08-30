@@ -20,6 +20,7 @@ import pytest
 from interlock.core.types import Fragment
 from interlock.eval.induce import FAILURE_MODES, TripleGenerator
 from interlock.retrieval import corpus_chunks, load_corpus
+from interlock.retrieval.chunker import Chunk
 from interlock.risk.calibration import (
     ECE_TARGET,
     SignalCalibrator,
@@ -359,6 +360,27 @@ def test_generation_is_deterministic_given_a_seed() -> None:
     assert [t.failure_mode for t in first] != [
         t.failure_mode for t in TripleGenerator(chunks=chunks, seed=8).generate(120)
     ]
+
+
+def test_shared_generator_clean_answers_remain_single_complete_sentences() -> None:
+    sentences = (
+        "The customer must submit every supporting document within thirty calendar days.",
+        "The bank completes review within fifteen working days after receiving all documents.",
+    )
+    body = " ".join(sentences)
+    chunk = Chunk(
+        doc_id="complete",
+        chunk_id="complete#0",
+        title="Claims timing",
+        text=f"Claims timing\n\n{body}",
+        body=body,
+        domain="claims",
+        provenance="retrieved_verified",
+        ordinal=0,
+    )
+
+    answer = TripleGenerator(chunks=[chunk], seed=5).generate_exact({"clean": 1})[0].answer
+    assert answer in sentences
 
 
 def test_every_triple_carries_machine_checkable_ground_truth() -> None:

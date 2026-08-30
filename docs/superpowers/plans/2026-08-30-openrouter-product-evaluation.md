@@ -65,6 +65,7 @@
 - Produces: `ChallengeLevel = Literal["L1_direct", "L2_distractor", "L3_conflict"]`
 - Produces: `AnchorTriple(triple: LabelledTriple, challenge_level: ChallengeLevel, domain: str)`
 - Produces: `build_anchor(chunks: Sequence[Chunk], *, seed: int) -> list[AnchorTriple]`
+- Produces: stable `evidence_cluster_id` values that exclude question wording and row IDs.
 - Produces: `TripleGenerator.generate_exact(mode_counts: Mapping[str, int]) -> list[LabelledTriple]`
 - Consumed by: `scripts/build_manual_anchor.build_labels()` and later stratified paid-run selection.
 
@@ -165,11 +166,13 @@ Emit top-level gold flags and add these payload fields:
     "domain": anchor.domain,
     "context_count": len(anchor.triple.context),
     "context_doc_ids": [fragment.doc_id for fragment in anchor.triple.context],
+    "evidence_cluster_id": evidence_cluster_id(anchor),
 }
 ```
 
 Extend `summary()` with literal `mode_counts`, `challenge_level_counts`, `domains`, and
-`audit_distribution_note`.
+`audit_distribution_note`, plus `unique_evidence_clusters`, `prompt_variants`, and
+`max_cluster_size`. The 300 rows are prompt variants; they are not independent evidence.
 
 - [ ] **Step 6: Add failure, determinism, and metadata tests**
 
@@ -479,8 +482,10 @@ assert report["confusion"]["clean"]["ungrounded"] == 1
 assert report["failures"][0]["item_id"] == "clean-missed"
 ```
 
-Also assert per-mode, per-level, and per-domain denominators, and that the Wilson interval
-is not zero-width for a perfect small slice.
+Also assert per-mode, per-level, and per-domain denominators, cluster-level effective
+sample size, and that the cluster-level Wilson interval is not zero-width for a perfect
+small slice. Repeated prompt variants from one `evidence_cluster_id` must not narrow the
+interval.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -495,7 +500,9 @@ Expected: collection FAIL because the report module does not exist.
 Join by item ID and fail on duplicate labels or judgments. Operational validity uses all
 attempts; agreement excludes invalid statuses. Compute per-label precision/recall/F1,
 confusion, Wilson intervals, latency/token percentiles, and slices by mode, level, and
-domain. Include every disagreement and invalid result in `failures` with bounded text.
+domain. Collapse repeated evidence clusters before Wilson intervals while reporting both
+prompt count and effective cluster count. Include every disagreement and invalid result
+in `failures` with bounded text.
 
 Mark aggregate agreement `diagnostic_distribution: true` and include the literal note
 that 200/100 is not production prevalence.

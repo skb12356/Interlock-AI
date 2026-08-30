@@ -34,7 +34,6 @@ import random
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from itertools import pairwise
 from typing import Any
 
 from interlock.core.types import Defect, Fragment
@@ -387,18 +386,7 @@ class TripleGenerator:
     # -- helpers -------------------------------------------------------- #
 
     def _pick_sentence(self, chunk: Chunk, requiring: re.Pattern[str] | None = None) -> str:
-        sentences = [s.strip() for s in _SENTENCE.split(chunk.body) if len(s.strip()) > 40]
-        candidates: list[str] = [
-            *sentences,
-            *(f"{first} {second}" for first, second in pairwise(sentences)),
-        ]
-        for sentence in sentences:
-            candidates.extend(
-                sentence[: match.start()].rstrip()
-                for match in re.finditer(r", |; |\band\b |\bto\b ", sentence)
-                if len(sentence[: match.start()].rstrip()) > 40
-            )
-        candidates = list(dict.fromkeys(candidates))
+        candidates = [s.strip() for s in _SENTENCE.split(chunk.body) if len(s.strip()) > 40]
         if requiring is not None:
             candidates = [s for s in candidates if requiring.search(s)]
         return self._rng.choice(candidates) if candidates else ""

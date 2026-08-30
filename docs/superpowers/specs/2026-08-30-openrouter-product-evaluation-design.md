@@ -59,6 +59,13 @@ Each row also records the banking `domain`, context count, source document IDs, 
 mode, gold defect, offending span, and a human-readable review basis. Coverage reports
 must show domain and challenge-level counts so an aggregate cannot hide a missing cell.
 
+The 300 rows are prompt variants, not 300 independent evidence cases. Every row carries
+an `evidence_cluster_id` derived only from answer, context, gold label, failure mode, and
+challenge level; question wording and row IDs are excluded. Dataset summaries report
+`unique_evidence_clusters`, `prompt_variants`, and `max_cluster_size`. Agreement reports
+must publish both prompt count and cluster-level effective sample size, collapse repeated
+evidence before Wilson intervals, and never present a row-level interval as independent.
+
 ## OpenRouter-Compatible Judge
 
 The judge runner supports the OpenAI-compatible contract used by OpenRouter:
@@ -108,7 +115,7 @@ delegated to this judge.
 
 The report includes:
 
-- overall valid-judgment agreement with a Wilson confidence interval;
+- overall valid-judgment agreement with a cluster-level Wilson confidence interval;
 - per-label precision, recall, and F1;
 - confusion matrix;
 - agreement by failure mode, challenge level, and domain;

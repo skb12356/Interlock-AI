@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -26,9 +27,9 @@ def anchor_rows() -> list[dict[str, Any]]:
     return build_labels(300, seed=20260829)
 
 
-def grounding_signature(row: dict[str, Any]) -> str:
+def expected_evidence_cluster_id(row: dict[str, Any]) -> str:
     payload = row["payload"]
-    return json.dumps(
+    encoded = json.dumps(
         {
             "answer": payload["answer"],
             "context": payload["context"],
@@ -41,8 +42,10 @@ def grounding_signature(row: dict[str, Any]) -> str:
             "challenge_level": payload["challenge_level"],
         },
         ensure_ascii=False,
+        separators=(",", ":"),
         sort_keys=True,
-    )
+    ).encode("utf-8")
+    return f"evidence-{hashlib.sha256(encoded).hexdigest()}"
 
 
 def test_manual_anchor_has_the_approved_200_100_mode_matrix(
@@ -122,6 +125,32 @@ def test_manual_anchor_records_context_and_review_metadata(
         assert row["review_basis"]
 
 
+def test_anchor_answers_are_complete_supported_or_contradicting_propositions(
+    anchor_rows: list[dict[str, Any]],
+) -> None:
+    for row in anchor_rows:
+        payload = row["payload"]
+        if payload["failure_mode"] == "clean":
+            assert payload["answer"] in payload["context"][0]["text"]
+            assert payload["answer"].endswith((".", "!", "?"))
+        if payload["failure_mode"] == "contradiction":
+            contradicting_body = payload["context"][1]["text"].split("\n\n", 1)[1].strip()
+            assert payload["answer"] == contradicting_body
+            assert payload["answer"].endswith((".", "!", "?"))
+
+
+def test_anchor_rows_have_stable_evidence_clusters_and_honest_summary(
+    anchor_rows: list[dict[str, Any]],
+) -> None:
+    cluster_counts = Counter(row["payload"]["evidence_cluster_id"] for row in anchor_rows)
+    for row in anchor_rows:
+        assert row["payload"]["evidence_cluster_id"] == expected_evidence_cluster_id(row)
+    report = summary(anchor_rows)
+    assert report["unique_evidence_clusters"] == len(cluster_counts)
+    assert report["prompt_variants"] == 300
+    assert report["max_cluster_size"] == max(cluster_counts.values())
+
+
 def test_generated_anchor_is_explicitly_unreviewed(
     anchor_rows: list[dict[str, Any]],
 ) -> None:
@@ -189,18 +218,25 @@ def test_the_committed_anchor_artifact_matches_the_approved_matrix() -> None:
         assert payload["context_count"] == len(payload["context"])
         assert payload["context_doc_ids"] == [fragment["doc_id"] for fragment in payload["context"]]
         assert payload["domain"]
+        assert payload["evidence_cluster_id"] == expected_evidence_cluster_id(row)
 
 
-def test_every_committed_grounding_case_is_independent() -> None:
-    path = REPO_ROOT / "data" / "labels" / "manual_anchor_300.jsonl"
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
-    assert len({grounding_signature(row) for row in rows}) == 300
+def test_committed_summary_reports_actual_evidence_clusters() -> None:
+    labels_path = REPO_ROOT / "data" / "labels" / "manual_anchor_300.jsonl"
+    summary_path = REPO_ROOT / "data" / "labels" / "manual_anchor_300.summary.json"
+    rows = [json.loads(line) for line in labels_path.read_text(encoding="utf-8").splitlines()]
+    report = json.loads(summary_path.read_text(encoding="utf-8"))
+    clusters = Counter(row["payload"]["evidence_cluster_id"] for row in rows)
+    assert report["unique_evidence_clusters"] == len(clusters)
+    assert report["prompt_variants"] == len(rows)
+    assert report["max_cluster_size"] == max(clusters.values())
 
 
 @pytest.mark.parametrize("seed", [39, 86])
-def test_anchor_builds_independent_cases_across_seeds(seed: int) -> None:
+def test_anchor_builds_clustered_prompt_variants_across_seeds(seed: int) -> None:
     rows = build_labels(300, seed=seed)
-    assert len({grounding_signature(row) for row in rows}) == 300
+    assert len(rows) == 300
+    assert all(row["payload"]["evidence_cluster_id"] for row in rows)
 
 
 def test_committed_contradictions_follow_manifest_direction() -> None:

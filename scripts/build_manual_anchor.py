@@ -27,7 +27,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from interlock.core.clock import wall_time  # noqa: E402
-from interlock.eval.anchor import ANCHOR_MODE_COUNTS, build_anchor  # noqa: E402
+from interlock.eval.anchor import (  # noqa: E402
+    ANCHOR_MODE_COUNTS,
+    build_anchor,
+    evidence_cluster_id,
+)
 from interlock.eval.splits import split_corpus  # noqa: E402
 from interlock.ledger.writer import apply_migrations, connect  # noqa: E402
 from interlock.retrieval import corpus_chunks, load_corpus  # noqa: E402
@@ -54,6 +58,7 @@ def build_labels(count: int, seed: int) -> list[dict[str, Any]]:
                 "domain": anchor.domain,
                 "context_count": len(triple.context),
                 "context_doc_ids": [fragment.doc_id for fragment in triple.context],
+                "evidence_cluster_id": evidence_cluster_id(anchor),
             }
         )
         defect = triple.defect
@@ -126,6 +131,7 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     mode_counts = Counter(row["payload"]["failure_mode"] for row in rows)
     challenge_level_counts = Counter(row["payload"]["challenge_level"] for row in rows)
     domains = Counter(row["payload"]["domain"] for row in rows)
+    evidence_clusters = Counter(row["payload"]["evidence_cluster_id"] for row in rows)
     return {
         "count": len(rows),
         "gold_ungrounded": sum(row["gold_ungrounded"] for row in rows),
@@ -144,6 +150,9 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "mode_counts": dict(sorted(mode_counts.items())),
         "challenge_level_counts": dict(sorted(challenge_level_counts.items())),
         "domains": dict(sorted(domains.items())),
+        "unique_evidence_clusters": len(evidence_clusters),
+        "prompt_variants": len(rows),
+        "max_cluster_size": max(evidence_clusters.values(), default=0),
         "audit_distribution_note": (
             "Diagnostic audit distribution: 200 clean and 100 defective rows. "
             "It does not replace the 10% production defect base-rate assumption used "

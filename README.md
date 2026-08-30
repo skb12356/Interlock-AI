@@ -304,16 +304,20 @@ Per-signal AUROC is published including the weak signals — `citation_unsupport
 `context_conflict` 0.575, `question_drift` 0.536, `overconfidence` 0.504 — because a fusion
 layer that silently down-weights three near-chance signals should say so.
 
-### The conformal guarantee, and its price
+### The conformal guarantee
 
-| λ | Escape rate | Intervention rate | p-value | Certified |
-|---:|---:|---:|---:|:--:|
-| 0.015 | 0.000 | **100%** | 0.00059 | ✅ |
-| 0.020 | 0.199 | 6.7% | 1.0 | ❌ |
+**Certified: at most 1% ungrounded escapes, at 90% confidence, on n = 840 held-out items.**
+The selected threshold is λ = 0.015, where the measured escape rate is **0.000** and the
+Learn-then-Test p-value is 0.00059 — comfortably inside α = 0.01, δ = 0.10.
 
-At α = 0.01, δ = 0.10, n = 840. The bound holds **and** the certified threshold intervenes
-on all traffic. Both halves are reported together; the filter is off by default and
-`make eval-guaranteed` runs it on.
+That guarantee has a price, and it is the reason the filter is a mode rather than the
+default: at λ = 0.015 the system checks **100% of traffic**. The next threshold up
+(λ = 0.020) checks only 6.7% of traffic, and the procedure declines to certify it — its
+measured escape rate is 19.9%, so no promise can honestly be attached to it. That is the
+procedure working: it certifies what the data supports and refuses what it does not.
+
+Run it with `make eval-guaranteed`; the selection is committed in
+[`artifacts/calibration/lambda.json`](artifacts/calibration/lambda.json).
 
 ### Measured action latency
 

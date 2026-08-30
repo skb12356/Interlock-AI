@@ -238,8 +238,9 @@ The console only serves an explicit artifact allowlist. Confidence intervals rem
 their estimates, replay evidence is labelled, and an empty ledger reports unavailable or
 zero-observation state rather than fabricated economics.
 
-Two results must always be read together: the conformal artifact reports zero certified
-ungrounded escapes **and** a 100% intervention rate at the selected threshold.
+Two results must always be read together: the conformal artifact certifies zero ungrounded
+escapes at the selected threshold, and that threshold checks 100% of traffic. The guarantee
+and its operational price belong in the same sentence.
 
 The current `banking-v4` policy was selected from 216 bounded policy candidates over
 three immutable seeds. It preserves the reference Hold/Repair/Pass behavior and keeps

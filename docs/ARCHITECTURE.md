@@ -329,14 +329,21 @@ Committed result (`artifacts/calibration/lambda.json`), at `α = 0.01`, `δ = 0.
 `n = 840`:
 
 ```
-λ = 0.015 → escape rate 0.0, intervention rate 1.00, p = 0.00059  (rejected ⇒ certified)
-λ = 0.020 → escape rate 0.199, intervention rate 0.067, p = 1.0   (not rejected)
+λ = 0.015 → escape rate 0.000, checks 100% of traffic,  p = 0.00059  → hypothesis rejected, threshold CERTIFIED
+λ = 0.020 → escape rate 0.199, checks   6.7% of traffic, p = 1.0      → not rejected, so no promise is attached
 ```
 
-The bound holds — and the certified threshold intervenes on **100% of traffic**, which the
-artifact says in its own notes. That is the honest reading: the guarantee is real and, at
-this detector quality, operationally expensive. Which is why the conformal filter is *off*
-by default and `make eval-guaranteed` runs it on, so both numbers stay visible.
+Read the p-values the way the procedure defines them: the hypothesis under test is *"the
+true escape rate at this λ exceeds α"*, so **rejecting it is what certifies the threshold**.
+λ = 0.015 is rejected decisively and is the threshold selected. λ = 0.020 is not rejected —
+its measured escape rate is 19.9%, twenty times α — so the procedure refuses to certify it.
+Refusing is the correct behaviour, not a failure: a threshold that cannot be defended does
+not get a promise attached to it.
+
+The cost of the guarantee is that the certified threshold checks **100% of traffic**, which
+the artifact records in its own notes. That is why the conformal filter is a mode rather
+than the default: `make eval-guaranteed` runs with it on, so both the certified rate and its
+operational price stay visible together.
 
 ---
 

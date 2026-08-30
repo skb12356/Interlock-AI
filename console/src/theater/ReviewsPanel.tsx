@@ -1,11 +1,20 @@
+import { useState } from "react";
+
 import type { HoldProjection } from "../domain/contracts";
 import { MicroLabel } from "./primitives";
 import { color, font, radius } from "./tokens";
 
 /** Reviews workspace. Every card comes from the durable gateway projection. */
 
+/** The session a hold came from, when this browser has it in its history. */
+export interface HoldOrigin {
+  sessionId: string;
+  sessionTitle: string;
+}
+
 export interface HoldCard {
   id: string;
+  origin: HoldOrigin | null;
   kind: "response" | "tool_call";
   title: string;
   summary: string;
@@ -29,11 +38,26 @@ function formatSla(hold: HoldProjection): { text: string; expired: boolean } {
   return { text: `SLA ${hours}h ${minutes}m`, expired: false };
 }
 
-export function toHoldCard(hold: HoldProjection, hasToken: boolean): HoldCard {
+/**
+ * Hold ids are long opaque identifiers. The card shows a readable middle-elided
+ * form and keeps the full value one click away, because it is what an operator
+ * pastes into a search when they come back to this hold tomorrow.
+ */
+export function shortHoldId(id: string): string {
+  if (id.length <= 24) return id;
+  return `${id.slice(0, 13)}…${id.slice(-6)}`;
+}
+
+export function toHoldCard(
+  hold: HoldProjection,
+  hasToken: boolean,
+  origin: HoldOrigin | null = null,
+): HoldCard {
   const sla = formatSla(hold);
   const impact = hold.payload?.["impact_inr"];
   return {
     id: hold.hold_id,
+    origin,
     kind: hold.kind,
     title: hold.reason,
     summary: typeof hold.payload?.["summary"] === "string" ? (hold.payload["summary"] as string) : hold.reason,
@@ -56,6 +80,7 @@ export function ReviewsPanel({
   onApprove,
   onReject,
   onRefresh,
+  onOpenSession,
 }: {
   holds: HoldCard[];
   loading: boolean;
@@ -64,6 +89,7 @@ export function ReviewsPanel({
   onApprove: (holdId: string) => void;
   onReject: (holdId: string) => void;
   onRefresh: () => void;
+  onOpenSession: (sessionId: string) => void;
 }) {
   return (
     <section
@@ -131,6 +157,7 @@ export function ReviewsPanel({
           resolving={resolvingHoldId === card.id}
           onApprove={() => onApprove(card.id)}
           onReject={() => onReject(card.id)}
+          onOpenSession={onOpenSession}
         />
       ))}
     </section>
@@ -143,16 +170,17 @@ function HoldCardView({
   resolving,
   onApprove,
   onReject,
+  onOpenSession,
 }: {
   card: HoldCard;
   dimmed: boolean;
   resolving: boolean;
   onApprove: () => void;
   onReject: () => void;
+  onOpenSession: (sessionId: string) => void;
 }) {
   const approvalAvailable = card.hasToken && !card.slaExpired;
   const facts = [
-    { label: "Hold id", value: card.id },
     { label: "Tool", value: card.tool },
     { label: "Sentence", value: card.sentence },
     { label: "Impact", value: card.impact },
@@ -201,6 +229,50 @@ function HoldCardView({
           {card.sla}
         </span>
       </header>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "10px 16px",
+          padding: "13px 20px",
+          borderBottom: `1px solid ${color.lineSoft}`,
+        }}
+      >
+        <span style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: 0 }}>
+          <MicroLabel>Hold id</MicroLabel>
+          <span title={card.id} style={{ font: `500 12px ${font.mono}` }}>
+            {shortHoldId(card.id)}
+          </span>
+        </span>
+        <CopyButton value={card.id} />
+        {card.origin ? (
+          <button
+            type="button"
+            onClick={() => onOpenSession(card.origin!.sessionId)}
+            style={{
+              padding: "7px 12px",
+              borderRadius: radius.button,
+              border: `1px solid ${color.line}`,
+              background: "transparent",
+              color: color.accent,
+              cursor: "pointer",
+              font: `500 11px ${font.sans}`,
+              maxWidth: "320px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Open chat session · {card.origin.sessionTitle} →
+          </button>
+        ) : (
+          <MicroLabel style={{ color: color.textMute }}>
+            no chat session for this hold in this browser
+          </MicroLabel>
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))" }}>
         {facts.map((fact, index) => (
@@ -309,4 +381,66 @@ function HoldCardView({
       </footer>
     </article>
   );
+}
+
+/** Copies the full id so an operator can search for this hold later. */
+function CopyButton({ value }: { value: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+
+  const copy = async () => {
+    const ok = (await writeClipboard(value)) ? "copied" : "failed";
+    setState(ok);
+    window.setTimeout(() => setState("idle"), 1_800);
+  };
+
+  const copied = state === "copied";
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      aria-label={`Copy hold id ${value}`}
+      style={{
+        flex: "none",
+        padding: "7px 12px",
+        borderRadius: radius.button,
+        border: `1px solid ${copied ? color.pass : state === "failed" ? color.fail : color.line}`,
+        background: "transparent",
+        color: copied ? color.pass : state === "failed" ? color.fail : color.textDim,
+        cursor: "pointer",
+        font: `500 10px ${font.mono}`,
+        letterSpacing: ".1em",
+        textTransform: "uppercase",
+      }}
+    >
+      {copied ? "Copied" : state === "failed" ? "Copy failed" : "Copy id"}
+    </button>
+  );
+}
+
+/**
+ * The async clipboard API is not available everywhere (older browsers, denied
+ * permissions), so fall back to a selection copy before admitting failure.
+ */
+async function writeClipboard(value: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    // fall through to the selection-based copy
+  }
+  try {
+    const field = document.createElement("textarea");
+    field.value = value;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.appendChild(field);
+    field.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(field);
+    return ok;
+  } catch {
+    return false;
+  }
 }

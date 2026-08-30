@@ -1,9 +1,32 @@
 {
   "count": 300,
-  "gold_ungrounded": 25,
-  "gold_contradicted": 5,
+  "gold_ungrounded": 80,
+  "gold_contradicted": 20,
   "gold_unsafe": 0,
-  "clean": 270,
+  "clean": 200,
   "source": "calibration split only; document-disjoint from seeded eval split",
-  "labeller": "person1_codex_manual_review"
+  "labeller": "person1_codex_manual_review",
+  "mode_counts": {
+    "clause_swapped": 20,
+    "clean": 200,
+    "contradiction": 20,
+    "number_corrupted": 20,
+    "retrieval_dropped": 20,
+    "unanswerable": 20
+  },
+  "challenge_level_counts": {
+    "L1_direct": 102,
+    "L2_distractor": 102,
+    "L3_conflict": 96
+  },
+  "domains": {
+    "branch_info": 23,
+    "claims": 51,
+    "fees": 23,
+    "general": 85,
+    "loan_terms": 60,
+    "payments": 37,
+    "prepayment": 21
+  },
+  "audit_distribution_note": "Diagnostic audit distribution: 200 clean and 100 defective rows. It does not replace the 10% production defect base-rate assumption used to fit calibration."
 }

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import random
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -202,6 +203,21 @@ class TripleGenerator:
             triple = self._one(index, mode)
             if triple is not None:
                 triples.append(triple)
+        return triples
+
+    def generate_exact(self, mode_counts: Mapping[str, int]) -> list[LabelledTriple]:
+        """Build exactly the requested failure-mode matrix or fail loudly."""
+        unknown = set(mode_counts) - set(FAILURE_MODES)
+        if unknown:
+            raise ValueError(f"unknown failure modes: {sorted(unknown)}")
+        plan = [mode for mode, count in mode_counts.items() for _ in range(count)]
+        self._rng.shuffle(plan)
+        triples: list[LabelledTriple] = []
+        for index, mode in enumerate(plan):
+            triple = self._one(index, mode)
+            if triple is None or triple.failure_mode != mode:
+                raise ValueError(f"cannot satisfy exact quota for {mode}")
+            triples.append(triple)
         return triples
 
     def _one(self, index: int, mode: str) -> LabelledTriple | None:

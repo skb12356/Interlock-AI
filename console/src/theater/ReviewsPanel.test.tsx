@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { ReviewsPanel, type HoldCard } from "./ReviewsPanel";
+import { ReviewsPanel, toHoldCard, type HoldCard } from "./ReviewsPanel";
 
 const tokenlessHold: HoldCard = {
   id: "hld_tokenless",
@@ -52,5 +52,28 @@ describe("ReviewsPanel", () => {
 
     await userEvent.click(reject);
     expect(onReject).toHaveBeenCalledWith("hld_tokenless");
+  });
+
+  it("keeps a token-bearing response hold approvable when no SLA deadline was assigned", () => {
+    const card = toHoldCard({
+      hold_id: "hld_response",
+      request_id: "req_1",
+      kind: "response",
+      reason: "response review",
+      tool: null,
+      sentence_idx: 0,
+      payload: {},
+      evidence: [],
+      flagged_span: null,
+      state: "pending",
+      created_ts: 1,
+      sla_deadline_ts: null,
+      expired: false,
+    }, true);
+
+    renderPanel([card]);
+    expect(card.slaExpired).toBe(false);
+    expect(screen.getByText("No SLA deadline")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve release" })).toBeEnabled();
   });
 });

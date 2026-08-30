@@ -151,10 +151,16 @@ export function EvidencePanel({
         <article style={cardStyle}>
           <MicroLabel tone={color.accent}>Live economics</MicroLabel>
           {economics?.available ? (
-            <p style={{ font: `700 18px ${font.mono}` }}>
-              Net ₹{economics.net_value_inr?.toLocaleString("en-IN")}
-              {economics.net_value_ci_inr ? ` · CI ₹${economics.net_value_ci_inr[0].toLocaleString("en-IN")}–₹${economics.net_value_ci_inr[1].toLocaleString("en-IN")}` : ""}
-            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+              <span style={{ font: `500 11px ${font.mono}` }}>Routing savings · ₹{economics.routing_savings_inr?.toLocaleString("en-IN") ?? "unavailable"}</span>
+              <span style={{ font: `500 11px ${font.mono}` }}>Regret · ₹{economics.regret_inr?.toLocaleString("en-IN") ?? "unavailable"} · {economics.regret_samples ?? 0} samples</span>
+              <span style={{ font: `500 11px ${font.mono}` }}>Rework · ₹{economics.rework_inr?.toLocaleString("en-IN") ?? "unavailable"} · {economics.rework_samples ?? 0} samples</span>
+              <span style={{ font: `700 16px ${font.mono}` }}>
+                Net ₹{economics.net_value_inr?.toLocaleString("en-IN") ?? "unavailable"}
+                {economics.net_value_ci_inr ? ` · CI ₹${economics.net_value_ci_inr[0].toLocaleString("en-IN")}–₹${economics.net_value_ci_inr[1].toLocaleString("en-IN")}` : ""}
+                {` · ${economics.net_value_samples ?? 0} samples`}
+              </span>
+            </div>
           ) : <p style={{ color: color.textDim }}>Unavailable{economics?.reason ? ` — ${economics.reason}` : ""}</p>}
         </article>
 

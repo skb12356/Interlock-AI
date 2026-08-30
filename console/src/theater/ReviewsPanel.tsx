@@ -20,7 +20,8 @@ export interface HoldCard {
 }
 
 function formatSla(hold: HoldProjection): { text: string; expired: boolean } {
-  if (hold.expired || hold.sla_deadline_ts === null) return { text: "SLA expired", expired: true };
+  if (hold.expired) return { text: "SLA expired", expired: true };
+  if (hold.sla_deadline_ts === null) return { text: "No SLA deadline", expired: false };
   const remainingMs = hold.sla_deadline_ts * 1000 - Date.now();
   if (remainingMs <= 0) return { text: "SLA expired", expired: true };
   const hours = Math.floor(remainingMs / 3_600_000);

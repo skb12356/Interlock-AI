@@ -129,6 +129,33 @@ describe("ReviewsPanel", () => {
     expect(screen.getByText("Created just now")).toBeInTheDocument();
   });
 
+  it("renders the aggregated sentence indices from the durable projection", () => {
+    const card = toHoldCard({
+      hold_id: "hld_aggregate",
+      request_id: "req_aggregate",
+      kind: "response",
+      reason: "L4_hold",
+      tool: null,
+      sentence_idx: null,
+      sentence_indices: [2, 4],
+      payload: { held_count: 2 },
+      evidence: [],
+      flagged_span: null,
+      state: "pending",
+      created_ts: Date.now() / 1000,
+      sla_deadline_ts: Date.now() / 1000 + 900,
+      expired: false,
+    }, false);
+
+    renderPanel([card]);
+    expect(screen.getByText("idx 2, 4")).toBeInTheDocument();
+  });
+
+  it("describes a tool hold as a tool call rather than a sentence", () => {
+    renderPanel([{ ...tokenlessHold, kind: "tool_call" }]);
+    expect(screen.getByText("1 tool call")).toBeInTheDocument();
+  });
+
   it("asks before clearing all pending reviews", async () => {
     const user = userEvent.setup();
     const { onClearAll } = renderPanel([tokenlessHold]);

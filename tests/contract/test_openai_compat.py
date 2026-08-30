@@ -398,12 +398,16 @@ def test_private_interlock_context_never_leaves_the_gateway(client: TestClient) 
 
     response = client.post(
         "/v1/chat/completions",
-        json=_request(interlock={"retrieved": [private_fragment]}),
+        json=_request(
+            session_id="browser-session-private",
+            interlock={"retrieved": [private_fragment]},
+        ),
     )
 
     assert response.status_code == 200
     upstream = json.loads(route.calls[0].request.content)
     assert "interlock" not in upstream
+    assert "session_id" not in upstream
     assert "customer-private-claim-text" not in route.calls[0].request.content.decode()
 
 

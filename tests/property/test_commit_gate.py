@@ -512,6 +512,27 @@ async def test_decisions_are_recorded_for_the_trace() -> None:
     assert [d.action for d in gate.decisions] == ["L0_pass", "L4_hold"]
 
 
+async def test_decision_indices_survive_an_earlier_engine_failure() -> None:
+    class FirstExplodesThenHolds(ScriptedEngine):
+        async def evaluate(self, ctx: object) -> Decision:
+            index = getattr(ctx, "sentence_idx", 0)
+            if index == 0:
+                raise RuntimeError("first verifier failed")
+            return _decision("L4_hold", index)
+
+    gate = CommitGate(
+        risk_engine=FirstExplodesThenHolds(),
+        stakes=_stakes(),
+        request_id="r",
+        mode="buffered",
+    )
+    await run_gate(gate, ["Unchecked sentence. ", "Held sentence. "])
+
+    assert [(index, decision.action) for index, decision in gate.decisions_with_indices] == [
+        (1, "L4_hold")
+    ]
+
+
 async def test_a_block_does_not_duplicate_already_emitted_text() -> None:
     """Regression for a bug the property test found.
 

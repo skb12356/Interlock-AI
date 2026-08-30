@@ -238,8 +238,13 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (view === "reviews") void loadReviews();
+    if (view === "reviews") {
+      void loadReviews();
+      const refresh = window.setInterval(() => void loadReviews(), 30_000);
+      return () => window.clearInterval(refresh);
+    }
     if (view === "evidence") void loadEvidence();
+    return undefined;
   }, [loadEvidence, loadReviews, view]);
 
   const handleHold = async (holdId: string, resolution: "approved" | "rejected") => {

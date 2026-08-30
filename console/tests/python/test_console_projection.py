@@ -244,7 +244,9 @@ def live_source(tmp_path: Path) -> LiveConsoleSource:
             "hold_id": "hld_1",
             "request_id": "req_1",
             "kind": "tool_call",
-            "payload_json": json.dumps({"name": "send_email", "amount": 100}),
+            "payload_json": json.dumps(
+                {"name": "send_email", "amount": 100, "sentence_indices": [2, 4]}
+            ),
             "flagged_span": "recipient",
             "evidence_json": json.dumps(["untrusted source"]),
             "state": "pending",
@@ -278,6 +280,7 @@ def test_live_source_returns_complete_decisions_holds_and_ledger_summary(tmp_pat
     holds = source.holds()
     assert holds[0]["tool"] == "send_email"
     assert holds[0]["session_id"] == "session_1"
+    assert holds[0]["sentence_indices"] == [2, 4]
     assert holds[0]["evidence"] == ["untrusted source"]
     assert holds[0]["expired"] is True
     assert "resume_token" not in json.dumps(holds)

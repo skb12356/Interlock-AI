@@ -117,6 +117,7 @@ class CommitGate:
     _emitted_chars: int = field(default=0, init=False)
     _answer_prefix: str = field(default="", init=False)
     _decisions: list[Decision] = field(default_factory=list, init=False)
+    _decision_records: list[tuple[int, Decision]] = field(default_factory=list, init=False)
     _pending: asyncio.Task[Decision] | None = field(default=None, init=False, repr=False)
     _pending_sentence: str = field(default="", init=False)
     _pending_idx: int = field(default=-1, init=False)
@@ -144,6 +145,11 @@ class CommitGate:
     @property
     def decisions(self) -> list[Decision]:
         return list(self._decisions)
+
+    @property
+    def decisions_with_indices(self) -> list[tuple[int, Decision]]:
+        """Settled decisions paired with their original sentence positions."""
+        return list(self._decision_records)
 
     def escalate(self, reason: str = "") -> None:
         """Switch to buffered for the remainder of the stream. One-way.
@@ -276,6 +282,7 @@ class CommitGate:
             return self._release(sentence, index, decision=None, note="engine_error")
 
         self._decisions.append(decision)
+        self._decision_records.append((index, decision))
         return await self._apply(decision, sentence, index)
 
     async def _apply(self, decision: Decision, sentence: str, index: int) -> list[Emission]:

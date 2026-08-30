@@ -71,6 +71,9 @@ export function toHoldCard(
   const impact = hold.payload?.["impact_inr"];
   const domain = hold.payload?.["domain"];
   const heldCount = hold.payload?.["held_count"];
+  const sentenceIndices = hold.sentence_indices ?? (
+    hold.sentence_idx === null || hold.sentence_idx === undefined ? [] : [hold.sentence_idx]
+  );
   return {
     id: hold.hold_id,
     requestId: hold.request_id,
@@ -79,7 +82,7 @@ export function toHoldCard(
     title: hold.reason,
     summary: typeof hold.payload?.["summary"] === "string" ? (hold.payload["summary"] as string) : hold.reason,
     tool: hold.tool ?? "—",
-    sentence: hold.sentence_idx === null || hold.sentence_idx === undefined ? "—" : `idx ${hold.sentence_idx}`,
+    sentence: sentenceIndices.length > 0 ? `idx ${sentenceIndices.join(", ")}` : "—",
     impact: typeof impact === "number" ? `₹${impact.toLocaleString("en-IN")}` : "—",
     domain: typeof domain === "string" ? domain : "—",
     heldCount: typeof heldCount === "number" ? heldCount : 1,
@@ -266,7 +269,12 @@ function HoldCardView({
   const facts = [
     { label: "Tool", value: card.tool },
     { label: "Sentence", value: card.sentence },
-    { label: "Held scope", value: `${card.heldCount} sentence${card.heldCount === 1 ? "" : "s"}` },
+    {
+      label: "Held scope",
+      value: card.kind === "tool_call"
+        ? "1 tool call"
+        : `${card.heldCount} sentence${card.heldCount === 1 ? "" : "s"}`,
+    },
     { label: "Domain", value: card.domain },
     { label: "Impact", value: card.impact },
     { label: "Age", value: card.created },

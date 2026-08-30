@@ -125,7 +125,9 @@ class OpenAICompatProvider:
         # retrieved text that Lane A and the tool interlock inspect locally, but it is
         # not authorized provider prompt context and must not cross this final egress
         # boundary on primary, fallback, repair, or shadow requests.
-        public_body = {key: value for key, value in body.items() if key != "interlock"}
+        public_body = {
+            key: value for key, value in body.items() if key not in {"interlock", "session_id"}
+        }
         return {**self._extra_body, **public_body}
 
     def _headers(self) -> dict[str, str]:

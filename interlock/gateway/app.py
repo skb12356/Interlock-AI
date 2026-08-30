@@ -1004,7 +1004,7 @@ async def _stream_response(
 
         held = [
             (sentence_idx, decision)
-            for sentence_idx, decision in enumerate(gate.decisions)
+            for sentence_idx, decision in gate.decisions_with_indices
             if decision.action == "L4_hold"
         ]
         if held:

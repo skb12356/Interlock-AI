@@ -36,9 +36,15 @@ export async function streamChat(
       model: "interlock",
       messages: [{ role: "user", content: request.prompt }],
       stream: true,
-      ...(request.sessionId ? { session_id: request.sessionId } : {}),
       ...(request.replay === false || !request.scenario ? {} : { scenario: request.scenario }),
-      ...(request.fragments?.length ? { interlock: { retrieved: request.fragments } } : {}),
+      ...(request.sessionId || request.fragments?.length
+        ? {
+            interlock: {
+              ...(request.sessionId ? { session_id: request.sessionId } : {}),
+              ...(request.fragments?.length ? { retrieved: request.fragments } : {}),
+            },
+          }
+        : {}),
     }),
     signal: request.signal,
   });

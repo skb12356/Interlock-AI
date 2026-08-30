@@ -303,6 +303,15 @@ class LiveConsoleSource:
         for raw in self.app.state.ledger.pending_holds():
             payload = _json_object(raw.get("payload_json"))
             deadline = raw.get("sla_deadline_ts")
+            payload_indices = payload.get("sentence_indices")
+            sentence_indices = (
+                [int(index) for index in payload_indices if isinstance(index, int)]
+                if isinstance(payload_indices, list)
+                else []
+            )
+            legacy_sentence_idx = payload.get("sentence_idx")
+            if not sentence_indices and isinstance(legacy_sentence_idx, int):
+                sentence_indices = [legacy_sentence_idx]
             session_id = payload.get("session_id")
             if not session_id:
                 request = (
@@ -322,7 +331,8 @@ class LiveConsoleSource:
                     "kind": raw["kind"],
                     "reason": raw.get("reason") or "review required",
                     "tool": payload.get("name") or payload.get("tool"),
-                    "sentence_idx": payload.get("sentence_idx"),
+                    "sentence_idx": sentence_indices[0] if sentence_indices else None,
+                    "sentence_indices": sentence_indices,
                     "payload": _without_secrets(payload),
                     "evidence": _json_list(raw.get("evidence_json")),
                     "flagged_span": raw.get("flagged_span"),

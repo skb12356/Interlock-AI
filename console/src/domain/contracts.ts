@@ -119,6 +119,7 @@ export interface DecisionDetail {
 export interface HoldProjection extends HoldEvent {
   request_id: string;
   session_id?: string | null;
+  sentence_indices?: number[];
   payload: Record<string, unknown>;
   evidence: string[];
   flagged_span: string | null;

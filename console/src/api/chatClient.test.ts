@@ -121,7 +121,8 @@ describe("streamChat", () => {
     );
 
     const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body)) as Record<string, unknown>;
-    expect(body).toMatchObject({ session_id: "session_42" });
+    expect(body).toMatchObject({ interlock: { session_id: "session_42" } });
+    expect(body).not.toHaveProperty("session_id");
   });
 
   it("fails an interrupted body that closes before the DONE sentinel", async () => {

@@ -1,140 +1,169 @@
 import { color, font, radius } from "./tokens";
-import { MicroLabel } from "./primitives";
-import type { Mode } from "./traceEngine";
 
-export type View = "live" | "reviews" | "evidence";
+export type View = "chat" | "live" | "reviews" | "evidence";
 
-const NAV: Array<{ id: View; n: string; label: string }> = [
-  { id: "live", n: "01", label: "Live" },
-  { id: "reviews", n: "02", label: "Reviews" },
-  { id: "evidence", n: "03", label: "Evidence" },
+const NAV: Array<{ id: View; label: string }> = [
+  { id: "chat", label: "Chat" },
+  { id: "live", label: "Trace" },
+  { id: "reviews", label: "Reviews" },
+  { id: "evidence", label: "Evidence" },
 ];
 
+export type GatewayHealth = "connecting" | "connected" | "replay" | "unavailable";
+
+const HEALTH_TONE: Record<GatewayHealth, string> = {
+  connecting: color.warn,
+  connected: color.pass,
+  replay: color.accent,
+  unavailable: color.fail,
+};
+
+/**
+ * One bar: who you are looking at, where you are, and whether the gateway is
+ * answering. There is no mode switch — the console only ever shows live traffic.
+ */
 export function Header({
   view,
   onView,
-  mode,
-  onToggleMode,
-  connectionLabel,
+  breadcrumb,
+  health,
+  healthDetail,
+  traceAvailable,
 }: {
   view: View;
   onView: (view: View) => void;
-  mode: Mode;
-  onToggleMode: () => void;
-  connectionLabel: string;
+  breadcrumb: string | null;
+  health: GatewayHealth;
+  healthDetail: string;
+  traceAvailable: boolean;
 }) {
-  const modeTone = mode === "demo" ? color.warn : color.pass;
   return (
     <header
       style={{
         position: "sticky",
         top: 0,
         zIndex: 20,
-        minHeight: "60px",
+        minHeight: "56px",
         display: "flex",
         flexWrap: "wrap",
         alignItems: "center",
-        gap: "12px 18px",
-        padding: "10px 24px",
+        gap: "10px 18px",
+        padding: "9px 20px",
         borderBottom: `1px solid ${color.lineSoft}`,
         background: color.bgHeader,
         backdropFilter: "blur(8px)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
         <span
           aria-hidden="true"
           style={{
-            width: "26px",
-            height: "26px",
+            width: "24px",
+            height: "24px",
             display: "grid",
             placeItems: "center",
-            border: "1px solid rgba(230,225,215,.28)",
+            border: `1px solid ${color.accent}`,
             borderRadius: radius.mark,
-            font: `700 10px ${font.mono}`,
+            font: `700 9px ${font.mono}`,
             letterSpacing: "-.06em",
             color: color.accent,
           }}
         >
           I/L
         </span>
-        <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
-          <strong style={{ font: `600 13px ${font.sans}` }}>Interlock</strong>
-          <span
-            style={{
-              font: `500 8px ${font.mono}`,
-              letterSpacing: ".18em",
-              textTransform: "uppercase",
-              color: color.textMeta,
-            }}
-          >
-            Control plane
-          </span>
-        </span>
+        <strong style={{ font: `600 13px ${font.sans}`, letterSpacing: "-.01em" }}>Interlock</strong>
+        {breadcrumb ? (
+          <>
+            <span aria-hidden="true" style={{ color: color.textMute }}>
+              /
+            </span>
+            <span
+              style={{
+                font: `400 12px ${font.sans}`,
+                color: color.textDim,
+                maxWidth: "280px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {breadcrumb}
+            </span>
+          </>
+        ) : null}
       </div>
 
-      <nav aria-label="Console workspaces" style={{ display: "flex", gap: "4px" }}>
+      <nav
+        aria-label="Console views"
+        style={{
+          display: "flex",
+          gap: "2px",
+          padding: "3px",
+          borderRadius: radius.pill,
+          border: `1px solid ${color.line}`,
+          background: "rgba(230,225,215,.02)",
+        }}
+      >
         {NAV.map((item) => {
           const active = view === item.id;
+          const disabled = item.id === "live" && !traceAvailable;
           return (
             <button
               key={item.id}
               type="button"
               onClick={() => onView(item.id)}
+              disabled={disabled}
               aria-current={active ? "page" : undefined}
+              title={disabled ? "Run a request first — the trace opens from a chat answer" : undefined}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "7px",
-                padding: "7px 12px",
-                borderRadius: radius.button,
-                cursor: "pointer",
-                border: `1px solid ${active ? "rgba(200,180,160,.35)" : "transparent"}`,
-                background: active ? "rgba(200,180,160,.1)" : "transparent",
-                color: active ? color.text : color.textDim,
-                font: `500 12px ${font.sans}`,
+                padding: "6px 14px",
+                borderRadius: radius.pill,
+                border: "none",
+                cursor: disabled ? "not-allowed" : "pointer",
+                background: active ? color.accent : "transparent",
+                color: active ? color.onAccent : disabled ? color.textMute : color.textDim,
+                font: `${active ? 600 : 500} 12px ${font.sans}`,
+                transition: "background .2s ease, color .2s ease",
               }}
             >
-              <span style={{ font: `500 9px ${font.mono}`, color: color.textFaint }}>{item.n}</span>
               {item.label}
             </button>
           );
         })}
       </nav>
 
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "14px" }}>
-        <button
-          type="button"
-          onClick={onToggleMode}
-          aria-pressed={mode === "live"}
+      <div
+        style={{
+          marginLeft: "auto",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "5px 12px",
+          borderRadius: radius.pill,
+          border: `1px solid ${color.line}`,
+          whiteSpace: "nowrap",
+          flex: "none",
+        }}
+      >
+        <span
+          aria-hidden="true"
           style={{
-            padding: "6px 12px",
-            borderRadius: radius.pill,
-            cursor: "pointer",
-            border: `1px solid ${mode === "demo" ? "rgba(217,165,92,.4)" : "rgba(154,209,127,.4)"}`,
-            background: mode === "demo" ? "rgba(217,165,92,.09)" : "rgba(154,209,127,.09)",
-            color: modeTone,
+            width: "6px",
+            height: "6px",
+            borderRadius: "50%",
+            background: HEALTH_TONE[health],
+            animation: health === "connecting" ? "ilPulse 1.4s ease-in-out infinite" : "none",
+          }}
+        />
+        <span
+          style={{
             font: `500 9px ${font.mono}`,
             letterSpacing: ".14em",
             textTransform: "uppercase",
-            whiteSpace: "nowrap",
-            flex: "none",
+            color: color.textDim,
           }}
         >
-          {mode === "demo" ? "Demo trace" : "Live backend"}
-        </button>
-        <span style={{ display: "flex", alignItems: "center", gap: "8px", whiteSpace: "nowrap", flex: "none" }}>
-          <span
-            aria-hidden="true"
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: modeTone,
-              animation: "ilPulse 2s ease-in-out infinite",
-            }}
-          />
-          <MicroLabel style={{ letterSpacing: ".14em" }}>{connectionLabel}</MicroLabel>
+          {healthDetail}
         </span>
       </div>
     </header>

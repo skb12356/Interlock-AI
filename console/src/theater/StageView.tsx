@@ -1,9 +1,7 @@
-import { useEffect } from "react";
-
 import { SplitFlapBoard } from "./SplitFlapBoard";
 import { StageRail } from "./StageRail";
 import { GateStage, GenStage, LaneAStage, LaneBStage, LaneCStage, LadderStage, ReleaseStage } from "./stageBodies";
-import { LAST_STAGE, STAGES } from "./stages";
+import { STAGES } from "./stages";
 import { color, font, radius } from "./tokens";
 import { MicroLabel } from "./primitives";
 import type { Scene } from "./scenes";
@@ -19,29 +17,19 @@ export function StageView({
   scene,
   settings,
   onReplay,
+  onBackToChat,
+  onNewSession,
 }: {
   engine: TraceEngine;
   state: TraceUiState;
   scene: Scene;
   settings: EngineSettings;
   onReplay: () => void;
+  onBackToChat: () => void;
+  onNewSession: () => void;
 }) {
   const stage = STAGES[state.stage];
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
-      if (event.key === "ArrowRight") engine.next();
-      else if (event.key === "ArrowLeft") engine.prev();
-      else if (event.key === " ") {
-        event.preventDefault();
-        engine.togglePause();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [engine]);
+  const finished = state.durationMs !== null;
 
   const stageProps = { scene, state, settings };
   const body =
@@ -58,11 +46,11 @@ export function StageView({
     ) : stage.key === "release" ? (
       <ReleaseStage {...stageProps} />
     ) : (
-      <LaneCStage {...stageProps} onReplay={onReplay} onReset={() => engine.reset()} />
+      <LaneCStage {...stageProps} onReplay={onReplay} onReset={onBackToChat} />
     );
 
-  const stagePercent = Math.min(100, (state.stageElapsed / (stage.dwell * settings.pace)) * 100);
-  const progress = ((state.stage * 100 + stagePercent) / STAGES.length).toFixed(2);
+  // Progress is stage position, not a clock: the stream decides when a stage ends.
+  const progress = (((state.stage + (finished ? 1 : 0)) / STAGES.length) * 100).toFixed(2);
 
   return (
     <div
@@ -120,8 +108,10 @@ export function StageView({
             </div>
           </div>
           <div style={{ flex: "none", whiteSpace: "nowrap", textAlign: "right" }}>
-            <div style={{ font: `700 22px ${font.mono}`, color: color.accent }}>{formatElapsed(state.elapsed)}</div>
-            <MicroLabel style={{ marginTop: "4px" }}>Since submit</MicroLabel>
+            <div style={{ font: `700 22px ${font.mono}`, color: finished ? color.pass : color.accent }}>
+              {formatElapsed(finished ? (state.durationMs ?? 0) : state.elapsed)}
+            </div>
+            <MicroLabel style={{ marginTop: "4px" }}>{finished ? "Time taken" : "Since submit"}</MicroLabel>
           </div>
         </div>
 
@@ -149,23 +139,6 @@ export function StageView({
             background: "rgba(22,24,18,.6)",
           }}
         >
-          <div style={{ display: "flex", gap: "6px" }}>
-            <ControlButton label="Previous stage" glyph="←" onClick={() => engine.prev()} disabled={state.stage === 0} />
-            <ControlButton
-              label={state.paused ? "Resume" : "Pause"}
-              glyph={state.paused ? "▶" : "❙❙"}
-              onClick={() => engine.togglePause()}
-              wide
-              active={state.paused}
-            />
-            <ControlButton
-              label="Next stage"
-              glyph="→"
-              onClick={() => engine.next()}
-              disabled={state.stage === LAST_STAGE}
-            />
-          </div>
-
           <div
             aria-hidden="true"
             className="il-stage-progress"
@@ -189,65 +162,43 @@ export function StageView({
             </MicroLabel>
           </span>
 
-          <button
-            type="button"
-            onClick={() => engine.reset()}
-            style={{
-              flex: "none",
-              padding: "8px 14px",
-              borderRadius: radius.button,
-              border: `1px solid ${color.line}`,
-              background: "transparent",
-              cursor: "pointer",
-              color: color.text,
-              font: `500 9px ${font.mono}`,
-              letterSpacing: ".14em",
-              textTransform: "uppercase",
-            }}
-          >
-            New prompt
-          </button>
+          <span style={{ display: "flex", gap: "8px", flex: "none" }}>
+            <FooterButton label="Back to chat" onClick={onBackToChat} />
+            <FooterButton label="New chat session" onClick={onNewSession} emphasis />
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-function ControlButton({
+function FooterButton({
   label,
-  glyph,
   onClick,
-  disabled,
-  wide,
-  active,
+  emphasis,
 }: {
   label: string;
-  glyph: string;
   onClick: () => void;
-  disabled?: boolean;
-  wide?: boolean;
-  active?: boolean;
+  emphasis?: boolean;
 }) {
   return (
     <button
       type="button"
-      aria-label={label}
       onClick={onClick}
-      disabled={disabled}
       style={{
-        height: "30px",
-        width: wide ? "40px" : "30px",
-        display: "grid",
-        placeItems: "center",
+        padding: "8px 14px",
         borderRadius: radius.button,
-        border: `1px solid ${active ? "rgba(217,165,92,.5)" : "rgba(230,225,215,.14)"}`,
-        background: active ? "rgba(217,165,92,.1)" : "transparent",
-        color: disabled ? color.textMute : active ? color.warn : color.text,
-        cursor: disabled ? "not-allowed" : "pointer",
-        font: `500 11px ${font.mono}`,
+        border: `1px solid ${emphasis ? color.accent : color.line}`,
+        background: emphasis ? "rgba(200,180,160,.12)" : "transparent",
+        cursor: "pointer",
+        color: emphasis ? color.accent : color.text,
+        font: `500 9px ${font.mono}`,
+        letterSpacing: ".14em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
       }}
     >
-      {glyph}
+      {label}
     </button>
   );
 }

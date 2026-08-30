@@ -99,12 +99,22 @@ SCENARIOS = [
 ]
 
 
-def request_body(scenario: Scenario) -> dict[str, Any]:
+def request_body(scenario: Scenario, *, max_tokens: int) -> dict[str, Any]:
     body: dict[str, Any] = {
         "model": "interlock-auto",
         "scenario": scenario.upstream_scenario or scenario.name,
         "stream": True,
-        "messages": [{"role": "user", "content": scenario.prompt}],
+        "max_tokens": max_tokens,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Answer the customer directly in one concise sentence using the "
+                    "retrieved evidence. /no_think"
+                ),
+            },
+            {"role": "user", "content": scenario.prompt},
+        ],
     }
     if scenario.retrieved is not None:
         body["interlock"] = {"retrieved": scenario.retrieved}
@@ -137,13 +147,19 @@ def parse_sse(text: str) -> tuple[list[str], list[dict[str, Any]]]:
     return data_payloads, events
 
 
-def post_stream(client: httpx.Client, base_url: str, scenario: Scenario) -> dict[str, Any]:
+def post_stream(
+    client: httpx.Client,
+    base_url: str,
+    scenario: Scenario,
+    *,
+    max_tokens: int,
+) -> dict[str, Any]:
     headers = {"X-Interlock-Events": "all"}
     if scenario.force:
         headers["X-Interlock-Force"] = scenario.force
     response = client.post(
         f"{base_url}/v1/chat/completions",
-        json=request_body(scenario),
+        json=request_body(scenario, max_tokens=max_tokens),
         headers=headers,
         timeout=120.0,
     )
@@ -208,13 +224,22 @@ def main() -> int:
     parser.add_argument("--gateway", default="http://127.0.0.1:8080")
     parser.add_argument("--console", default="http://127.0.0.1:5173")
     parser.add_argument("--strict-actions", action="store_true")
+    parser.add_argument("--max-tokens", type=int, default=256)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=ARTIFACT_DIR / "gateway_rehearsal.json",
+    )
     args = parser.parse_args()
+    if args.max_tokens < 1:
+        parser.error("--max-tokens must be positive")
 
     transcript: dict[str, Any] = {
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "gateway": args.gateway,
         "console": args.console,
         "strict_actions": args.strict_actions,
+        "max_tokens": args.max_tokens,
         "scenarios": [],
     }
 
@@ -223,7 +248,12 @@ def main() -> int:
         transcript["console_health"] = fetch_json(client, f"{args.console}/health")
 
         for scenario in SCENARIOS:
-            result = post_stream(client, args.gateway, scenario)
+            result = post_stream(
+                client,
+                args.gateway,
+                scenario,
+                max_tokens=args.max_tokens,
+            )
             assert_scenario(result, scenario, strict_actions=args.strict_actions)
             transcript["scenarios"].append(result)
             event_names = sorted({event["event"] for event in result["events"]})
@@ -238,10 +268,14 @@ def main() -> int:
     if not recent:
         raise AssertionError("ConsoleHub recent buffer is empty after rehearsal")
 
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    path = ARTIFACT_DIR / "gateway_rehearsal.json"
+    path = args.output
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(redacted(transcript), indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"wrote {path.relative_to(REPO_ROOT)}")
+    try:
+        shown = path.relative_to(REPO_ROOT)
+    except ValueError:
+        shown = path
+    print(f"wrote {shown}")
     return 0
 
 

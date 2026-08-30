@@ -20,6 +20,7 @@ from interlock.eval.policy_experiment import (  # noqa: E402
     BaselineTrace,
     candidate_matrix,
     comparison_payload,
+    reference_action_regressions,
     render_comparison_markdown,
     replay_seed_candidate,
     select_candidate,
@@ -128,6 +129,10 @@ async def main() -> int:
 
     candidates = candidate_matrix()
     for index, candidate in enumerate(candidates, start=1):
+        candidate.reference_action_regressions = reference_action_regressions(
+            policy=policy,
+            adjustment=candidate.adjustment,
+        )
         candidate.seeds = tuple(
             replay_seed_candidate(
                 trace,

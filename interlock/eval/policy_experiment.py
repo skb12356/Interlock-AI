@@ -28,6 +28,7 @@ __all__ = [
     "apply_adjustment",
     "candidate_matrix",
     "comparison_payload",
+    "reference_action_regressions",
     "render_comparison_markdown",
     "replay_seed_candidate",
     "select_candidate",
@@ -79,6 +80,7 @@ class CandidateResult:
     name: str
     adjustment: PolicyAdjustment
     seeds: tuple[CandidateSeedResult, ...]
+    reference_action_regressions: tuple[str, ...] = ()
     eligible: bool = True
     rejection_reasons: list[str] = field(default_factory=list)
 
@@ -163,6 +165,66 @@ def apply_adjustment(
     )
 
 
+def reference_action_regressions(
+    *, policy: Policy, adjustment: PolicyAdjustment
+) -> tuple[str, ...]:
+    """Return changes to the three product-defining objective examples.
+
+    These examples are longstanding objective contracts, not rows selected from the
+    evaluation benchmark.  Candidate selection may reduce nuisance only while the
+    high-stakes Hold, low-stakes Repair, and low-risk Pass remain intact.
+    """
+    cases = (
+        (
+            "high_stakes_hold",
+            {"ungrounded": 0.31},
+            Stakes(
+                impact_inr=40_000,
+                reversibility="costly",
+                domain="loan_terms",
+                confidence=0.9,
+            ),
+            "L4_hold",
+        ),
+        (
+            "low_stakes_repair",
+            {"ungrounded": 0.31},
+            Stakes(
+                impact_inr=200,
+                reversibility="reversible",
+                domain="general",
+                confidence=0.9,
+            ),
+            "L2_repair",
+        ),
+        (
+            "low_risk_pass",
+            {"ungrounded": 0.01},
+            Stakes(
+                impact_inr=200,
+                reversibility="reversible",
+                domain="general",
+                confidence=0.9,
+            ),
+            "L0_pass",
+        ),
+    )
+    regressions: list[str] = []
+    for name, probs, stakes, expected in cases:
+        baseline = choose_action(probs=probs, stakes=stakes, policy=policy).action
+        if baseline != expected:
+            raise ValueError(f"reference policy contract changed: {name}:{expected}->{baseline}")
+        adjusted = apply_adjustment(
+            probs=probs,
+            stakes=stakes,
+            policy=policy,
+            adjustment=adjustment,
+        ).action
+        if adjusted != expected:
+            regressions.append(f"{name}:{expected}->{adjusted}")
+    return tuple(regressions)
+
+
 def select_candidate(
     results: Sequence[CandidateResult], *, baseline_escape_by_seed: Mapping[int, int]
 ) -> CandidateResult:
@@ -177,6 +239,10 @@ def select_candidate(
         required = set(baseline_escape_by_seed)
         if seen != required:
             candidate.rejection_reasons.append("seed_coverage_mismatch")
+        candidate.rejection_reasons.extend(
+            f"reference_action_regression:{regression}"
+            for regression in candidate.reference_action_regressions
+        )
         for row in candidate.seeds:
             if row.catch_rate < 0.9:
                 candidate.rejection_reasons.append(f"catch_below_90_percent:{row.seed}")
@@ -319,6 +385,7 @@ def _candidate_payload(candidate: CandidateResult) -> dict[str, Any]:
             "distance_from_neutral": candidate.adjustment.distance,
         },
         "eligible": candidate.eligible,
+        "reference_action_regressions": list(candidate.reference_action_regressions),
         "rejection_reasons": list(candidate.rejection_reasons),
         "worst_seed_disruptive_rate": candidate.worst_disruptive,
         "worst_seed_false_intervention_rate": candidate.worst_false_intervention,
@@ -337,6 +404,7 @@ def comparison_payload(
         "selection_rules": {
             "minimum_catch_rate_each_seed": 0.9,
             "escape_regression_allowed": False,
+            "reference_action_regression_allowed": False,
             "ranking": [
                 "worst_seed_disruptive_rate",
                 "worst_seed_false_intervention_rate",

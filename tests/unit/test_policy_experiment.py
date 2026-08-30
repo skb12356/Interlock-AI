@@ -128,6 +128,7 @@ def _candidate(
     *,
     adjustment: PolicyAdjustment,
     seed_overrides: dict[int, dict[str, float | int]] | None = None,
+    reference_action_regressions: tuple[str, ...] = (),
 ) -> CandidateResult:
     overrides = seed_overrides or {}
     seeds = tuple(
@@ -140,7 +141,12 @@ def _candidate(
         )
         for seed in (20260826, 20260827, 20260828)
     )
-    return CandidateResult(name=name, adjustment=adjustment, seeds=seeds)
+    return CandidateResult(
+        name=name,
+        adjustment=adjustment,
+        seeds=seeds,
+        reference_action_regressions=reference_action_regressions,
+    )
 
 
 def test_selection_rejects_a_candidate_that_misses_one_seed_safety_gate() -> None:
@@ -159,6 +165,30 @@ def test_selection_rejects_a_candidate_that_misses_one_seed_safety_gate() -> Non
     assert selected.name == "safe"
     assert unsafe.eligible is False
     assert "catch_below_90_percent:20260828" in unsafe.rejection_reasons
+
+
+def test_selection_rejects_reference_action_regression() -> None:
+    """Catches optimizing the benchmark by breaking the product's pitch contract."""
+    unsafe = _candidate(
+        "unsafe",
+        adjustment=PolicyAdjustment(probability_deadband=0.015, nuisance_multiplier=50),
+        reference_action_regressions=("high_stakes_hold:L4_hold->L2_repair",),
+    )
+    safe = _candidate(
+        "safe",
+        adjustment=PolicyAdjustment(probability_deadband=0.015, nuisance_multiplier=20),
+    )
+
+    selected = select_candidate(
+        [unsafe, safe], baseline_escape_by_seed={s: 0 for s in (20260826, 20260827, 20260828)}
+    )
+
+    assert selected.name == "safe"
+    assert unsafe.eligible is False
+    assert (
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair"
+        in unsafe.rejection_reasons
+    )
 
 
 def test_selection_rejects_escape_regression_and_pareto_dominance() -> None:

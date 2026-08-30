@@ -15,6 +15,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-2"
       ],
@@ -74,6 +75,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-5"
       ],
@@ -133,6 +135,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -192,8 +195,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -248,8 +252,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0_nuisance-20",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -304,8 +309,13 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -360,6 +370,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.0025_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-2"
       ],
@@ -419,6 +430,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.0025_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-5"
       ],
@@ -477,8 +489,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.0025_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -533,8 +546,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.0025_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -589,8 +603,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.0025_nuisance-20",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -645,8 +660,13 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.0025_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -701,6 +721,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.005_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-5"
       ],
@@ -759,6 +780,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.005_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -817,8 +839,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.005_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -873,8 +896,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.005_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -929,8 +953,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.005_nuisance-20",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -985,8 +1010,13 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.005_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -1041,6 +1071,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.01_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-5"
       ],
@@ -1099,6 +1130,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.01_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -1157,8 +1189,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.01_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -1213,8 +1246,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.01_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -1269,8 +1303,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.01_nuisance-20",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -1325,8 +1360,13 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.01_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -1381,8 +1421,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.015_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -1436,8 +1477,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.015_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -1491,8 +1533,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.015_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -1547,8 +1590,9 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.015_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-20"
       ],
       "seeds": [
         {
@@ -1604,11 +1648,10 @@
         "nuisance_multiplier": 20.0,
         "probability_deadband": 0.015
       },
-      "eligible": false,
+      "eligible": true,
       "name": "impact-1_deadband-0.015_nuisance-20",
-      "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
-      ],
+      "reference_action_regressions": [],
+      "rejection_reasons": [],
       "seeds": [
         {
           "action_counts": {
@@ -1660,9 +1703,16 @@
         "nuisance_multiplier": 50.0,
         "probability_deadband": 0.015
       },
-      "eligible": true,
+      "eligible": false,
       "name": "impact-1_deadband-0.015_nuisance-50",
-      "rejection_reasons": [],
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
+      "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
+      ],
       "seeds": [
         {
           "action_counts": {
@@ -1716,6 +1766,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.02_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -1771,6 +1822,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.02_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -1826,6 +1878,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.02_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -1882,6 +1935,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.02_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -1938,6 +1992,7 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.02_nuisance-20",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -1994,7 +2049,13 @@
       },
       "eligible": false,
       "name": "impact-1_deadband-0.02_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826"
       ],
       "seeds": [
@@ -2050,6 +2111,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-5"
       ],
@@ -2108,6 +2170,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -2166,8 +2229,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -2221,8 +2285,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -2277,8 +2342,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -2333,8 +2403,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -2389,6 +2464,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.0025_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-5"
       ],
@@ -2447,6 +2523,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.0025_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -2505,8 +2582,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.0025_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -2560,8 +2638,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.0025_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -2616,8 +2695,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.0025_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -2672,8 +2756,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.0025_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -2728,6 +2817,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.005_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -2786,8 +2876,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.005_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -2841,8 +2932,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.005_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -2897,8 +2989,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.005_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -2953,8 +3046,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.005_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -3012,8 +3110,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.005_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -3068,6 +3171,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.01_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -3126,8 +3230,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.01_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -3182,8 +3287,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.01_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -3238,8 +3344,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.01_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-20"
       ],
       "seeds": [
         {
@@ -3297,8 +3404,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.01_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -3353,8 +3465,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.01_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -3412,8 +3529,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.015_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -3467,8 +3585,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.015_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -3525,8 +3644,9 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.015_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-20"
       ],
       "seeds": [
         {
@@ -3582,11 +3702,10 @@
         "nuisance_multiplier": 10.0,
         "probability_deadband": 0.015
       },
-      "eligible": false,
+      "eligible": true,
       "name": "impact-0.5_deadband-0.015_nuisance-10",
-      "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
-      ],
+      "reference_action_regressions": [],
+      "rejection_reasons": [],
       "seeds": [
         {
           "action_counts": {
@@ -3640,8 +3759,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.015_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -3697,9 +3821,16 @@
         "nuisance_multiplier": 50.0,
         "probability_deadband": 0.015
       },
-      "eligible": true,
+      "eligible": false,
       "name": "impact-0.5_deadband-0.015_nuisance-50",
-      "rejection_reasons": [],
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
+      "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
+      ],
       "seeds": [
         {
           "action_counts": {
@@ -3753,6 +3884,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.02_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -3808,6 +3940,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.02_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -3864,6 +3997,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.02_nuisance-5",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -3920,6 +4054,7 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.02_nuisance-10",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -3976,7 +4111,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.02_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826"
       ],
       "seeds": [
@@ -4032,7 +4173,13 @@
       },
       "eligible": false,
       "name": "impact-0.5_deadband-0.02_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826"
       ],
       "seeds": [
@@ -4088,6 +4235,7 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -4144,8 +4292,9 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -4198,8 +4347,11 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0_nuisance-5",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate"
       ],
       "seeds": [
         {
@@ -4253,8 +4405,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -4309,7 +4466,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -4368,7 +4531,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -4427,6 +4596,7 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.0025_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "pareto_dominated:impact-1_deadband-0_nuisance-10"
       ],
@@ -4483,8 +4653,9 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.0025_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -4537,8 +4708,11 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.0025_nuisance-5",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate"
       ],
       "seeds": [
         {
@@ -4592,8 +4766,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.0025_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -4648,7 +4827,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.0025_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -4707,7 +4892,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.0025_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -4766,8 +4957,9 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.005_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -4819,8 +5011,9 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.005_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -4873,8 +5066,11 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.005_nuisance-5",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate"
       ],
       "seeds": [
         {
@@ -4928,8 +5124,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.005_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -4987,7 +5188,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.005_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -5046,7 +5253,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.005_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -5105,8 +5318,9 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.01_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -5158,8 +5372,9 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.01_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-10"
       ],
       "seeds": [
         {
@@ -5212,8 +5427,11 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.01_nuisance-5",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate"
       ],
       "seeds": [
         {
@@ -5270,8 +5488,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.01_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -5326,7 +5549,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.01_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -5385,7 +5614,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.01_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -5444,8 +5679,9 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.015_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-20"
       ],
       "seeds": [
         {
@@ -5500,8 +5736,9 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.015_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.005_nuisance-50"
+        "pareto_dominated:impact-1_deadband-0.015_nuisance-20"
       ],
       "seeds": [
         {
@@ -5557,8 +5794,11 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.015_nuisance-5",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate"
       ],
       "seeds": [
         {
@@ -5612,8 +5852,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.015_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
-        "pareto_dominated:impact-1_deadband-0.015_nuisance-50"
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass"
       ],
       "seeds": [
         {
@@ -5671,7 +5916,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.015_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260827",
         "escape_regression:20260828"
       ],
@@ -5730,7 +5981,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.015_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -5790,6 +6047,7 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.02_nuisance-1",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -5843,6 +6101,7 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.02_nuisance-2",
+      "reference_action_regressions": [],
       "rejection_reasons": [
         "escape_regression:20260826"
       ],
@@ -5897,7 +6156,11 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.02_nuisance-5",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826"
       ],
       "seeds": [
@@ -5952,7 +6215,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.02_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826"
       ],
       "seeds": [
@@ -6008,7 +6277,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.02_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6068,7 +6343,13 @@
       },
       "eligible": false,
       "name": "impact-0.25_deadband-0.02_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6128,7 +6409,11 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0_nuisance-1",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6187,7 +6472,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6246,7 +6537,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6307,7 +6604,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6368,7 +6671,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6429,7 +6738,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6490,7 +6805,11 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.0025_nuisance-1",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6549,7 +6868,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.0025_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6608,7 +6933,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.0025_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6669,7 +7000,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.0025_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6730,7 +7067,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.0025_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6791,7 +7134,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.0025_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6852,7 +7201,11 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.005_nuisance-1",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6911,7 +7264,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.005_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -6971,7 +7330,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.005_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7032,7 +7397,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.005_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7093,7 +7464,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.005_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7154,7 +7531,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.005_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7215,7 +7598,11 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.01_nuisance-1",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7274,7 +7661,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.01_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7334,7 +7727,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.01_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7395,7 +7794,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.01_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7456,7 +7861,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.01_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7517,7 +7928,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.01_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7578,7 +7995,11 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.015_nuisance-1",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7637,7 +8058,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.015_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7697,7 +8124,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.015_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7758,7 +8191,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.015_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7819,7 +8258,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.015_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7880,7 +8325,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.015_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -7941,7 +8392,11 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.02_nuisance-1",
+      "reference_action_regressions": [
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8000,7 +8455,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.02_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8060,7 +8521,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.02_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8121,7 +8588,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.02_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8182,7 +8655,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.02_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8243,7 +8722,13 @@
       },
       "eligible": false,
       "name": "impact-0.1_deadband-0.02_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8304,7 +8789,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8363,7 +8854,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8422,7 +8919,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8483,7 +8986,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8544,7 +9053,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8605,7 +9120,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8666,7 +9187,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.0025_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8725,7 +9252,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.0025_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8784,7 +9317,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.0025_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8845,7 +9384,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.0025_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8906,7 +9451,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.0025_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -8967,7 +9518,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.0025_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "escape_regression:20260827",
@@ -9029,7 +9586,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.005_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9088,7 +9651,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.005_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9147,7 +9716,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.005_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9208,7 +9783,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.005_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9269,7 +9850,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.005_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9330,7 +9917,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.005_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -9393,7 +9986,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.01_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9452,7 +10051,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.01_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9511,7 +10116,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.01_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9572,7 +10183,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.01_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9633,7 +10250,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.01_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -9696,7 +10319,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.01_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -9759,7 +10388,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.015_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9818,7 +10453,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.015_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "escape_regression:20260826",
         "escape_regression:20260827",
         "escape_regression:20260828"
@@ -9877,7 +10518,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.015_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "escape_regression:20260827",
@@ -9939,7 +10586,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.015_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "escape_regression:20260827",
@@ -10001,7 +10654,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.015_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10064,7 +10723,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.015_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10127,7 +10792,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.02_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L1_annotate"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L1_annotate",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "escape_regression:20260827",
@@ -10187,7 +10858,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.02_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "escape_regression:20260827",
@@ -10249,7 +10926,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.02_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "escape_regression:20260827",
@@ -10311,7 +10994,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.02_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10374,7 +11063,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.02_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10437,7 +11132,13 @@
       },
       "eligible": false,
       "name": "impact-0.05_deadband-0.02_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10499,7 +11200,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10559,7 +11266,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10622,7 +11335,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10685,7 +11404,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10747,7 +11472,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10810,7 +11541,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10874,7 +11611,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.0025_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10934,7 +11677,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.0025_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -10997,7 +11746,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.0025_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11060,7 +11815,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.0025_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11123,7 +11884,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.0025_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11186,7 +11953,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.0025_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11250,7 +12023,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.005_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11310,7 +12089,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.005_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11373,7 +12158,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.005_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11436,7 +12227,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.005_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11499,7 +12296,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.005_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11562,7 +12365,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.005_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11626,7 +12435,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.01_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11686,7 +12501,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.01_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11749,7 +12570,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.01_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11812,7 +12639,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.01_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11875,7 +12708,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.01_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -11938,7 +12777,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.01_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12002,7 +12847,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.015_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12062,7 +12913,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.015_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12125,7 +12982,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.015_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12188,7 +13051,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.015_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12251,7 +13120,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.015_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12314,7 +13189,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.015_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12378,7 +13259,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.02_nuisance-1",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12438,7 +13325,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.02_nuisance-2",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12501,7 +13394,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.02_nuisance-5",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12564,7 +13463,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.02_nuisance-10",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12627,7 +13532,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.02_nuisance-20",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12690,7 +13601,13 @@
       },
       "eligible": false,
       "name": "impact-0.025_deadband-0.02_nuisance-50",
+      "reference_action_regressions": [
+        "high_stakes_hold:L4_hold->L2_repair",
+        "low_stakes_repair:L2_repair->L0_pass"
+      ],
       "rejection_reasons": [
+        "reference_action_regression:high_stakes_hold:L4_hold->L2_repair",
+        "reference_action_regression:low_stakes_repair:L2_repair->L0_pass",
         "catch_below_90_percent:20260826",
         "escape_regression:20260826",
         "catch_below_90_percent:20260827",
@@ -12755,57 +13672,58 @@
   ],
   "selected": {
     "adjustment": {
-      "distance_from_neutral": 0.995,
+      "distance_from_neutral": 0.395,
       "impact_scale": 1.0,
-      "nuisance_multiplier": 50.0,
+      "nuisance_multiplier": 20.0,
       "probability_deadband": 0.015
     },
     "eligible": true,
-    "name": "impact-1_deadband-0.015_nuisance-50",
+    "name": "impact-1_deadband-0.015_nuisance-20",
+    "reference_action_regressions": [],
     "rejection_reasons": [],
     "seeds": [
       {
         "action_counts": {
-          "L0_pass": 87,
-          "L2_repair": 91,
-          "L4_hold": 12,
-          "L5_block": 10
+          "L0_pass": 63,
+          "L2_repair": 115,
+          "L4_hold": 2,
+          "L5_block": 20
         },
         "catch_rate": 1.0,
-        "disruptive_rate": 0.4840764331210191,
+        "disruptive_rate": 0.6305732484076433,
         "escape_count": 0,
-        "false_intervention_rate": 0.4840764331210191,
+        "false_intervention_rate": 0.6305732484076433,
         "seed": 20260826
       },
       {
         "action_counts": {
-          "L0_pass": 84,
-          "L2_repair": 90,
-          "L4_hold": 8,
-          "L5_block": 18
+          "L0_pass": 66,
+          "L2_repair": 108,
+          "L4_hold": 3,
+          "L5_block": 23
         },
         "catch_rate": 1.0,
-        "disruptive_rate": 0.5031847133757962,
+        "disruptive_rate": 0.6050955414012739,
         "escape_count": 0,
-        "false_intervention_rate": 0.5031847133757962,
+        "false_intervention_rate": 0.6050955414012739,
         "seed": 20260827
       },
       {
         "action_counts": {
-          "L0_pass": 84,
-          "L2_repair": 91,
-          "L4_hold": 5,
-          "L5_block": 20
+          "L0_pass": 57,
+          "L2_repair": 118,
+          "L4_hold": 1,
+          "L5_block": 24
         },
         "catch_rate": 1.0,
-        "disruptive_rate": 0.49044585987261147,
+        "disruptive_rate": 0.6496815286624203,
         "escape_count": 0,
-        "false_intervention_rate": 0.49044585987261147,
+        "false_intervention_rate": 0.6496815286624203,
         "seed": 20260828
       }
     ],
-    "worst_seed_disruptive_rate": 0.5031847133757962,
-    "worst_seed_false_intervention_rate": 0.5031847133757962
+    "worst_seed_disruptive_rate": 0.6496815286624203,
+    "worst_seed_false_intervention_rate": 0.6496815286624203
   },
   "selected_on_production_traffic": false,
   "selection_rules": {
@@ -12815,7 +13733,8 @@
       "worst_seed_disruptive_rate",
       "worst_seed_false_intervention_rate",
       "smallest_adjustment_distance"
-    ]
+    ],
+    "reference_action_regression_allowed": false
   },
   "source": "generated seeded evaluation"
 }

@@ -46,6 +46,7 @@ the most informative result in the build so far (F-019).
 | **Observer (real weights)** | not started | D2-B4 — needs torch |
 | Hand-labelled anchor set (300) | not started | D2-B3 — calibration currently runs on induced data (D-010) |
 | Demo app UI | not started | D1-A5 remainder |
+| Operator console (stage-flow rebuild) | **built** | `console/src/theater/`; 66 vitest cases, demo + live paths |
 | Governor / degradation order | **built** | D2-A6 — invariant 4 asserted in both directions; `/admin/governor` |
 | **Governor / Lane C / console** | not started | D2-A6, D4 |
 
@@ -359,6 +360,43 @@ once, the night before.
 observed. No cache saving is modelled at all, so the −20.15% net spend figure is routing
 and loop-breaking only, and the plan's conservative 20–45% cache range is absent by
 choice rather than by oversight. The harness prints both limits in its own output.
+
+### D-012 — The console is a Vite/React app, not Next.js + Tailwind + shadcn
+**Design handoff:** the animated stage-flow console was specified against
+"Next.js 15 App Router + TypeScript + Tailwind v4 + shadcn/ui".
+**Reality:** the repository already ships a Vite + React 19 + TypeScript console with the
+gateway contract, SSE parser, resume-token vault and projection client written against
+it, and `make up` serves it on :5173.
+**Why:** migrating to Next.js would have replaced working, tested transport code to gain
+nothing this screen uses — there is no routing, no server rendering and no data fetching
+on the server. The design's tokens, geometry, timings and copy are reproduced exactly;
+only the framework underneath differs. `@xyflow/react` was not added (the design is a
+stage machine, not a node canvas) and `recharts` was removed with the old evidence
+charts.
+
+### D-013 — Live mode never fabricates a per-check latency
+**Design handoff:** lane A shows six checks, each with its own millisecond figure.
+**Reality:** the gateway emits four SSE events (`interlock.stakes`, `.signal`,
+`.decision`, `.hold`) and reports pre-flight as an aggregate, so the live lane A shows
+the stakes, reversibility, gate mode and route decision it really receives, plus one row
+reading `AGGREGATE ONLY` that says the per-check latencies are not in the contract.
+The demo path keeps the six seeded figures, which are labelled as a replayed trace.
+
+### D-015 — The rail overlay slides out beside the bars, not over them
+**Design handoff:** the expanded stage rail sits at `left:0`, 252px wide, covering the
+60px collapsed rail.
+**Reality:** it starts at `left:60px`. Covering the bars made them unreachable with a
+mouse — hovering opens the overlay instantly, so a click aimed at bar 04 landed on
+whichever overlay row happened to be under the cursor (observed: it jumped to stage 06).
+Everything else about the overlay is unchanged: absolutely positioned, no reflow, same
+blur, shadow and transition.
+
+### D-014 — Document upload was dropped from the console UI
+**Reality:** the previous console let an operator attach an untrusted document, which
+drove the `held` scene. The new design specifies no such affordance and it is not in the
+rebuilt UI. `console/src/api/uploadClient.ts` and the gateway endpoint behind it are
+untouched, so restoring the control is a UI change only. Recorded here because it is a
+capability regression, not an oversight.
 
 ## 4b. Open findings
 

@@ -412,7 +412,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 code=rule.name,
             )
 
-        cache_lookup = _cache_lookup(app, body, lane) if body.get("stream", False) else None
+        # A regenerate means the caller rejected the previous answer. Serving that same
+        # answer from cache would defeat the request and skip rework attribution.
+        cache_lookup = (
+            _cache_lookup(app, body, lane)
+            if body.get("stream", False) and not explicit_regenerate
+            else None
+        )
         if cache_lookup is not None and cache_lookup.hit and cache_lookup.entry is not None:
             lane.route_reason = "cache_hit"
             generator = _cached_stream_response(

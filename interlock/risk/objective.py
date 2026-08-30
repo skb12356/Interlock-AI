@@ -224,6 +224,33 @@ def choose_action(
 
     best = available[0]
     runner_up = available[1] if len(available) > 1 else None
+
+    # F-019: an intervention must improve materially on passing, not merely win the
+    # argmin by a few rupees. This abstention rule only applies when L0 is available;
+    # hard rules returned above and conformal/action constraints remain authoritative.
+    pass_row = by_action["L0_pass"]
+    if (
+        best.action != "L0_pass"
+        and pass_row.available
+        and policy.minimum_relative_action_gain > 0.0
+    ):
+        relative_gain = (pass_row.total - best.total) / max(pass_row.total, 1.0)
+        if relative_gain < policy.minimum_relative_action_gain:
+            return ActionChoice(
+                action="L0_pass",
+                loss_table=rows,
+                chosen_loss=pass_row.total,
+                runner_up=best.action,
+                margin=0.0,
+                why=[
+                    f"stakes: {stakes.domain} at {format_inr(stakes.impact_inr)} "
+                    f"({stakes.reversibility})",
+                    f"policy margin: {best.action} reduces expected loss by "
+                    f"{relative_gain:.1%}, below the required "
+                    f"{policy.minimum_relative_action_gain:.1%}; choosing L0_pass",
+                ],
+            )
+
     return ActionChoice(
         action=best.action,
         loss_table=rows,

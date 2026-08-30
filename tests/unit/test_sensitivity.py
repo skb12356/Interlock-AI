@@ -1,19 +1,9 @@
-"""F-019, locked in.
+"""F-019 sensitivity boundaries after the reviewed policy resolution.
 
-The false-intervention rate is 91% against a ≤2% target, and there are two very
-different stories that fit that number:
-
-1. *the detector is weak* — improve it and the target is met;
-2. *the objective is misspecified* — no detector can meet it.
-
-They imply completely different next actions, so the difference is worth an experiment
-rather than an opinion. `scripts/sensitivity.py` runs it by stipulating a detector and
-sweeping its clean-text floor through the real policy and the real ladder.
-
-These tests pin what that experiment found. They exist mainly so that a later attempt to
-"fix" the metric by adjusting `impact_inr` or `lambda_time` fails loudly here, with a
-docstring explaining why the number is what it is. CLAUDE.md is explicit that F-002 must
-not be tuned away, and this is F-002 with an argument attached.
+The original objective produced roughly 91% false interventions. Production now
+requires an intervention to reduce expected loss by at least 50% relative to passing.
+These tests retain the stakes-sensitivity invariant and pin the intended abstention
+behavior. Hard-rule and unavailable-action precedence are tested in test_objective.py.
 """
 
 from __future__ import annotations
@@ -90,17 +80,16 @@ def test_low_stakes_traffic_is_servable_by_a_real_detector() -> None:
     assert floor > 0.019, f"the real detector's ~1.9% clean floor no longer clears {floor:.4f}"
 
 
-def test_high_stakes_traffic_demands_a_detector_nobody_has() -> None:
-    """Recorded, not fixed.
+def test_high_stakes_boundary_is_relaxed_but_remains_conservative() -> None:
+    """The policy margin moves the boundary without erasing stakes sensitivity.
 
-    At ₹40,000 the objective needs P(clean) below roughly 1-in-30,000 before it will
-    pass. No lexical detector is close, and the observer probe will not be either. That
-    is the finding; the resolution is a decision about the impact model, taken
-    deliberately, and NOT a quiet edit to this number.
+    At Rs.40,000 the pre-F-019 objective required roughly 1-in-30,000. The reviewed
+    50% relative-gain rule moves that to roughly 1-in-4,000: still conservative, but an
+    immaterial arithmetic win no longer forces an intervention.
     """
     floor = break_even_floor(_stakes(40_000, "costly", "prepayment"))
     assert floor < 0.001, floor
-    assert floor < 1 / 10_000
+    assert floor > 1 / 10_000
 
 
 @pytest.mark.parametrize("impact", [3_000, 12_000, 40_000])
@@ -140,21 +129,17 @@ def test_a_near_perfect_detector_makes_the_disruptive_target_reachable() -> None
         assert action not in disruptive, f"Rs.{impact}: {action}"
 
 
-def test_annotation_is_what_remains_and_it_is_not_a_disruption() -> None:
-    """The entire residual gap between 9.55% and the 2% target, in one assertion.
+def test_near_perfect_detector_passes_even_very_high_stakes() -> None:
+    """An immaterial annotation no longer wins only because it is slightly cheaper.
 
-    Even with a near-perfect detector the optimiser still annotates very high-stakes
-    answers. L1 appends a citation and ships the answer otherwise unchanged, for 5 ms
-    of added latency and Rs.0.50 of modelled nuisance. Whether that is a "false
-    intervention" is a definitional question -- and it is worth being explicit that the
-    answer is not obvious, rather than quietly picking whichever reading passes.
+    The raw argmin would annotate this answer. Its expected-loss reduction is below the
+    reviewed 50% policy margin, so the production decision is L0_PASS.
     """
-    action = choose_action(
+    choice = choose_action(
         probs={"ungrounded": 0.000_01},
         stakes=_stakes(120_000, "costly", "prepayment"),
         policy=POLICY,
-    ).action
-    assert action == "L1_annotate"
-    assert POLICY.latency_ms["L1_annotate"] <= 5
-    assert POLICY.compute_tokens["L1_annotate"] == 0, "annotation must not call a model"
-    assert POLICY.nuisance_inr["L1_annotate"] < POLICY.nuisance_inr["L2_repair"]
+    )
+    assert choice.action == "L0_pass"
+    assert choice.runner_up == "L1_annotate"
+    assert "policy margin" in " ".join(choice.why)

@@ -2,23 +2,27 @@
 
 ## Current Scorecard Misses
 
-The latest regenerated evaluation still misses three release targets:
+The 2026-08-30 three-seed evaluation still misses two release targets and is on the
+boundary of a third:
 
-- Verification cost: 5.20%
-- Net spend: -18.96%
-- False interventions: 85.35%
+- Verification cost: 4.95%, 5.18%, 4.87% (mean 5.00%)
+- Net spend: -19.16%, -17.01%, -16.99% (mean -17.72%)
+- False interventions: 68.15%, 68.79%, 69.43% (mean 68.79%)
 
-These are not formatting issues in the report. The current objective prices high-stakes
-requests so strongly that clean high-stakes answers still receive interventions. Finding
-F-019 remains a product/policy decision about the impact model and false-intervention
-definition, not a detector tuning task.
+F-019 is resolved with an explicit 50% minimum relative action-gain policy. Across all
+three seeds it preserves 100% pre-action catch and 0% empirical ungrounded escapes. On
+the 300 labelled anchors it preserves the baseline 96.67% catch and 3.33% escape rate,
+while reducing false interventions from 94.81% to 51.11%. This is calibration-split
+evidence, not an independent holdout. The global 2% target remains missed because every
+clean case above Rs.10,000 still crosses the material-gain boundary.
 
 ## Impact Model
 
-The policy charges the full request impact to each sentence-level decision. That is
-conservative, but it can over-price multi-sentence answers and makes high-stakes clean
-traffic difficult to pass. The code now exposes the loss table, regret, rework and net
-value so this tradeoff is visible, but the policy decision itself is still explicit.
+The policy charges the full request impact to each sentence-level decision. That remains
+conservative and can over-price multi-sentence answers. The selected margin does not
+change impact accounting; it abstains when the cheapest intervention improves expected
+loss by less than 50% versus passing. Request-level impact accounting still needs an
+evaluation harness that models multiple sentence decisions per request.
 
 ## Efficacy
 

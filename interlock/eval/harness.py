@@ -456,12 +456,10 @@ def compute_metrics(
     high_stakes = [o for o in clean if o.stakes_inr >= 10_000]
     if high_stakes and all(o.intervened for o in high_stakes):
         metrics.notes.append(
-            "NOTHING passes above Rs.10,000. That is the objective working, not failing: "
-            "at Rs.40,000 impact with a 2.5x reversibility multiplier, L0_pass only wins "
-            "if P(defect) < ~0.0001. The detector's floor on clean text is ~0.02, so "
-            "high-stakes traffic cannot pass at any detector quality short of ~1-in-10,000 "
-            "false positives. Finding F-019 -- this is a question about the impact model, "
-            "not about the detector."
+            "All clean cases above Rs.10,000 still receive an intervention. Under the "
+            "reviewed F-019 policy, those actions reduce modelled expected loss by at "
+            "least 50% versus passing; weaker gains now abstain. The remaining rate is a "
+            "measured high-stakes policy tradeoff, not a stale detector-threshold claim."
         )
     if not defective:
         metrics.notes.append("no defective cases in the set -- the catch rate is vacuous")

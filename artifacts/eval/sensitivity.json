@@ -4,32 +4,32 @@
   "n_cases": 200,
   "n_defective": 43,
   "defect_ceiling": 0.95,
-  "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+  "policy_version": "banking-v3@sha256:218a79e602a71ac3",
   "break_even_by_band": [
     {
       "impact_inr": 50,
       "domain": "branch_info",
-      "break_even_floor": 0.04780952380952381
+      "break_even_floor": 0.4443294117647057
     },
     {
       "impact_inr": 200,
       "domain": "general",
-      "break_even_floor": 0.01239506172839506
+      "break_even_floor": 0.12183225806451611
     },
     {
       "impact_inr": 3000,
       "domain": "fees",
-      "break_even_floor": 0.0003345551482839045
+      "break_even_floor": 0.003354174067495559
     },
     {
       "impact_inr": 12000,
       "domain": "claims",
-      "break_even_floor": 8.365969502541377e-05
+      "break_even_floor": 0.0008391024216840692
     },
     {
       "impact_inr": 40000,
       "domain": "prepayment",
-      "break_even_floor": 2.509937251568648e-05
+      "break_even_floor": 0.0002517698820078658
     }
   ],
   "sweep": [
@@ -43,23 +43,23 @@
     },
     {
       "clean_floor": 3e-05,
-      "false_intervention_rate_any": 0.47770700636942676,
+      "false_intervention_rate_any": 0.0,
       "false_intervention_rate_disruptive": 0.0,
       "catch_rate": 1.0,
-      "meets_targets_counting_annotation": false,
+      "meets_targets_counting_annotation": true,
       "meets_targets_disruptive_only": true
     },
     {
       "clean_floor": 0.0001,
-      "false_intervention_rate_any": 0.6369426751592356,
-      "false_intervention_rate_disruptive": 0.1337579617834395,
+      "false_intervention_rate_any": 0.0,
+      "false_intervention_rate_disruptive": 0.0,
       "catch_rate": 1.0,
-      "meets_targets_counting_annotation": false,
-      "meets_targets_disruptive_only": false
+      "meets_targets_counting_annotation": true,
+      "meets_targets_disruptive_only": true
     },
     {
       "clean_floor": 0.0003,
-      "false_intervention_rate_any": 0.6369426751592356,
+      "false_intervention_rate_any": 0.47770700636942676,
       "false_intervention_rate_disruptive": 0.47770700636942676,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
@@ -67,7 +67,7 @@
     },
     {
       "clean_floor": 0.001,
-      "false_intervention_rate_any": 0.6815286624203821,
+      "false_intervention_rate_any": 0.6369426751592356,
       "false_intervention_rate_disruptive": 0.6369426751592356,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
@@ -75,6 +75,14 @@
     },
     {
       "clean_floor": 0.003,
+      "false_intervention_rate_any": 0.6369426751592356,
+      "false_intervention_rate_disruptive": 0.6369426751592356,
+      "catch_rate": 1.0,
+      "meets_targets_counting_annotation": false,
+      "meets_targets_disruptive_only": false
+    },
+    {
+      "clean_floor": 0.01,
       "false_intervention_rate_any": 0.6815286624203821,
       "false_intervention_rate_disruptive": 0.6815286624203821,
       "catch_rate": 1.0,
@@ -82,16 +90,8 @@
       "meets_targets_disruptive_only": false
     },
     {
-      "clean_floor": 0.01,
-      "false_intervention_rate_any": 0.7707006369426752,
-      "false_intervention_rate_disruptive": 0.6815286624203821,
-      "catch_rate": 1.0,
-      "meets_targets_counting_annotation": false,
-      "meets_targets_disruptive_only": false
-    },
-    {
       "clean_floor": 0.019,
-      "false_intervention_rate_any": 0.8535031847133758,
+      "false_intervention_rate_any": 0.6815286624203821,
       "false_intervention_rate_disruptive": 0.6815286624203821,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
@@ -99,12 +99,12 @@
     },
     {
       "clean_floor": 0.05,
-      "false_intervention_rate_any": 1.0,
-      "false_intervention_rate_disruptive": 0.7707006369426752,
+      "false_intervention_rate_any": 0.7133757961783439,
+      "false_intervention_rate_disruptive": 0.7133757961783439,
       "catch_rate": 1.0,
       "meets_targets_counting_annotation": false,
       "meets_targets_disruptive_only": false
     }
   ],
-  "verdict": "disruptive target achievable below a clean floor of 3e-05"
+  "verdict": "disruptive target achievable below a clean floor of 0.0001"
 }

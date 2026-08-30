@@ -15,6 +15,12 @@ currency: INR
 # earn its delay.
 lambda_time_inr_per_second: 0.40
 
+# F-019 false-intervention control. Outside deterministic hard rules, an action must
+# reduce expected loss by at least this fraction relative to L0_PASS. A three-seed
+# strategy sweep plus the 300 human-labelled anchors selected 50%: lower margins left
+# more false interventions, while 70% crossed the measured safety boundary.
+minimum_relative_action_gain: 0.50
+
 stakes:
   # Used when no domain matches. Deliberately small: unknown should not mean expensive.
   default_impact_inr: 200

@@ -172,6 +172,66 @@ def test_margin_is_the_distance_to_the_runner_up(policy: Policy) -> None:
     )
 
 
+def test_minimum_relative_gain_passes_when_intervention_gain_is_too_small(
+    policy: Policy,
+) -> None:
+    ungated = policy.model_copy(update={"minimum_relative_action_gain": 0.0})
+    gated = policy.model_copy(update={"minimum_relative_action_gain": 0.5})
+    stakes = _stakes(1_000, "costly", "general")
+    probs = {"ungrounded": 0.01}
+    original = choose_action(probs=probs, stakes=stakes, policy=ungated)
+    rows = {row.action: row for row in original.loss_table}
+    gain = (rows["L0_pass"].total - original.chosen_loss) / max(
+        rows["L0_pass"].total, 1.0
+    )
+
+    assert original.action == "L2_repair"
+    assert 0.49 <= gain < 0.5
+    choice = choose_action(probs=probs, stakes=stakes, policy=gated)
+    assert choice.action == "L0_pass"
+    assert choice.runner_up == original.action
+    assert "below the required 50.0%" in " ".join(choice.why)
+
+
+def test_minimum_relative_gain_keeps_a_material_intervention(policy: Policy) -> None:
+    gated = policy.model_copy(update={"minimum_relative_action_gain": 0.5})
+    choice = choose_action(
+        probs={"ungrounded": 0.31},
+        stakes=_stakes(40_000, "costly", "loan_terms"),
+        policy=gated,
+    )
+    rows = {row.action: row for row in choice.loss_table}
+    gain = (rows["L0_pass"].total - choice.chosen_loss) / rows["L0_pass"].total
+
+    assert choice.action == "L4_hold"
+    assert gain >= 0.5
+
+
+def test_minimum_relative_gain_does_not_override_a_hard_rule(policy: Policy) -> None:
+    gated = policy.model_copy(update={"minimum_relative_action_gain": 0.99})
+    choice = choose_action(
+        probs={"ungrounded": 0.0},
+        stakes=_stakes(50, "reversible", "branch_info"),
+        policy=gated,
+        hard_rules=[HardRule(name="canary_leak", action="L5_block", reason="canary")],
+    )
+
+    assert choice.action == "L5_block"
+    assert choice.hard_rule == "canary_leak"
+
+
+def test_minimum_relative_gain_does_not_restore_unavailable_pass(policy: Policy) -> None:
+    gated = policy.model_copy(update={"minimum_relative_action_gain": 0.99})
+    choice = choose_action(
+        probs={"ungrounded": 0.31},
+        stakes=_stakes(200),
+        policy=gated,
+        extra_unavailable={"L0_pass": "conformal_safety"},
+    )
+
+    assert choice.action != "L0_pass"
+
+
 # --------------------------------------------------------------------------- #
 # The ladder shrinks as the answer travels (ADR-003)
 # --------------------------------------------------------------------------- #
@@ -312,6 +372,7 @@ def test_every_rung_of_the_ladder_is_reachable(policy: Policy) -> None:
     chosen at any probability or any stakes level.** The whole middle of the ladder was
     dead and nothing would have told us before stage.
     """
+    objective_policy = policy.model_copy(update={"minimum_relative_action_gain": 0.0})
     chosen = set()
     for impact, reversibility in [
         (50, "reversible"),
@@ -327,7 +388,7 @@ def test_every_rung_of_the_ladder_is_reachable(policy: Policy) -> None:
                     choose_action(
                         probs={"ungrounded": probability},
                         stakes=_stakes(impact, reversibility),
-                        policy=policy,
+                        policy=objective_policy,
                         already_emitted=emitted,
                     ).action
                 )

@@ -53,7 +53,7 @@ def test_adjustment_changes_only_effective_pricing_inputs() -> None:
     )
 
     assert stakes.impact_inr == 40_000
-    assert any("effective impact Rs.4,000" in reason for reason in choice.why)
+    assert any("impact Rs.40,000 -> Rs.4,000" in reason for reason in choice.why)
     assert any("probability deadband 0.005" in reason for reason in choice.why)
     assert any("nuisance multiplier 2" in reason for reason in choice.why)
 

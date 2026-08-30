@@ -30,6 +30,7 @@ from interlock.core.errors import PolicyError
 from interlock.core.types import ACTIONS, Action, Defect, Reversibility
 
 __all__ = [
+    "DecisionAdjustment",
     "DomainStakes",
     "EfficacyEntry",
     "Guarantees",
@@ -129,6 +130,26 @@ class Thresholds(_Strict):
     strong_model_above_impact_inr: float = 1000.0
 
 
+class DecisionAdjustment(_Strict):
+    """Governed transformations applied only to probabilistic loss pricing.
+
+    Neutral defaults preserve existing tenant behavior.  Hard rules are evaluated
+    independently and cannot be weakened by these values.
+    """
+
+    impact_scale: float = Field(default=1.0, gt=0.0, le=1.0)
+    probability_deadband: float = Field(default=0.0, ge=0.0, lt=1.0)
+    nuisance_multiplier: float = Field(default=1.0, ge=1.0)
+
+    @property
+    def is_neutral(self) -> bool:
+        return (
+            self.impact_scale == 1.0
+            and self.probability_deadband == 0.0
+            and self.nuisance_multiplier == 1.0
+        )
+
+
 class Policy(_Strict):
     version: str
     currency: str = "INR"
@@ -144,6 +165,7 @@ class Policy(_Strict):
     human_review: HumanReview
     guarantees: Guarantees
     thresholds: Thresholds = Field(default_factory=Thresholds)
+    decision_adjustment: DecisionAdjustment = Field(default_factory=DecisionAdjustment)
 
     #: sha256 of the file this was loaded from. Stamped on every decision.
     policy_version: str = ""

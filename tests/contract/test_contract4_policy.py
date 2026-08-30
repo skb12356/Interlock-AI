@@ -10,9 +10,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from interlock.core.errors import PolicyError
-from interlock.core.policy import Policy, load_policy
+from interlock.core.policy import DecisionAdjustment, Policy, load_policy
 from interlock.core.types import ACTIONS
 
 POLICY_PATH = Path(__file__).resolve().parents[2] / "policies" / "banking.yaml"
@@ -29,14 +30,19 @@ def policy() -> Policy:
 
 
 def test_the_shipped_banking_policy_loads(policy: Policy) -> None:
-    assert policy.version == "banking-v3"
+    assert policy.version == "banking-v4"
     assert policy.currency == "INR"
+    assert policy.decision_adjustment == DecisionAdjustment(
+        impact_scale=1.0,
+        probability_deadband=0.015,
+        nuisance_multiplier=20.0,
+    )
 
 
 def test_policy_version_is_the_digest_of_the_file(policy: Policy) -> None:
     """Stamped on every decision, so an auditor asking 'which version priced this?'
     gets an answer that cannot be fudged after the fact."""
-    assert policy.policy_version.startswith("banking-v3@sha256:")
+    assert policy.policy_version.startswith("banking-v4@sha256:")
 
 
 def test_policy_version_changes_when_the_file_changes(tmp_path: Path) -> None:
@@ -97,6 +103,33 @@ def test_unknown_tools_must_have_a_default(tmp_path: Path) -> None:
     path.write_text(text, encoding="utf-8")
     with pytest.raises(PolicyError, match="default"):
         load_policy(path)
+
+
+def test_decision_adjustment_defaults_to_neutral(policy: Policy) -> None:
+    """Old tenant policies remain behaviorally unchanged until governance opts in."""
+    payload = policy.model_dump(exclude={"decision_adjustment"})
+
+    restored = Policy.model_validate(payload)
+
+    assert restored.decision_adjustment == DecisionAdjustment()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("impact_scale", 0.0),
+        ("impact_scale", 1.01),
+        ("probability_deadband", -0.01),
+        ("probability_deadband", 1.0),
+        ("nuisance_multiplier", 0.99),
+    ],
+)
+def test_decision_adjustment_rejects_values_outside_governed_bounds(
+    field: str, value: float
+) -> None:
+    """Invalid transformations must fail policy validation rather than degrade silently."""
+    with pytest.raises(ValidationError):
+        DecisionAdjustment.model_validate({field: value})
 
 
 def test_all_six_actions_are_priced_for_nuisance_and_latency(policy: Policy) -> None:

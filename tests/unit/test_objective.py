@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from interlock.core.policy import Policy, load_policy
+from interlock.core.policy import DecisionAdjustment, Policy, load_policy
 from interlock.core.types import ACTIONS, Defect, Stakes
 from interlock.risk.objective import (
     HardRule,
@@ -66,6 +66,50 @@ def test_case_c_low_risk_does_nothing(policy: Policy) -> None:
     L0 must stay genuinely free or the latency budget is a fiction."""
     choice = choose_action(probs={"ungrounded": 0.01}, stakes=_stakes(200), policy=policy)
     assert choice.action == "L0_pass"
+
+
+def test_governed_adjustment_changes_only_effective_loss_inputs(policy: Policy) -> None:
+    """The release adjustment is auditable without mutating request-wide stakes."""
+    stakes = _stakes(200)
+    adjustment = DecisionAdjustment(probability_deadband=0.015, nuisance_multiplier=20)
+
+    choice = choose_action(
+        probs=_RISK_31,
+        stakes=stakes,
+        policy=policy,
+        adjustment=adjustment,
+    )
+    rows = {row.action: row for row in choice.loss_table}
+
+    assert stakes.impact_inr == 200
+    assert rows["L0_pass"].residual_harm == pytest.approx((0.31 - 0.015) * 200)
+    assert rows["L2_repair"].nuisance == pytest.approx((1 - 0.295) * 2 * 20)
+    assert rows["L4_hold"].compute == policy.human_review.cost_inr
+    assert choice.action == "L2_repair"
+    explanation = " ".join(choice.why)
+    assert "impact Rs.200 -> Rs.200 (scale 1)" in explanation
+    assert "probability deadband 0.015" in explanation
+    assert "nuisance multiplier 20" in explanation
+    assert "0.31 -> effective 0.295" in explanation
+
+
+def test_governed_adjustment_cannot_weaken_a_hard_rule(policy: Policy) -> None:
+    """The probabilistic release knob never changes deterministic enforcement."""
+    choice = choose_action(
+        probs={"ungrounded": 0.0},
+        stakes=_stakes(40_000, "costly", "loan_terms"),
+        policy=policy,
+        adjustment=DecisionAdjustment(
+            impact_scale=0.025,
+            probability_deadband=0.02,
+            nuisance_multiplier=50,
+        ),
+        hard_rules=(HardRule("canary", "L5_block", "tenant canary escaped"),),
+    )
+
+    assert choice.action == "L5_block"
+    assert choice.hard_rule == "canary"
+    assert any("probability deadband 0.02" in reason for reason in choice.why)
 
 
 def test_the_action_changes_only_because_the_stakes_changed(policy: Policy) -> None:

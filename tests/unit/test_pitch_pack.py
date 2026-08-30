@@ -15,7 +15,7 @@ def test_pitch_pack_uses_current_policy_and_seed_evidence(tmp_path: Path) -> Non
     stored = json.loads(output.read_text(encoding="utf-8"))
 
     assert stored == payload
-    assert payload["policy_version"].startswith("banking-v3@sha256:")
+    assert payload["policy_version"].startswith("banking-v4@sha256:")
     assert len(payload["metrics"]) >= 6
     assert len(payload["stakes"]) == 3
     assert {item["seed"] for item in payload["metrics"][0]["measurements"]} == {

@@ -7,13 +7,24 @@
 #
 # Treat changes here as reviewed code changes, never as inline constants (CLAUDE.md §9).
 
-version: "banking-v3"
+version: "banking-v4"
 currency: INR
 
 # What one second of a customer's waiting is worth. This is term (4) of the objective,
 # and it is the structural reason the system cannot slow the AI down: a slow action must
 # earn its delay.
 lambda_time_inr_per_second: 0.40
+
+# Measured release adjustment selected from artifacts/eval/policy_comparison.json.
+# Generated seeded evaluation only (seeds 20260826/27/28), not production traffic:
+# 100% pre-action catch, zero grounding escapes, and 64.97% worst-seed disruptive
+# false intervention versus 92.36% for the neutral policy on the fresh comparison run.
+# The selection gate also preserves the reference high-stakes Hold, low-stakes Repair,
+# and low-risk Pass. Hard rules execute independently and cannot be weakened here.
+decision_adjustment:
+  impact_scale: 1.0
+  probability_deadband: 0.015
+  nuisance_multiplier: 20.0
 
 stakes:
   # Used when no domain matches. Deliberately small: unknown should not mean expensive.

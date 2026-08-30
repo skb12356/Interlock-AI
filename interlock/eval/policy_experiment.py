@@ -13,7 +13,7 @@ from dataclasses import dataclass, field, replace
 from itertools import product
 from typing import Any
 
-from interlock.core.policy import Policy
+from interlock.core.policy import DecisionAdjustment, Policy
 from interlock.core.types import Action, Decision, Defect, RiskContext, Stakes
 from interlock.eval.harness import CaseOutcome, EvalRun, compute_metrics
 from interlock.eval.metrics import PRE_ACTION_ACTIONS
@@ -117,51 +117,19 @@ def apply_adjustment(
     extra_unavailable: Mapping[Action, str] | None = None,
 ) -> ActionChoice:
     """Price one candidate without mutating request stakes or the loaded policy."""
-    effective_probs: dict[Defect, float] = {
-        defect: max(0.0, probability - adjustment.probability_deadband)
-        for defect, probability in probs.items()
-    }
-    effective_stakes = stakes.model_copy(
-        update={"impact_inr": stakes.impact_inr * adjustment.impact_scale}
-    )
-    effective_policy = policy.model_copy(
-        update={
-            "nuisance_inr": {
-                action: amount * adjustment.nuisance_multiplier
-                for action, amount in policy.nuisance_inr.items()
-            }
-        }
-    )
-    choice = choose_action(
-        probs=effective_probs,
-        stakes=effective_stakes,
-        policy=effective_policy,
+    return choose_action(
+        probs=probs,
+        stakes=stakes,
+        policy=policy,
+        adjustment=DecisionAdjustment(
+            impact_scale=adjustment.impact_scale,
+            probability_deadband=adjustment.probability_deadband,
+            nuisance_multiplier=adjustment.nuisance_multiplier,
+        ),
         already_emitted=already_emitted,
         monetary_amount_inr=monetary_amount_inr,
         hard_rules=hard_rules,
         extra_unavailable=extra_unavailable,
-    )
-    notes: list[str] = []
-    if adjustment.impact_scale != 1:
-        notes.append(
-            "policy experiment: original impact "
-            f"Rs.{stakes.impact_inr:,.0f}, effective impact Rs.{effective_stakes.impact_inr:,.0f} "
-            f"(scale {adjustment.impact_scale:g})"
-        )
-    if adjustment.probability_deadband:
-        notes.append(f"policy experiment: probability deadband {adjustment.probability_deadband:g}")
-    if adjustment.nuisance_multiplier != 1:
-        notes.append(f"policy experiment: nuisance multiplier {adjustment.nuisance_multiplier:g}")
-    if not notes:
-        return choice
-    return ActionChoice(
-        action=choice.action,
-        loss_table=choice.loss_table,
-        chosen_loss=choice.chosen_loss,
-        runner_up=choice.runner_up,
-        margin=choice.margin,
-        why=choice.why + notes,
-        hard_rule=choice.hard_rule,
     )
 
 

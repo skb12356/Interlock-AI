@@ -27,7 +27,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from interlock.core.money import format_inr
-from interlock.core.policy import Policy
+from interlock.core.policy import DecisionAdjustment, Policy
 from interlock.core.types import ACTIONS, Action, Defect, LossRow, Stakes
 
 __all__ = [
@@ -114,6 +114,7 @@ def price_actions(
     probs: Mapping[Defect, float],
     stakes: Stakes,
     policy: Policy,
+    adjustment: DecisionAdjustment | None = None,
     already_emitted: bool = False,
     monetary_amount_inr: float = 0.0,
     extra_unavailable: Mapping[Action, str] | None = None,
@@ -124,11 +125,16 @@ def price_actions(
     the table *is* the explanation, so an action the optimiser could not choose must
     still show why it could not.
     """
+    governed = adjustment or DecisionAdjustment()
+    effective_probs = {
+        defect: max(0.0, probability - governed.probability_deadband)
+        for defect, probability in probs.items()
+    }
     unavailable = dict(unavailable_actions(already_emitted=already_emitted))
     if extra_unavailable:
         unavailable.update(extra_unavailable)
 
-    probability_of_any = p_any(probs)
+    probability_of_any = p_any(effective_probs)
     price_per_token = policy.price_inr_per_1k_tokens / 1000.0
 
     rows: list[LossRow] = []
@@ -136,15 +142,17 @@ def price_actions(
         residual_harm = sum(
             probability
             * policy.impact_for(
-                impact_inr=stakes.impact_inr,
+                impact_inr=stakes.impact_inr * governed.impact_scale,
                 defect=defect,
                 reversibility=stakes.reversibility,
                 monetary_amount_inr=monetary_amount_inr,
             )
             * (1.0 - policy.efficacy_for(action, defect))
-            for defect, probability in probs.items()
+            for defect, probability in effective_probs.items()
         )
-        nuisance = (1.0 - probability_of_any) * policy.nuisance_inr[action]
+        nuisance = (
+            (1.0 - probability_of_any) * policy.nuisance_inr[action] * governed.nuisance_multiplier
+        )
         compute = policy.compute_tokens[action] * price_per_token
         if action in _REQUIRES_HUMAN:
             compute += policy.human_review.cost_inr
@@ -171,6 +179,7 @@ def choose_action(
     probs: Mapping[Defect, float],
     stakes: Stakes,
     policy: Policy,
+    adjustment: DecisionAdjustment | None = None,
     already_emitted: bool = False,
     monetary_amount_inr: float = 0.0,
     hard_rules: Sequence[HardRule] = (),
@@ -182,10 +191,16 @@ def choose_action(
     rule decides the outcome, the table shows what the arithmetic would have said —
     which is what lets the console explain a hard stop rather than merely announce it.
     """
+    governed = adjustment or DecisionAdjustment()
+    effective_probs = {
+        defect: max(0.0, probability - governed.probability_deadband)
+        for defect, probability in probs.items()
+    }
     rows = price_actions(
         probs=probs,
         stakes=stakes,
         policy=policy,
+        adjustment=governed,
         already_emitted=already_emitted,
         monetary_amount_inr=monetary_amount_inr,
         extra_unavailable=extra_unavailable,
@@ -201,7 +216,7 @@ def choose_action(
             chosen_loss=by_action[fired.action].total,
             runner_up=None,
             margin=0.0,
-            why=[f"hard rule: {fired.reason}"],
+            why=[f"hard rule: {fired.reason}", *_adjustment_notes(stakes, governed)],
             hard_rule=fired.name,
         )
 
@@ -230,7 +245,7 @@ def choose_action(
         chosen_loss=best.total,
         runner_up=runner_up.action if runner_up else None,
         margin=(runner_up.total - best.total) if runner_up else 0.0,
-        why=_explain(best, runner_up, probs, stakes),
+        why=_explain(best, runner_up, probs, effective_probs, stakes, governed),
     )
 
 
@@ -245,7 +260,9 @@ def _explain(
     best: LossRow,
     runner_up: LossRow | None,
     probs: Mapping[Defect, float],
+    effective_probs: Mapping[Defect, float],
     stakes: Stakes,
+    adjustment: DecisionAdjustment,
 ) -> list[str]:
     """Ordered, human-readable. The console renders these verbatim."""
     why = [
@@ -254,7 +271,12 @@ def _explain(
     ranked = sorted(probs.items(), key=lambda item: item[1], reverse=True)
     for defect, probability in ranked[:3]:
         if probability > 0.0:
-            why.append(f"P({defect}) = {probability:.2f}")
+            effective = effective_probs[defect]
+            if adjustment.probability_deadband:
+                why.append(f"P({defect}) = {probability:.3g} -> effective {effective:.3g}")
+            else:
+                why.append(f"P({defect}) = {probability:.2f}")
+    why.extend(_adjustment_notes(stakes, adjustment))
     why.append(
         f"{best.action} costs {format_inr(best.total, 2)} "
         f"(harm {best.residual_harm:,.2f} + nuisance {best.nuisance:,.2f} "
@@ -266,3 +288,17 @@ def _explain(
             f"(margin {format_inr(runner_up.total - best.total, 2)})"
         )
     return why
+
+
+def _adjustment_notes(stakes: Stakes, adjustment: DecisionAdjustment) -> list[str]:
+    """Disclose non-neutral governance inputs without changing request stakes."""
+    if adjustment.is_neutral:
+        return []
+    effective_impact = stakes.impact_inr * adjustment.impact_scale
+    return [
+        "policy adjustment: impact "
+        f"{format_inr(stakes.impact_inr)} -> {format_inr(effective_impact)} "
+        f"(scale {adjustment.impact_scale:g}); probability deadband "
+        f"{adjustment.probability_deadband:g}; nuisance multiplier "
+        f"{adjustment.nuisance_multiplier:g}"
+    ]

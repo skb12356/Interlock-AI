@@ -492,7 +492,7 @@ def test_a_request_without_messages_is_rejected(client: TestClient) -> None:
 def test_health_reports_the_policy_version(client: TestClient) -> None:
     body = client.get("/health").json()
     assert body["ok"] is True
-    assert body["policy_version"].startswith("banking-v3@sha256:")
+    assert body["policy_version"].startswith("banking-v4@sha256:")
     assert "ollama" in body["providers"]
 
 
@@ -562,8 +562,20 @@ def test_lane_a_signals_reach_the_ledger(client: TestClient) -> None:
     respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
     client.post("/v1/chat/completions", json=_request())
 
-    rows = _wait_for_rows(client, "SELECT name FROM signals", minimum=3)
-    assert {"injection", "pii_leak", "canary_planted"} <= {row[0] for row in rows}
+    expected = {"injection", "pii_leak", "canary_planted"}
+    deadline = time.monotonic() + 3.0
+    observed: set[str] = set()
+    while time.monotonic() < deadline:
+        rows = (
+            client.app.state.ledger._require_connection()
+            .execute("SELECT name FROM signals")
+            .fetchall()
+        )
+        observed = {row[0] for row in rows}
+        if expected <= observed:
+            break
+        time.sleep(0.02)
+    assert expected <= observed
 
 
 @respx.mock

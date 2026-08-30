@@ -153,6 +153,7 @@ class StubRiskEngine:
             probs=probs,
             stakes=ctx.stakes,
             policy=self.policy,
+            adjustment=self.policy.decision_adjustment,
             already_emitted=ctx.already_emitted,
             hard_rules=hard_rules,
         )

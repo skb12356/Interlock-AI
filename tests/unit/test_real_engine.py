@@ -18,7 +18,7 @@ from typing import ClassVar
 
 import pytest
 
-from interlock.core.policy import load_policy
+from interlock.core.policy import DecisionAdjustment, load_policy
 from interlock.core.types import Fragment, RiskContext, Stakes
 from interlock.risk.calibration import MultiDefectCalibrator
 from interlock.risk.conformal import ConformalResult
@@ -137,6 +137,28 @@ async def test_a_grounded_sentence_scores_at_the_base_rate(engine: RealRiskEngin
 async def test_a_grounded_sentence_passes_at_low_stakes(engine: RealRiskEngine) -> None:
     decision = await engine.evaluate(_ctx(GROUNDED_SENTENCE, stakes=_low_stakes()))
     assert decision.action == "L0_pass"
+
+
+async def test_engine_passes_governed_adjustment_to_the_objective(
+    calibrator: MultiDefectCalibrator,
+) -> None:
+    """Catches a valid policy block that production silently ignores."""
+    adjusted_policy = POLICY.model_copy(
+        update={
+            "decision_adjustment": DecisionAdjustment(
+                probability_deadband=0.015,
+                nuisance_multiplier=20,
+            )
+        }
+    )
+    adjusted_engine = RealRiskEngine(policy=adjusted_policy, calibrator=calibrator)
+
+    decision = await adjusted_engine.evaluate(_ctx(GROUNDED_SENTENCE, stakes=_low_stakes()))
+
+    explanation = " ".join(decision.why)
+    assert "policy adjustment:" in explanation
+    assert "probability deadband 0.015" in explanation
+    assert "nuisance multiplier 20" in explanation
 
 
 async def test_the_same_probability_produces_different_actions_by_stakes(

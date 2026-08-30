@@ -168,7 +168,7 @@ async def test_the_decision_is_stamped_with_its_policy_version(
     """So an auditor can ask which version priced this."""
     decision = await engine.evaluate(_ctx())
     assert decision.policy_version == policy.policy_version
-    assert decision.policy_version.startswith("banking-v3@sha256:")
+    assert decision.policy_version.startswith("banking-v4@sha256:")
 
 
 async def test_the_decision_is_replayable(engine: StubRiskEngine) -> None:

@@ -48,6 +48,10 @@ class Chunk:
     domain: str
     provenance: Provenance
     ordinal: int
+    #: Manifest-declared document this chunk contradicts. Direction matters: when set,
+    #: this document is the contradicting/outdated side and the referenced document is
+    #: authoritative.
+    contradicts: str | None = None
 
     def to_fragment(self, score: float | None = None) -> Fragment:
         """The contract type. Retrieval's whole output surface is ``Fragment``."""
@@ -73,6 +77,7 @@ def chunk_markdown(
     doc_id: str,
     domain: str,
     provenance: Provenance,
+    contradicts: str | None = None,
     title: str = "",
     max_chars: int = DEFAULT_MAX_CHARS,
     min_chars: int = DEFAULT_MIN_CHARS,
@@ -103,6 +108,7 @@ def chunk_markdown(
             domain=domain,
             provenance=provenance,
             ordinal=ordinal,
+            contradicts=contradicts,
         )
         for ordinal, passage in enumerate(passages)
     ]

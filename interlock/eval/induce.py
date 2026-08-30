@@ -223,13 +223,17 @@ class TripleGenerator:
     def _one(self, index: int, mode: str) -> LabelledTriple | None:
         builder = getattr(self, f"_make_{mode}")
         result: tuple[str, str, list[Fragment], str, str] | None = None
-        chunk = self._rng.choice(self.chunks)
+        candidates = self.chunks
+        if mode == "contradiction":
+            authoritative_ids = {chunk.contradicts for chunk in self.chunks if chunk.contradicts}
+            candidates = [chunk for chunk in self.chunks if chunk.doc_id in authoritative_ids]
+        chunk = self._rng.choice(candidates or self.chunks)
 
         # Most chunks cannot host most failures -- there is no number to corrupt in a
         # branch-timings passage. Try several before giving up, or the rare modes end
         # up with a handful of items each and the taxonomy is balanced only on paper.
         for _ in range(MAX_CHUNK_ATTEMPTS):
-            chunk = self._rng.choice(self.chunks)
+            chunk = self._rng.choice(candidates or self.chunks)
             result = builder(chunk)
             if result is not None:
                 break
@@ -419,12 +423,6 @@ class TripleGenerator:
         return None
 
     def _contradiction_partner(self, chunk: Chunk) -> Chunk | None:
-        """A chunk from a different document in the same domain.
-
-        Same domain is what makes the two passages *about* the same thing, which is
-        what makes the contradiction real rather than a pair of strangers.
-        """
-        candidates = [
-            c for c in self.chunks if c.domain == chunk.domain and c.doc_id != chunk.doc_id
-        ]
+        """The manifest-declared document that contradicts authoritative ``chunk``."""
+        candidates = [c for c in self.chunks if c.contradicts == chunk.doc_id]
         return self._rng.choice(candidates) if candidates else None

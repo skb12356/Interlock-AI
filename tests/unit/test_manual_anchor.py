@@ -16,6 +16,9 @@ from interlock.ledger.writer import connect
 from interlock.retrieval.chunker import Chunk
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+MANIFEST_PATH = REPO_ROOT / "corpus" / "manifest.json"
+GENERATED_SOURCE = "generated_anchor_from_calibration_split"
+GENERATOR_LABELLER = "interlock_anchor_generator_v1"
 
 
 @pytest.fixture(scope="module")
@@ -100,6 +103,16 @@ def test_manual_anchor_records_context_and_review_metadata(
         assert row["review_basis"]
 
 
+def test_generated_anchor_is_explicitly_unreviewed(
+    anchor_rows: list[dict[str, Any]],
+) -> None:
+    for row in anchor_rows:
+        assert row["source"] == GENERATED_SOURCE
+        assert row["labeller"] == GENERATOR_LABELLER
+        assert row["review_status"] == "unreviewed"
+        assert "not manually reviewed" in row["review_basis"]
+
+
 def test_manual_anchor_rejects_counts_without_an_approved_matrix() -> None:
     with pytest.raises(ValueError, match="defined only for exactly 300 rows"):
         build_labels(299, seed=20260829)
@@ -111,7 +124,7 @@ def test_manual_anchor_jsonl_round_trips(tmp_path: Path, anchor_rows: list[dict[
     write_jsonl(rows, path)
     loaded = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert len(loaded) == 12
-    assert loaded[0]["labeller"] == "person1_codex_manual_review"
+    assert loaded[0]["labeller"] == GENERATOR_LABELLER
 
 
 def test_manual_anchor_imports_to_labels_table(
@@ -123,7 +136,7 @@ def test_manual_anchor_imports_to_labels_table(
     connection = connect(db)
     try:
         count = connection.execute(
-            "SELECT COUNT(*) FROM labels WHERE labeller='person1_codex_manual_review'"
+            "SELECT COUNT(*) FROM labels WHERE labeller=?", (GENERATOR_LABELLER,)
         ).fetchone()[0]
         assert count == 12
     finally:
@@ -157,3 +170,37 @@ def test_the_committed_anchor_artifact_matches_the_approved_matrix() -> None:
         assert payload["context_count"] == len(payload["context"])
         assert payload["context_doc_ids"] == [fragment["doc_id"] for fragment in payload["context"]]
         assert payload["domain"]
+
+
+def test_every_committed_payload_is_semantically_unique() -> None:
+    path = REPO_ROOT / "data" / "labels" / "manual_anchor_300.jsonl"
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    signatures = []
+    for row in rows:
+        payload = dict(row["payload"])
+        payload.pop("triple_id")
+        signatures.append(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+    assert len(set(signatures)) == 300
+
+
+def test_committed_contradictions_follow_manifest_direction() -> None:
+    path = REPO_ROOT / "data" / "labels" / "manual_anchor_300.jsonl"
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    contradicts = {entry["doc_id"]: entry.get("contradicts") for entry in manifest["documents"]}
+    contradiction_rows = [row for row in rows if row["payload"]["failure_mode"] == "contradiction"]
+    assert len(contradiction_rows) == 20
+    for row in contradiction_rows:
+        payload = row["payload"]
+        authoritative, contradicting = [
+            doc_id.split("#", 1)[0] for doc_id in payload["context_doc_ids"][:2]
+        ]
+        assert payload["source_doc_id"] == authoritative
+        assert contradicts[contradicting] == authoritative
+        assert payload["answer"] in payload["context"][1]["text"]
+
+
+def test_committed_anchor_rows_match_the_canonical_builder() -> None:
+    path = REPO_ROOT / "data" / "labels" / "manual_anchor_300.jsonl"
+    committed = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert committed == build_labels(300, seed=20260829)

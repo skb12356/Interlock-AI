@@ -39,6 +39,28 @@ CHALLENGE_LEVELS: tuple[ChallengeLevel, ...] = (
     "L3_conflict",
 )
 
+_QUESTION_TEMPLATES: tuple[str, ...] = (
+    "What does {title} state?",
+    "Which rule is set out in {title}?",
+    "According to {title}, what applies?",
+    "How does {title} describe the applicable terms?",
+    "What requirement does {title} establish?",
+    "Which policy detail is specified by {title}?",
+    "Under {title}, what condition governs the customer?",
+    "What does the cited policy say in {title}?",
+)
+
+_UNANSWERABLE_QUESTION_TEMPLATES: tuple[str, ...] = (
+    "Under {title}, what exact penalty applies after two defaults in one quarter?",
+    "What precise charge does {title} impose for two defaults in the same quarter?",
+    "If a customer defaults twice in one quarter, what exact penalty does {title} set?",
+    "Which specific penalty follows two same-quarter defaults under {title}?",
+    "How much is the exact two-default quarterly penalty in {title}?",
+    "What fixed sanction does {title} prescribe for a second quarterly default?",
+    "According to {title}, what precise consequence follows two defaults in a quarter?",
+    "What exact amount is charged for two defaults in one quarter under {title}?",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class AnchorTriple:
@@ -60,6 +82,27 @@ def _level_plan(count: int) -> list[ChallengeLevel]:
 
 def _document_id(fragment_doc_id: str | None) -> str:
     return fragment_doc_id.split("#", 1)[0] if fragment_doc_id else ""
+
+
+def _vary_question(triple: LabelledTriple, *, title: str, occurrence: int) -> LabelledTriple:
+    templates = (
+        _UNANSWERABLE_QUESTION_TEMPLATES
+        if triple.failure_mode == "unanswerable"
+        else _QUESTION_TEMPLATES
+    )
+    if occurrence >= len(templates):
+        raise ValueError(f"not enough semantic question variants for {triple.triple_id}")
+    return LabelledTriple(
+        triple_id=triple.triple_id,
+        question=templates[occurrence].format(title=title),
+        answer=triple.answer,
+        context=triple.context,
+        defect=triple.defect,
+        failure_mode=triple.failure_mode,
+        provenance_note=triple.provenance_note,
+        source_doc_id=triple.source_doc_id,
+        offending_span=triple.offending_span,
+    )
 
 
 def _enrich_context(
@@ -113,6 +156,8 @@ def build_anchor(chunks: Sequence[Chunk], *, seed: int) -> list[AnchorTriple]:
     levels_by_mode = {mode: _level_plan(count) for mode, count in ANCHOR_MODE_COUNTS.items()}
     mode_indices: defaultdict[str, int] = defaultdict(int)
     domains = {chunk.doc_id: chunk.domain for chunk in chunk_list}
+    titles = {chunk.doc_id: chunk.title for chunk in chunk_list}
+    question_occurrences: defaultdict[tuple[object, ...], int] = defaultdict(int)
     rng = random.Random(seed)
     anchors: list[AnchorTriple] = []
     for triple in triples:
@@ -123,6 +168,20 @@ def build_anchor(chunks: Sequence[Chunk], *, seed: int) -> list[AnchorTriple]:
             domain = domains[triple.source_doc_id]
         except KeyError as exc:
             raise ValueError(f"source document missing for {triple.triple_id}") from exc
+        question_key = (
+            triple.failure_mode,
+            triple.source_doc_id,
+            triple.answer,
+            tuple(fragment.doc_id for fragment in triple.context),
+            level,
+        )
+        occurrence = question_occurrences[question_key]
+        question_occurrences[question_key] += 1
+        triple = _vary_question(
+            triple,
+            title=titles[triple.source_doc_id],
+            occurrence=occurrence,
+        )
         anchors.append(
             AnchorTriple(
                 triple=_enrich_context(
@@ -136,4 +195,24 @@ def build_anchor(chunks: Sequence[Chunk], *, seed: int) -> list[AnchorTriple]:
                 domain=domain,
             )
         )
+    signatures = {
+        (
+            anchor.triple.question,
+            anchor.triple.answer,
+            tuple(
+                (fragment.text, fragment.doc_id, fragment.provenance)
+                for fragment in anchor.triple.context
+            ),
+            anchor.triple.defect,
+            anchor.triple.failure_mode,
+            anchor.triple.provenance_note,
+            anchor.triple.source_doc_id,
+            anchor.triple.offending_span,
+            anchor.challenge_level,
+            anchor.domain,
+        )
+        for anchor in anchors
+    }
+    if len(signatures) != len(anchors):
+        raise ValueError("anchor contains duplicate semantic payloads")
     return anchors

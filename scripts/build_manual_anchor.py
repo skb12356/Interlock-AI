@@ -1,10 +1,11 @@
-"""Build and import the 300-item hand-label anchor set.
+"""Build and import the 300-item generated grounding anchor set.
 
 This creates a reviewable JSONL file and writes the same labels into the ledger's
 ``labels`` table. The candidate items come from the calibration side of the corpus
 split, so the anchor set stays document-disjoint from the seeded eval set.
 
-The labels follow the frozen defect taxonomy:
+Rows are generated deterministically and remain explicitly unreviewed. The labels follow
+the frozen defect taxonomy:
 
 * clean -> all gold flags 0
 * ungrounded modes -> ``gold_ungrounded=1``
@@ -59,16 +60,17 @@ def build_labels(count: int, seed: int) -> list[dict[str, Any]]:
         rows.append(
             {
                 "item_id": f"manual-anchor-{index:03d}",
-                "source": "manual_anchor_from_calibration_split",
+                "source": "generated_anchor_from_calibration_split",
                 "split": "calibration",
                 "payload": payload,
                 "gold_ungrounded": int(defect == "ungrounded"),
                 "gold_contradicted": int(defect == "contradicted"),
                 "gold_unsafe": int(defect == "unsafe_action"),
-                "labeller": "person1_codex_manual_review",
+                "labeller": "interlock_anchor_generator_v1",
+                "review_status": "unreviewed",
                 "review_basis": (
-                    "manual taxonomy review of question, answer, context, provenance_note, "
-                    "and offending_span"
+                    "automatically induced from the corpus manifest and failure taxonomy; "
+                    "not manually reviewed"
                 ),
             }
         )
@@ -100,6 +102,7 @@ def import_labels(rows: list[dict[str, Any]], db_path: Path) -> None:
                         {
                             **row["payload"],
                             "review_basis": row["review_basis"],
+                            "review_status": row["review_status"],
                         },
                         ensure_ascii=False,
                         sort_keys=True,
@@ -136,7 +139,8 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             and not row["gold_unsafe"]
         ),
         "source": "calibration split only; document-disjoint from seeded eval split",
-        "labeller": "person1_codex_manual_review",
+        "labeller": "interlock_anchor_generator_v1",
+        "review_status": "unreviewed",
         "mode_counts": dict(sorted(mode_counts.items())),
         "challenge_level_counts": dict(sorted(challenge_level_counts.items())),
         "domains": dict(sorted(domains.items())),

@@ -114,6 +114,16 @@ def test_the_whole_manifest_loads_and_nothing_on_disk_is_orphaned() -> None:
     assert len(documents) == 45
 
 
+def test_manifest_contradiction_direction_survives_chunking() -> None:
+    documents = load_corpus(MANIFEST, root=REPO_ROOT)
+    by_doc = {chunk.doc_id: chunk for chunk in corpus_chunks(documents)}
+
+    assert by_doc["d006"].contradicts == "d005"
+    assert by_doc["d008"].contradicts == "d007"
+    assert by_doc["d010"].contradicts == "d009"
+    assert by_doc["d005"].contradicts is None
+
+
 def test_the_poisoned_pdf_is_labelled_untrusted_at_ingestion(index: RetrievalIndex) -> None:
     """Not re-derived downstream. The tool interlock joins on this label."""
     untrusted = {c.doc_id for c in index.all_chunks() if c.provenance == "retrieved_untrusted"}

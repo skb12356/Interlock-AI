@@ -5,7 +5,8 @@
   "gold_unsafe": 0,
   "clean": 200,
   "source": "calibration split only; document-disjoint from seeded eval split",
-  "labeller": "person1_codex_manual_review",
+  "labeller": "interlock_anchor_generator_v1",
+  "review_status": "unreviewed",
   "mode_counts": {
     "clause_swapped": 20,
     "clean": 200,
@@ -20,12 +21,12 @@
     "L3_conflict": 96
   },
   "domains": {
-    "branch_info": 23,
-    "claims": 51,
-    "fees": 23,
-    "general": 85,
-    "loan_terms": 60,
-    "payments": 37,
+    "branch_info": 25,
+    "claims": 62,
+    "fees": 19,
+    "general": 76,
+    "loan_terms": 63,
+    "payments": 34,
     "prepayment": 21
   },
   "audit_distribution_note": "Diagnostic audit distribution: 200 clean and 100 defective rows. It does not replace the 10% production defect base-rate assumption used to fit calibration."

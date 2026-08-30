@@ -98,6 +98,7 @@ def corpus_chunks(documents: list[CorpusDocument], **chunk_kwargs: Any) -> list[
                 doc_id=document.doc_id,
                 domain=document.domain,
                 provenance=document.provenance,
+                contradicts=document.contradicts,
                 title=document.title,
                 **chunk_kwargs,
             )

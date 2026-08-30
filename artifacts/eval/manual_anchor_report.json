@@ -1,0 +1,1219 @@
+{
+  "agreement": {
+    "binary_grounding": {
+      "ci_95": [
+        0.8346254157811881,
+        0.9091832002871845
+      ],
+      "correct": 263,
+      "denominator": 300,
+      "numerator": 263,
+      "rate": 0.8766666666666667,
+      "total": 300
+    },
+    "false_intervention_on_clean": {
+      "ci_95": [
+        0.05374529946985246,
+        0.13189688544235392
+      ],
+      "denominator": 200,
+      "numerator": 17,
+      "rate": 0.085
+    },
+    "grounding_escape": {
+      "ci_95": [
+        0.1333659225590988,
+        0.28883096192650237
+      ],
+      "denominator": 100,
+      "numerator": 20,
+      "rate": 0.2
+    },
+    "strict_three_class": {
+      "ci_95": [
+        0.7403879054849664,
+        0.832278905116347
+      ],
+      "confusion": {
+        "clean": {
+          "clean": 183,
+          "contradicted": 7,
+          "ungrounded": 10
+        },
+        "contradicted": {
+          "clean": 0,
+          "contradicted": 19,
+          "ungrounded": 1
+        },
+        "ungrounded": {
+          "clean": 20,
+          "contradicted": 25,
+          "ungrounded": 35
+        }
+      },
+      "correct": 237,
+      "denominator": 300,
+      "numerator": 237,
+      "rate": 0.79,
+      "total": 300
+    }
+  },
+  "evidence_clusters": {
+    "largest_cluster_items": 6,
+    "unique": 263,
+    "with_multiple_items": 24
+  },
+  "failed_examples": [
+    {
+      "failure_mode": "number_corrupted",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-002",
+      "judge_label": "contradicted"
+    },
+    {
+      "failure_mode": "clean",
+      "gold": "clean",
+      "item_id": "manual-anchor-009",
+      "judge_label": "ungrounded"
+    },
+    {
+      "failure_mode": "clean",
+      "gold": "clean",
+      "item_id": "manual-anchor-012",
+      "judge_label": "ungrounded"
+    },
+    {
+      "failure_mode": "clause_swapped",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-013",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "clause_swapped",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-022",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "number_corrupted",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-023",
+      "judge_label": "contradicted"
+    },
+    {
+      "failure_mode": "unanswerable",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-024",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "clause_swapped",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-026",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "clause_swapped",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-034",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "unanswerable",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-036",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "unanswerable",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-040",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "number_corrupted",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-048",
+      "judge_label": "contradicted"
+    },
+    {
+      "failure_mode": "number_corrupted",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-051",
+      "judge_label": "contradicted"
+    },
+    {
+      "failure_mode": "unanswerable",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-056",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "retrieval_dropped",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-058",
+      "judge_label": "clean"
+    },
+    {
+      "failure_mode": "number_corrupted",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-060",
+      "judge_label": "contradicted"
+    },
+    {
+      "failure_mode": "number_corrupted",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-063",
+      "judge_label": "contradicted"
+    },
+    {
+      "failure_mode": "clean",
+      "gold": "clean",
+      "item_id": "manual-anchor-070",
+      "judge_label": "ungrounded"
+    },
+    {
+      "failure_mode": "number_corrupted",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-072",
+      "judge_label": "contradicted"
+    },
+    {
+      "failure_mode": "retrieval_dropped",
+      "gold": "ungrounded",
+      "item_id": "manual-anchor-073",
+      "judge_label": "clean"
+    }
+  ],
+  "invalid_results": {
+    "by_status": {},
+    "examples": []
+  },
+  "model": "openai/gpt-4o-mini",
+  "schema_version": 1,
+  "slices": {
+    "challenge_level": {
+      "L1_direct": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.7602877113371933,
+              0.9010779520692556
+            ],
+            "correct": 86,
+            "denominator": 102,
+            "numerator": 86,
+            "rate": 0.8431372549019608,
+            "total": 102
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.032295572977927914,
+              0.16309244762013875
+            ],
+            "denominator": 67,
+            "numerator": 5,
+            "rate": 0.07462686567164178
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.18550658059782457,
+              0.47980071879251973
+            ],
+            "denominator": 35,
+            "numerator": 11,
+            "rate": 0.3142857142857143
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.6737161802309318,
+              0.8364801886826144
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 62,
+                "contradicted": 1,
+                "ungrounded": 4
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 7,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 11,
+                "contradicted": 8,
+                "ungrounded": 9
+              }
+            },
+            "correct": 78,
+            "denominator": 102,
+            "numerator": 78,
+            "rate": 0.7647058823529411,
+            "total": 102
+          }
+        },
+        "total": 102,
+        "valid": 102
+      },
+      "L2_distractor": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.771452166523051,
+              0.9088096586950106
+            ],
+            "correct": 87,
+            "denominator": 102,
+            "numerator": 87,
+            "rate": 0.8529411764705882,
+            "total": 102
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.08314184208625061,
+              0.2534061748981201
+            ],
+            "denominator": 67,
+            "numerator": 10,
+            "rate": 0.14925373134328357
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.06260138804853496,
+              0.2937588030867426
+            ],
+            "denominator": 35,
+            "numerator": 5,
+            "rate": 0.14285714285714285
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.6737161802309318,
+              0.8364801886826144
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 57,
+                "contradicted": 4,
+                "ungrounded": 6
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 7,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 5,
+                "contradicted": 9,
+                "ungrounded": 14
+              }
+            },
+            "correct": 78,
+            "denominator": 102,
+            "numerator": 78,
+            "rate": 0.7647058823529411,
+            "total": 102
+          }
+        },
+        "total": 102,
+        "valid": 102
+      },
+      "L3_conflict": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.8702889506383905,
+              0.9710437203123955
+            ],
+            "correct": 90,
+            "denominator": 96,
+            "numerator": 90,
+            "rate": 0.9375,
+            "total": 96
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.008349735075946503,
+              0.10392718870586834
+            ],
+            "denominator": 66,
+            "numerator": 2,
+            "rate": 0.030303030303030304
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.05309569424218104,
+              0.2968168394441695
+            ],
+            "denominator": 30,
+            "numerator": 4,
+            "rate": 0.13333333333333333
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.7580833433259717,
+              0.9029637552782173
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 64,
+                "contradicted": 2,
+                "ungrounded": 0
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 5,
+                "ungrounded": 1
+              },
+              "ungrounded": {
+                "clean": 4,
+                "contradicted": 8,
+                "ungrounded": 12
+              }
+            },
+            "correct": 81,
+            "denominator": 96,
+            "numerator": 81,
+            "rate": 0.84375,
+            "total": 96
+          }
+        },
+        "total": 96,
+        "valid": 96
+      }
+    },
+    "domain": {
+      "branch_info": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.8668035060468213,
+              1.0
+            ],
+            "correct": 25,
+            "denominator": 25,
+            "numerator": 25,
+            "rate": 1.0,
+            "total": 25
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.0,
+              0.16113012549493322
+            ],
+            "denominator": 20,
+            "numerator": 0,
+            "rate": 0.0
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.0,
+              0.43449149475208104
+            ],
+            "denominator": 5,
+            "numerator": 0,
+            "rate": 0.0
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.7004380781662651,
+              0.9583325864293191
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 20,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 0,
+                "contradicted": 3,
+                "ungrounded": 2
+              }
+            },
+            "correct": 22,
+            "denominator": 25,
+            "numerator": 22,
+            "rate": 0.88,
+            "total": 25
+          }
+        },
+        "total": 25,
+        "valid": 25
+      },
+      "claims": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.7655044310309549,
+              0.9331420174150125
+            ],
+            "correct": 54,
+            "denominator": 62,
+            "numerator": 54,
+            "rate": 0.8709677419354839,
+            "total": 62
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.02721410139426493,
+              0.2079967892026529
+            ],
+            "denominator": 38,
+            "numerator": 3,
+            "rate": 0.07894736842105263
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.0924468910478809,
+              0.40470844485235474
+            ],
+            "denominator": 24,
+            "numerator": 5,
+            "rate": 0.20833333333333334
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.6559414245921728,
+              0.8604494286070205
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 35,
+                "contradicted": 1,
+                "ungrounded": 2
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 10,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 5,
+                "contradicted": 6,
+                "ungrounded": 3
+              }
+            },
+            "correct": 48,
+            "denominator": 62,
+            "numerator": 48,
+            "rate": 0.7741935483870968,
+            "total": 62
+          }
+        },
+        "total": 62,
+        "valid": 62
+      },
+      "fees": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.686054495051583,
+              0.9706420586049034
+            ],
+            "correct": 17,
+            "denominator": 19,
+            "numerator": 17,
+            "rate": 0.8947368421052632,
+            "total": 19
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.0,
+              0.19361341827271994
+            ],
+            "denominator": 16,
+            "numerator": 0,
+            "rate": 0.0
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.2076549551264879,
+              0.9385096847238394
+            ],
+            "denominator": 3,
+            "numerator": 2,
+            "rate": 0.6666666666666666
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.686054495051583,
+              0.9706420586049034
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 16,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 2,
+                "contradicted": 0,
+                "ungrounded": 1
+              }
+            },
+            "correct": 17,
+            "denominator": 19,
+            "numerator": 17,
+            "rate": 0.8947368421052632,
+            "total": 19
+          }
+        },
+        "total": 19,
+        "valid": 19
+      },
+      "general": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.7591234649192224,
+              0.9172156866007872
+            ],
+            "correct": 65,
+            "denominator": 76,
+            "numerator": 65,
+            "rate": 0.8552631578947368,
+            "total": 76
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.06676796994292626,
+              0.2527357692049491
+            ],
+            "denominator": 52,
+            "numerator": 7,
+            "rate": 0.1346153846153846
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.06678568000728924,
+              0.3585347038786943
+            ],
+            "denominator": 24,
+            "numerator": 4,
+            "rate": 0.16666666666666666
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.6563840337948657,
+              0.8446079302940304
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 45,
+                "contradicted": 4,
+                "ungrounded": 3
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 3,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 4,
+                "contradicted": 7,
+                "ungrounded": 10
+              }
+            },
+            "correct": 58,
+            "denominator": 76,
+            "numerator": 58,
+            "rate": 0.7631578947368421,
+            "total": 76
+          }
+        },
+        "total": 76,
+        "valid": 76
+      },
+      "loan_terms": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.8272947198845853,
+              0.9656246596634805
+            ],
+            "correct": 58,
+            "denominator": 63,
+            "numerator": 58,
+            "rate": 0.9206349206349206,
+            "total": 63
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.004786851054907726,
+              0.13824378437563367
+            ],
+            "denominator": 37,
+            "numerator": 1,
+            "rate": 0.02702702702702703
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.06149933998929477,
+              0.33531584418313565
+            ],
+            "denominator": 26,
+            "numerator": 4,
+            "rate": 0.15384615384615385
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.6959297958482789,
+              0.8875391815550149
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 36,
+                "contradicted": 0,
+                "ungrounded": 1
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 6,
+                "ungrounded": 1
+              },
+              "ungrounded": {
+                "clean": 4,
+                "contradicted": 6,
+                "ungrounded": 9
+              }
+            },
+            "correct": 51,
+            "denominator": 63,
+            "numerator": 51,
+            "rate": 0.8095238095238095,
+            "total": 63
+          }
+        },
+        "total": 63,
+        "valid": 63
+      },
+      "payments": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.7337882520370121,
+              0.9532862902656388
+            ],
+            "correct": 30,
+            "denominator": 34,
+            "numerator": 30,
+            "rate": 0.8823529411764706,
+            "total": 34
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.04344255039315584,
+              0.3100428814785757
+            ],
+            "denominator": 24,
+            "numerator": 3,
+            "rate": 0.125
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.01787574951572113,
+              0.4041563854975721
+            ],
+            "denominator": 10,
+            "numerator": 1,
+            "rate": 0.1
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.6648593225994784,
+              0.9165114439643031
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 21,
+                "contradicted": 0,
+                "ungrounded": 3
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 1,
+                "contradicted": 2,
+                "ungrounded": 7
+              }
+            },
+            "correct": 28,
+            "denominator": 34,
+            "numerator": 28,
+            "rate": 0.8235294117647058,
+            "total": 34
+          }
+        },
+        "total": 34,
+        "valid": 34
+      },
+      "prepayment": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.45373075657210293,
+              0.8280546356731631
+            ],
+            "correct": 14,
+            "denominator": 21,
+            "numerator": 14,
+            "rate": 0.6666666666666666,
+            "total": 21
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.08179379092465713,
+              0.5025687399512693
+            ],
+            "denominator": 13,
+            "numerator": 3,
+            "rate": 0.23076923076923078
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.21521252682444186,
+              0.7847874731755582
+            ],
+            "denominator": 8,
+            "numerator": 4,
+            "rate": 0.5
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.40878295815501514,
+              0.7924923220201749
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 10,
+                "contradicted": 2,
+                "ungrounded": 1
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 4,
+                "contradicted": 1,
+                "ungrounded": 3
+              }
+            },
+            "correct": 13,
+            "denominator": 21,
+            "numerator": 13,
+            "rate": 0.6190476190476191,
+            "total": 21
+          }
+        },
+        "total": 21,
+        "valid": 21
+      }
+    },
+    "failure_mode": {
+      "clause_swapped": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.25819502085709295,
+              0.6579179916924003
+            ],
+            "correct": 9,
+            "denominator": 20,
+            "numerator": 9,
+            "rate": 0.45,
+            "total": 20
+          },
+          "false_intervention_on_clean": {
+            "ci_95": null,
+            "denominator": 0,
+            "numerator": 0,
+            "rate": null
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.3420820083075997,
+              0.7418049791429071
+            ],
+            "denominator": 20,
+            "numerator": 11,
+            "rate": 0.55
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.11186005278940309,
+              0.4687050099580636
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 11,
+                "contradicted": 4,
+                "ungrounded": 5
+              }
+            },
+            "correct": 5,
+            "denominator": 20,
+            "numerator": 5,
+            "rate": 0.25,
+            "total": 20
+          }
+        },
+        "total": 20,
+        "valid": 20
+      },
+      "clean": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.8681031145576462,
+              0.9462547005301477
+            ],
+            "correct": 183,
+            "denominator": 200,
+            "numerator": 183,
+            "rate": 0.915,
+            "total": 200
+          },
+          "false_intervention_on_clean": {
+            "ci_95": [
+              0.05374529946985246,
+              0.13189688544235392
+            ],
+            "denominator": 200,
+            "numerator": 17,
+            "rate": 0.085
+          },
+          "grounding_escape": {
+            "ci_95": null,
+            "denominator": 0,
+            "numerator": 0,
+            "rate": null
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.8681031145576462,
+              0.9462547005301477
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 183,
+                "contradicted": 7,
+                "ungrounded": 10
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              }
+            },
+            "correct": 183,
+            "denominator": 200,
+            "numerator": 183,
+            "rate": 0.915,
+            "total": 200
+          }
+        },
+        "total": 200,
+        "valid": 200
+      },
+      "contradiction": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.8388698745050667,
+              1.0
+            ],
+            "correct": 20,
+            "denominator": 20,
+            "numerator": 20,
+            "rate": 1.0,
+            "total": 20
+          },
+          "false_intervention_on_clean": {
+            "ci_95": null,
+            "denominator": 0,
+            "numerator": 0,
+            "rate": null
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.0,
+              0.16113012549493322
+            ],
+            "denominator": 20,
+            "numerator": 0,
+            "rate": 0.0
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.7638641064874331,
+              0.9911187805671268
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 19,
+                "ungrounded": 1
+              },
+              "ungrounded": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              }
+            },
+            "correct": 19,
+            "denominator": 20,
+            "numerator": 19,
+            "rate": 0.95,
+            "total": 20
+          }
+        },
+        "total": 20,
+        "valid": 20
+      },
+      "number_corrupted": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.8388698745050667,
+              1.0
+            ],
+            "correct": 20,
+            "denominator": 20,
+            "numerator": 20,
+            "rate": 1.0,
+            "total": 20
+          },
+          "false_intervention_on_clean": {
+            "ci_95": null,
+            "denominator": 0,
+            "numerator": 0,
+            "rate": null
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.0,
+              0.16113012549493322
+            ],
+            "denominator": 20,
+            "numerator": 0,
+            "rate": 0.0
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.0,
+              0.16113012549493322
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 0,
+                "contradicted": 20,
+                "ungrounded": 0
+              }
+            },
+            "correct": 0,
+            "denominator": 20,
+            "numerator": 0,
+            "rate": 0.0,
+            "total": 20
+          }
+        },
+        "total": 20,
+        "valid": 20
+      },
+      "retrieval_dropped": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.6989617935882066,
+              0.9721341060158468
+            ],
+            "correct": 18,
+            "denominator": 20,
+            "numerator": 18,
+            "rate": 0.9,
+            "total": 20
+          },
+          "false_intervention_on_clean": {
+            "ci_95": null,
+            "denominator": 0,
+            "numerator": 0,
+            "rate": null
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.027865893984153206,
+              0.30103820641179335
+            ],
+            "denominator": 20,
+            "numerator": 2,
+            "rate": 0.1
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.6395767041130426,
+              0.9476322080405041
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 2,
+                "contradicted": 1,
+                "ungrounded": 17
+              }
+            },
+            "correct": 17,
+            "denominator": 20,
+            "numerator": 17,
+            "rate": 0.85,
+            "total": 20
+          }
+        },
+        "total": 20,
+        "valid": 20
+      },
+      "unanswerable": {
+        "agreement": {
+          "binary_grounding": {
+            "ci_95": [
+              0.43285051021946463,
+              0.8188104521320554
+            ],
+            "correct": 13,
+            "denominator": 20,
+            "numerator": 13,
+            "rate": 0.65,
+            "total": 20
+          },
+          "false_intervention_on_clean": {
+            "ci_95": null,
+            "denominator": 0,
+            "numerator": 0,
+            "rate": null
+          },
+          "grounding_escape": {
+            "ci_95": [
+              0.18118954786794464,
+              0.5671494897805354
+            ],
+            "denominator": 20,
+            "numerator": 7,
+            "rate": 0.35
+          },
+          "strict_three_class": {
+            "ci_95": [
+              0.43285051021946463,
+              0.8188104521320554
+            ],
+            "confusion": {
+              "clean": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "contradicted": {
+                "clean": 0,
+                "contradicted": 0,
+                "ungrounded": 0
+              },
+              "ungrounded": {
+                "clean": 7,
+                "contradicted": 0,
+                "ungrounded": 13
+              }
+            },
+            "correct": 13,
+            "denominator": 20,
+            "numerator": 13,
+            "rate": 0.65,
+            "total": 20
+          }
+        },
+        "total": 20,
+        "valid": 20
+      }
+    }
+  },
+  "source": {
+    "human_reviewed": false,
+    "kind": "openrouter_judge_on_generated_anchor",
+    "production_traffic": false,
+    "taxonomy_warning": "These anchors are generated and unreviewed. Judge disagreement measures offline grounding classification, not Interlock's stakes-aware intervention rate."
+  },
+  "usage": {
+    "accounted_cost_usd": "0.02011110",
+    "completion_tokens": 18748,
+    "latency_ms": {
+      "median": 3515.9745000000003,
+      "p95": 4645.608
+    },
+    "prompt_tokens": 59082,
+    "request_count": 60
+  },
+  "validity": {
+    "ci_95": [
+      0.9873565700022643,
+      0.9999999999999999
+    ],
+    "denominator": 300,
+    "numerator": 300,
+    "rate": 1.0,
+    "total": 300,
+    "valid": 300
+  }
+}

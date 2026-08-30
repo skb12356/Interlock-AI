@@ -18,7 +18,6 @@ from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, cast
-from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
@@ -50,20 +49,14 @@ def websocket_origin_allowed(
     host: str,
     *,
     configured: str | None = None,
+    scheme: str = "ws",
 ) -> bool:
     """Allow non-browser clients, same-origin browsers and explicit console origins."""
     if not origin:
         return True
     normalized = origin.rstrip("/")
-    parsed = urlsplit(normalized)
-    if parsed.netloc == host:
-        return True
-    host_name = host.partition(":")[0].strip("[]").lower()
-    if host_name in {"localhost", "127.0.0.1", "::1"} and parsed.hostname in {
-        "localhost",
-        "127.0.0.1",
-        "::1",
-    }:
+    expected_scheme = "https" if scheme in {"wss", "https"} else "http"
+    if normalized == f"{expected_scheme}://{host}":
         return True
     allowed = configured if configured is not None else os.getenv("INTERLOCK_CONSOLE_ORIGINS", "")
     return normalized in {item.strip().rstrip("/") for item in allowed.split(",") if item.strip()}
@@ -396,6 +389,7 @@ async def console_ws(websocket: WebSocket) -> None:
     if not websocket_origin_allowed(
         websocket.headers.get("origin"),
         websocket.headers.get("host", ""),
+        scheme=str(websocket.scope.get("scheme", "ws")),
     ):
         await websocket.close(code=1008, reason="websocket origin is not allowed")
         return

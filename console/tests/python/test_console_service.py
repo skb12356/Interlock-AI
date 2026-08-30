@@ -87,7 +87,8 @@ def test_websocket_proxy_uses_the_gateway_console_endpoint() -> None:
 
 def test_production_console_websocket_rejects_cross_site_origins() -> None:
     assert same_origin_websocket(None, "bank.example")
-    assert same_origin_websocket("https://bank.example", "bank.example")
+    assert same_origin_websocket("https://bank.example", "bank.example", scheme="wss")
+    assert not same_origin_websocket("http://bank.example", "bank.example", scheme="wss")
     assert not same_origin_websocket("https://evil.example", "bank.example")
 
 

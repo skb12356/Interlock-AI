@@ -202,7 +202,7 @@ npm --prefix console run test:e2e
 The final integration gate on 30 August 2026 produced 75 passing frontend unit tests and 14
 passing Playwright journeys across desktop 1440×900 and mobile 390×844. Visual QA found
 and fixed a mobile shrink-to-fit regression; the browser suite now pins both layout and
-content width to the configured viewport. The clean core/dev Python gate produced 1,027
+content width to the configured viewport. The clean core/dev Python gate produced 1,028
 passing tests and 2 optional-ML skips. TypeScript,
 Vite build, Ruff lint/format, strict mypy, dependency locking, and the 36-test retrieval
 suite also passed. The Vite build emits a non-blocking bundle-size warning, and its

@@ -387,6 +387,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         session_id = str(body.get("session_id") or interlock_meta.get("session_id") or "").strip()
         explicit_regenerate = bool(interlock_meta.get("regenerate"))
         previous_turn = app.state.rework_sessions.get(session_id) if session_id else None
+        user_role = (x_interlock_role or "customer").strip().lower()
+        cache_scope_digest = _cache_scope_digest(
+            body,
+            tenant_id=settings.tenant_id,
+            user_role=user_role,
+        )
         app.state.risk_engine.arm(request_id, x_interlock_force)
 
         # ---- Lane A: the only synchronous work before the model is called ----
@@ -396,7 +402,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             messages=list(body.get("messages") or []),
             retrieved=_fragments_from_body(body),
             tools=list(body.get("tools") or []),
-            user_role=(x_interlock_role or "customer").strip().lower(),
+            user_role=user_role,
         )
         lane: PreflightResult = await app.state.lane_a.run(preflight_ctx)
 
@@ -449,7 +455,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
             return response
 
-        cache_lookup = _cache_lookup(app, body, lane) if body.get("stream", False) else None
+        cache_lookup = (
+            _cache_lookup(app, body, lane, scope_digest=cache_scope_digest)
+            if body.get("stream", False)
+            else None
+        )
         if cache_lookup is not None and cache_lookup.hit and cache_lookup.entry is not None:
             lane.route_reason = "cache_hit"
             generator = _cached_stream_response(
@@ -579,6 +589,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             session_id=session_id,
             previous_turn=previous_turn,
             explicit_regenerate=explicit_regenerate,
+            cache_scope_digest=cache_scope_digest,
         )
         return StreamingResponse(
             generator,
@@ -719,6 +730,7 @@ async def _stream_response(
     session_id: str,
     previous_turn: dict[str, Any] | None,
     explicit_regenerate: bool,
+    cache_scope_digest: str,
 ) -> AsyncIterator[str]:
     """Frame the upstream stream through the commit gate.
 
@@ -1043,13 +1055,13 @@ async def _stream_response(
         )
         _store_cache(
             app=app,
-            body=original_body,
             question=_last_user_message(original_body),
             answer="".join(answer_parts).strip(),
             lane=lane,
             decisions=gate.decisions,
             model=model,
             degraded=lane.degraded or capacity_fallback,
+            scope_digest=cache_scope_digest,
         )
         upstream_ms = monotonic_ms() - upstream_started
         ledger.record(
@@ -1183,7 +1195,13 @@ def _publish_console(
         _log.debug("console publish failed for %s", event_name, exc_info=True)
 
 
-def _cache_lookup(app: FastAPI, body: dict[str, Any], lane: PreflightResult) -> Any | None:
+def _cache_lookup(
+    app: FastAPI,
+    body: dict[str, Any],
+    lane: PreflightResult,
+    *,
+    scope_digest: str,
+) -> Any | None:
     """Try the semantic cache, reporting misses in cache stats rather than logs."""
     question = _last_user_message(body)
     if not question:
@@ -1195,7 +1213,7 @@ def _cache_lookup(app: FastAPI, body: dict[str, Any], lane: PreflightResult) -> 
             embedding=embedding,
             retrieved=lane.fragments,
             stakes_inr=lane.stakes.impact_inr,
-            scope_digest=_cache_scope_digest(body),
+            scope_digest=scope_digest,
         )
     except Exception:
         _log.debug("semantic cache lookup failed", exc_info=True)
@@ -1205,13 +1223,13 @@ def _cache_lookup(app: FastAPI, body: dict[str, Any], lane: PreflightResult) -> 
 def _store_cache(
     *,
     app: FastAPI,
-    body: dict[str, Any],
     question: str,
     answer: str,
     lane: PreflightResult,
     decisions: list[Any],
     model: str,
     degraded: bool,
+    scope_digest: str,
 ) -> None:
     """Store only answers that passed verification unchanged."""
     if degraded or not question or not answer:
@@ -1228,15 +1246,24 @@ def _store_cache(
             stakes_inr=lane.stakes.impact_inr,
             action="L0_pass",
             model=model,
-            scope_digest=_cache_scope_digest(body),
+            scope_digest=scope_digest,
         )
     except Exception:
         _log.debug("semantic cache store failed", exc_info=True)
 
 
-def _cache_scope_digest(body: dict[str, Any]) -> str:
+def _cache_scope_digest(
+    body: dict[str, Any],
+    *,
+    tenant_id: str,
+    user_role: str,
+) -> str:
     """Bind a cache entry to the complete effective prompt and request options."""
-    effective = {key: value for key, value in body.items() if key != "stream"}
+    effective = {
+        "request": {key: value for key, value in body.items() if key != "stream"},
+        "tenant_id": tenant_id,
+        "user_role": user_role,
+    }
     canonical = json.dumps(effective, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 

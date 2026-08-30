@@ -505,8 +505,9 @@ Slow verifier/probe tests require the cached or downloadable
   provenance lattice.
 - Hold resume tokens appear only in the initiating browser's SSE event, live only in an
   in-memory vault, and are recursively removed from console projections and diagnostics.
-- Semantic-cache hits require the same canonical full prompt/options scope as well as the
-  question, retrieval context, stakes ceiling, clean prior decision, and policy version.
+- Semantic-cache hits require the same canonical full prompt/options, tenant, and trusted
+  role scope as well as the question, retrieval context, stakes ceiling, clean prior
+  decision, and policy version.
 - Browser WebSockets enforce same-origin or an explicit origin allowlist. Hold mutations
   require JSON, preventing cross-site HTML forms while preserving tokenless rejection.
 - Shadow replay is disabled by default because enabling it may create a second provider

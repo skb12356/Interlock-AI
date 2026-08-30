@@ -19,6 +19,7 @@ import pytest
 
 from interlock.core.policy import load_policy
 from interlock.core.types import Fragment, Stakes
+from interlock.gateway.app import _cache_scope_digest
 from interlock.gateway.cache import (
     SIMILARITY_THRESHOLD,
     SemanticCache,
@@ -36,6 +37,14 @@ CLEAN = Fragment(
     doc_id="d001#0",
     domain="prepayment",
 )
+
+
+def test_cache_scope_includes_tenant_and_trusted_role_context() -> None:
+    body = {"model": "interlock", "messages": [{"role": "user", "content": "Status?"}]}
+    customer = _cache_scope_digest(body, tenant_id="bank-a", user_role="customer")
+    admin = _cache_scope_digest(body, tenant_id="bank-a", user_role="admin")
+    other_tenant = _cache_scope_digest(body, tenant_id="bank-b", user_role="customer")
+    assert len({customer, admin, other_tenant}) == 3
 
 
 def _stakes(impact: float, domain: str = "general") -> Stakes:

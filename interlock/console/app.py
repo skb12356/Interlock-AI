@@ -44,11 +44,12 @@ def gateway_websocket_url(gateway_url: str) -> str:
     return urlunsplit((scheme, parsed.netloc, path, "", ""))
 
 
-def same_origin_websocket(origin: str | None, host: str) -> bool:
+def same_origin_websocket(origin: str | None, host: str, *, scheme: str = "ws") -> bool:
     """WebSocket handshakes are not protected by CORS; enforce browser same-origin."""
     if not origin:
         return True
-    return urlsplit(origin.rstrip("/")).netloc == host
+    expected_scheme = "https" if scheme in {"wss", "https"} else "http"
+    return origin.rstrip("/") == f"{expected_scheme}://{host}"
 
 
 def _forward_headers(headers: httpx.Headers) -> dict[str, str]:
@@ -133,6 +134,7 @@ def create_console_app(
         if not same_origin_websocket(
             browser.headers.get("origin"),
             browser.headers.get("host", ""),
+            scheme=str(browser.scope.get("scheme", "ws")),
         ):
             await browser.close(code=1008, reason="websocket origin is not allowed")
             return

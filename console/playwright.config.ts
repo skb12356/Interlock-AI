@@ -20,6 +20,7 @@ export default defineConfig({
   webServer: [
     {
       command: "uv run --project .. python ../scripts/replay_console.py --port 8099",
+      env: { INTERLOCK_CONSOLE_ORIGINS: "http://127.0.0.1:5173" },
       url: "http://127.0.0.1:8099/health",
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,

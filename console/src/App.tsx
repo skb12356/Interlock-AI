@@ -19,10 +19,11 @@ import type { HoldProjection } from "./domain/contracts";
 import type { ConsoleStatus, EvidenceBundle } from "./domain/evidence";
 import { ResumeTokenVault } from "./security/resumeTokens";
 import { useProjectionHistory } from "./state/useProjectionHistory";
+import { AboutPanel } from "./theater/AboutPanel";
 import { EvidencePanel } from "./theater/EvidencePanel";
 import { Header, type GatewayHealth, type View } from "./theater/Header";
 import { runLiveTrace } from "./theater/liveRun";
-import { ReviewsPanel, toHoldCard } from "./theater/ReviewsPanel";
+import { ReviewsPanel, toHoldCard, type HoldOrigin } from "./theater/ReviewsPanel";
 import { ShellDecoration } from "./theater/ShellDecoration";
 import { StageView } from "./theater/StageView";
 import { color } from "./theater/tokens";
@@ -39,7 +40,16 @@ const emptyEvidence: EvidenceBundle = {
   ledger: null,
 };
 
-const VIEWS: View[] = ["chat", "live", "reviews", "evidence"];
+const VIEWS: View[] = ["chat", "live", "reviews", "evidence", "about"];
+
+/** The workspaces are documents: they scroll, the shell around them does not. */
+function ScrollArea({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="il-scroll" style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+      {children}
+    </div>
+  );
+}
 
 /** The view lives in the hash so "see it live" is a real, shareable location. */
 function readView(): View {
@@ -245,6 +255,22 @@ export function App() {
     ? `gateway ${consoleStatus.source} · ${projection.status} · ${Object.keys(projection.state.requests).length} traces`
     : "gateway connecting";
 
+  /**
+   * Holds are answered from the review queue, but the question that caused one
+   * lives in a chat session. This maps a hold back to the session it came from
+   * when this browser has it, so a reviewer can read the conversation.
+   */
+  const holdOrigins = useMemo(() => {
+    const origins = new Map<string, HoldOrigin>();
+    sessions.forEach((session) => {
+      session.turns.forEach((turn) => {
+        const holdId = turn.overlay?.hold?.hold_id;
+        if (holdId) origins.set(holdId, { sessionId: session.id, sessionTitle: session.title });
+      });
+    });
+    return origins;
+  }, [sessions]);
+
   const traceAvailable = state.phase === "run";
 
   return (
@@ -301,17 +327,31 @@ export function App() {
             onNewSession={() => startSession()}
           />
         ) : view === "reviews" ? (
-          <ReviewsPanel
-            holds={holds.map((hold) => toHoldCard(hold, vault.current.get(hold.hold_id) !== undefined))}
-            loading={reviewsLoading}
-            error={reviewError}
-            resolvingHoldId={resolvingHoldId}
-            onApprove={(holdId) => void handleHold(holdId, "approved")}
-            onReject={(holdId) => void handleHold(holdId, "rejected")}
-            onRefresh={() => void loadReviews()}
-          />
+          <ScrollArea>
+            <ReviewsPanel
+              holds={holds.map((hold) =>
+                toHoldCard(hold, vault.current.get(hold.hold_id) !== undefined, holdOrigins.get(hold.hold_id) ?? null),
+              )}
+              loading={reviewsLoading}
+              error={reviewError}
+              resolvingHoldId={resolvingHoldId}
+              onApprove={(holdId) => void handleHold(holdId, "approved")}
+              onReject={(holdId) => void handleHold(holdId, "rejected")}
+              onRefresh={() => void loadReviews()}
+              onOpenSession={(sessionId) => {
+                setActiveSessionId(sessionId);
+                setView("chat");
+              }}
+            />
+          </ScrollArea>
+        ) : view === "about" ? (
+          <ScrollArea>
+            <AboutPanel />
+          </ScrollArea>
         ) : (
-          <EvidencePanel bundle={evidence} loading={evidenceLoading} error={evidenceError} />
+          <ScrollArea>
+            <EvidencePanel bundle={evidence} loading={evidenceLoading} error={evidenceError} />
+          </ScrollArea>
         )}
       </main>
     </div>

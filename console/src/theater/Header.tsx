@@ -1,12 +1,13 @@
 import { color, font, radius } from "./tokens";
 
-export type View = "chat" | "live" | "reviews" | "evidence";
+export type View = "chat" | "live" | "reviews" | "evidence" | "about";
 
 const NAV: Array<{ id: View; label: string }> = [
   { id: "chat", label: "Chat" },
   { id: "live", label: "Trace" },
   { id: "reviews", label: "Reviews" },
   { id: "evidence", label: "Evidence" },
+  { id: "about", label: "About" },
 ];
 
 export type GatewayHealth = "connecting" | "connected" | "replay" | "unavailable";

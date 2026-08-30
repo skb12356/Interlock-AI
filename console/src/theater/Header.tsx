@@ -1,3 +1,4 @@
+import { InterlockMark } from "./InterlockMark";
 import { color, font, radius } from "./tokens";
 
 export type View = "chat" | "live" | "reviews" | "evidence" | "about";
@@ -56,22 +57,7 @@ export function Header({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-        <span
-          aria-hidden="true"
-          style={{
-            width: "24px",
-            height: "24px",
-            display: "grid",
-            placeItems: "center",
-            border: `1px solid ${color.accent}`,
-            borderRadius: radius.mark,
-            font: `700 9px ${font.mono}`,
-            letterSpacing: "-.06em",
-            color: color.accent,
-          }}
-        >
-          I/L
-        </span>
+        <InterlockMark size={30} glow={false} />
         <strong style={{ font: `600 13px ${font.sans}`, letterSpacing: "-.01em" }}>Interlock</strong>
         {breadcrumb ? (
           <>

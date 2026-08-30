@@ -13,7 +13,9 @@ from io import StringIO
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
+import scripts.eval_manual_anchors as eval_cli
 from scripts.eval_manual_anchors import _print_json, summary_payload
 
 from interlock.eval.judge_run import (
@@ -21,8 +23,10 @@ from interlock.eval.judge_run import (
     MODEL_PRICES,
     ModelPrice,
     RunConfig,
+    _accounted_cost,
     dataset_digest,
     load_completed,
+    run_id,
     run_judgments,
     stratified_prefix,
 )
@@ -118,6 +122,34 @@ def _jsonl(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
+def _valid_record(
+    *,
+    item_id: str = "item-00",
+    model: str = "openai/gpt-5-nano",
+    digest: str | None = None,
+    batch_id: str = "batch-1",
+) -> dict[str, object]:
+    digest = digest or dataset_digest(ROWS)
+    return {
+        "item_id": item_id,
+        "model": model,
+        "dataset_digest": digest,
+        "prompt_version": JUDGE_PROMPT_VERSION,
+        "run_id": run_id(model=model, dataset_digest=digest),
+        "batch_id": batch_id,
+        "status": "valid",
+        "gold": "clean",
+        "judge_label": "clean",
+        "confidence": 0.9,
+        "rationale": "Supported.",
+        "usage": {"prompt_tokens": 100, "completion_tokens": 20, "cost_usd": None},
+        "latency_ms": 5.0,
+        "error": None,
+        "attempts": 1,
+        "accounted_cost_usd": "0.0001",
+    }
+
+
 def test_stratified_prefix_starts_with_every_mode_instead_of_file_order() -> None:
     ordered = [
         _row(index, mode, "L1_direct") for index, mode in enumerate(("clean",) * 7 + MODES[1:])
@@ -136,8 +168,16 @@ def test_stratified_prefix_round_robins_levels_within_each_mode() -> None:
 
     selected = stratified_prefix(ordered, 12)
 
-    assert [row["payload"]["challenge_level"] for row in selected[:6]] == ["L1_direct"] * 6
-    assert [row["payload"]["challenge_level"] for row in selected[6:]] == ["L2_distractor"] * 6
+    assert {row["payload"]["failure_mode"] for row in selected[:6]} == set(MODES)
+    assert {row["payload"]["challenge_level"] for row in selected[:6]} == set(LEVELS)
+    assert [row["payload"]["challenge_level"] for row in selected[:6]] == [
+        "L1_direct",
+        "L2_distractor",
+        "L3_conflict",
+        "L1_direct",
+        "L2_distractor",
+        "L3_conflict",
+    ]
 
 
 def test_dataset_digest_is_canonical_and_includes_prompt_version() -> None:
@@ -171,13 +211,7 @@ def test_resume_dispatches_only_unfinished_ids_and_never_duplicates_output(
 def test_resume_refuses_model_dataset_or_prompt_identity_mismatch(tmp_path: Path) -> None:
     output = tmp_path / "run.jsonl"
     digest = dataset_digest(ROWS)
-    base = {
-        "item_id": "item-00",
-        "model": "openai/gpt-5-nano",
-        "dataset_digest": digest,
-        "prompt_version": JUDGE_PROMPT_VERSION,
-        "batch_id": "batch-1",
-    }
+    base = _valid_record(digest=digest)
     for field, value in (
         ("model", "openai/gpt-5-mini"),
         ("dataset_digest", "wrong"),
@@ -191,17 +225,111 @@ def test_resume_refuses_model_dataset_or_prompt_identity_mismatch(tmp_path: Path
 def test_resume_refuses_duplicate_existing_item_identity(tmp_path: Path) -> None:
     output = tmp_path / "run.jsonl"
     digest = dataset_digest(ROWS)
-    record = {
-        "item_id": "item-00",
-        "model": "openai/gpt-5-nano",
-        "dataset_digest": digest,
-        "prompt_version": JUDGE_PROMPT_VERSION,
-        "batch_id": "batch-1",
-    }
+    record = _valid_record(digest=digest)
     output.write_text(f"{json.dumps(record)}\n{json.dumps(record)}\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="duplicate completed item"):
         load_completed(output, model="openai/gpt-5-nano", dataset_digest=digest)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "value"),
+    [
+        ("batch_id", ""),
+        ("status", 7),
+        ("gold", "unsafe_action"),
+        ("judge_label", 7),
+        ("confidence", float("nan")),
+        ("rationale", None),
+        ("latency_ms", -1),
+        ("error", {"secret": "wrong type"}),
+        ("usage", {"prompt_tokens": -1, "completion_tokens": 20, "cost_usd": None}),
+        ("attempts", 0),
+        ("accounted_cost_usd", "not-a-cost"),
+        ("accounted_cost_usd", "-0.1"),
+    ],
+)
+def test_resume_rejects_malformed_matching_identity_records(
+    tmp_path: Path, mutation: str, value: object
+) -> None:
+    output = tmp_path / "run.jsonl"
+    record = _valid_record()
+    record[mutation] = value
+    output.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid output record"):
+        load_completed(
+            output,
+            model="openai/gpt-5-nano",
+            dataset_digest=dataset_digest(ROWS),
+        )
+
+
+def test_resume_rejects_a_wrong_deterministic_run_id(tmp_path: Path) -> None:
+    output = tmp_path / "run.jsonl"
+    record = _valid_record()
+    record["run_id"] = "wrong"
+    output.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="incompatible run identity"):
+        load_completed(
+            output,
+            model="openai/gpt-5-nano",
+            dataset_digest=dataset_digest(ROWS),
+        )
+
+
+def test_resume_rejects_missing_required_record_fields(tmp_path: Path) -> None:
+    output = tmp_path / "run.jsonl"
+    record = _valid_record()
+    del record["usage"]
+    output.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid output record"):
+        load_completed(
+            output,
+            model="openai/gpt-5-nano",
+            dataset_digest=dataset_digest(ROWS),
+        )
+
+
+@pytest.mark.parametrize(
+    ("item_id", "gold"),
+    [("outside-dataset", "clean"), ("item-00", "contradicted")],
+)
+def test_runner_rejects_records_outside_the_digested_dataset_or_with_wrong_gold(
+    tmp_path: Path, item_id: str, gold: str
+) -> None:
+    output = tmp_path / "run.jsonl"
+    record = _valid_record(item_id=item_id)
+    record["gold"] = gold
+    output.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    judge = RecordingJudge()
+
+    with pytest.raises(ValueError, match="invalid output record"):
+        run_judgments(_config(limit=1), ROWS, judge, output)
+
+    assert judge.calls == []
+
+
+def test_resume_rejects_inconsistent_request_accounting_within_one_batch(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "run.jsonl"
+    first = _valid_record(item_id="item-00", batch_id="batch-shared")
+    second = _valid_record(item_id="item-01", batch_id="batch-shared")
+    second["accounted_cost_usd"] = "0.0002"
+    output.write_text(
+        f"{json.dumps(first)}\n{json.dumps(second)}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="inconsistent batch accounting"):
+        load_completed(
+            output,
+            model="openai/gpt-5-nano",
+            dataset_digest=dataset_digest(ROWS),
+        )
 
 
 def test_run_stops_before_dispatching_a_batch_that_crosses_the_cap(tmp_path: Path) -> None:
@@ -248,9 +376,31 @@ def test_batch_usage_is_counted_once_and_attempts_are_tracked(tmp_path: Path) ->
 
     assert summary.prompt_tokens == 1_000
     assert summary.completion_tokens == 500
-    assert summary.cost_usd == Decimal("0.0003")
+    assert summary.cost_usd > Decimal("0.0003")
     assert summary.actual_attempts == 2
     assert summary.network_calls == 2
+
+
+def test_provider_cost_adds_reserved_prior_retry_attempts() -> None:
+    cost = _accounted_cost(
+        JudgeUsage(1_000, 500, 0.0003),
+        price=MODEL_PRICES["openai/gpt-5-nano"],
+        attempts=3,
+        projected_single_attempt=Decimal("0.002"),
+    )
+
+    assert cost == Decimal("0.0043")
+
+
+def test_missing_provider_cost_uses_larger_fallback_for_every_attempt() -> None:
+    cost = _accounted_cost(
+        JudgeUsage(1, 1, None),
+        price=MODEL_PRICES["openai/gpt-5-nano"],
+        attempts=2,
+        projected_single_attempt=Decimal("0.002"),
+    )
+
+    assert cost == Decimal("0.004")
 
 
 def test_unknown_model_requires_explicit_prices_before_dispatch(tmp_path: Path) -> None:
@@ -298,6 +448,10 @@ def test_metadata_is_replaced_atomically_without_temporary_debris(tmp_path: Path
     assert metadata["model"] == "openai/gpt-5-nano"
     assert metadata["dataset_digest"] == dataset_digest(ROWS)
     assert metadata["prompt_version"] == JUDGE_PROMPT_VERSION
+    assert metadata["run_id"] == run_id(
+        model="openai/gpt-5-nano", dataset_digest=dataset_digest(ROWS)
+    )
+    assert metadata["external_context_authorized"] is True
     assert metadata["pricing_as_of"]
     assert metadata["completed"] == 3
     assert list(tmp_path.glob("*.tmp")) == []
@@ -311,6 +465,7 @@ def test_resume_refuses_incompatible_metadata_even_when_jsonl_is_absent(tmp_path
                 "model": "openai/gpt-5-mini",
                 "dataset_digest": dataset_digest(ROWS),
                 "prompt_version": JUDGE_PROMPT_VERSION,
+                "run_id": run_id(model="openai/gpt-5-mini", dataset_digest=dataset_digest(ROWS)),
             }
         ),
         encoding="utf-8",
@@ -331,7 +486,9 @@ def test_resume_refuses_an_unresolved_in_flight_paid_batch(tmp_path: Path) -> No
                 "model": "openai/gpt-5-nano",
                 "dataset_digest": dataset_digest(ROWS),
                 "prompt_version": JUDGE_PROMPT_VERSION,
+                "run_id": run_id(model="openai/gpt-5-nano", dataset_digest=dataset_digest(ROWS)),
                 "in_flight": {
+                    "batch_id": "batch-1",
                     "item_ids": ["item-00"],
                     "reserved_cost_usd": "0.001",
                 },
@@ -345,6 +502,69 @@ def test_resume_refuses_an_unresolved_in_flight_paid_batch(tmp_path: Path) -> No
         run_judgments(_config(limit=1), ROWS, judge, output)
 
     assert judge.calls == []
+
+
+def test_resume_reconciles_a_fully_durable_in_flight_batch(tmp_path: Path) -> None:
+    output = tmp_path / "run.jsonl"
+    digest = dataset_digest(ROWS)
+    batch_id = "batch-recoverable"
+    output.write_text(
+        json.dumps(_valid_record(digest=digest, batch_id=batch_id)) + "\n",
+        encoding="utf-8",
+    )
+    metadata_path = Path(f"{output}.meta.json")
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "model": "openai/gpt-5-nano",
+                "dataset_digest": digest,
+                "prompt_version": JUDGE_PROMPT_VERSION,
+                "run_id": run_id(model="openai/gpt-5-nano", dataset_digest=digest),
+                "in_flight": {
+                    "batch_id": batch_id,
+                    "item_ids": ["item-00"],
+                    "reserved_cost_usd": "0.001",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    judge = RecordingJudge()
+
+    summary = run_judgments(_config(limit=1), ROWS, judge, output)
+
+    assert summary.completed == 1
+    assert judge.calls == []
+    assert json.loads(metadata_path.read_text(encoding="utf-8"))["in_flight"] is None
+
+
+def test_resume_refuses_a_partially_durable_in_flight_batch(tmp_path: Path) -> None:
+    output = tmp_path / "run.jsonl"
+    digest = dataset_digest(ROWS)
+    batch_id = "batch-partial"
+    output.write_text(
+        json.dumps(_valid_record(digest=digest, batch_id=batch_id)) + "\n",
+        encoding="utf-8",
+    )
+    Path(f"{output}.meta.json").write_text(
+        json.dumps(
+            {
+                "model": "openai/gpt-5-nano",
+                "dataset_digest": digest,
+                "prompt_version": JUDGE_PROMPT_VERSION,
+                "run_id": run_id(model="openai/gpt-5-nano", dataset_digest=digest),
+                "in_flight": {
+                    "batch_id": batch_id,
+                    "item_ids": ["item-00", "item-01"],
+                    "reserved_cost_usd": "0.001",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="unresolved in-flight batch"):
+        run_judgments(_config(limit=2), ROWS, RecordingJudge(), output)
 
 
 def test_runner_journals_the_retry_reservation_before_dispatch(tmp_path: Path) -> None:
@@ -363,6 +583,25 @@ def test_runner_journals_the_retry_reservation_before_dispatch(tmp_path: Path) -
     assert json.loads(Path(f"{output}.meta.json").read_text())["in_flight"] is None
 
 
+def test_completed_batch_is_fsynced_before_the_in_flight_journal_is_cleared(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fsync_calls = 0
+    original_fsync = os.fsync
+
+    def counting_fsync(fd: int) -> None:
+        nonlocal fsync_calls
+        fsync_calls += 1
+        original_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", counting_fsync)
+
+    run_judgments(_config(limit=1), ROWS, RecordingJudge(), tmp_path / "run.jsonl")
+
+    # Three atomic metadata writes plus one durable JSONL batch sync.
+    assert fsync_calls >= 4
+
+
 def test_provider_cost_overrun_is_persisted_and_stops_without_redispatch(tmp_path: Path) -> None:
     output = tmp_path / "run.jsonl"
     judge = RecordingJudge(usage=JudgeUsage(100, 20, 0.01))
@@ -379,7 +618,7 @@ def test_provider_cost_overrun_is_persisted_and_stops_without_redispatch(tmp_pat
     assert summary.cost_usd == Decimal("0.01")
     assert len(_jsonl(output)) == 1
     metadata = json.loads(Path(f"{output}.meta.json").read_text(encoding="utf-8"))
-    assert metadata["cost_usd"] == "0.01"
+    assert Decimal(metadata["cost_usd"]) == Decimal("0.01")
     assert metadata["in_flight"] is None
 
 
@@ -462,6 +701,57 @@ def test_cli_without_opt_in_is_a_safe_plan_and_redacts_the_key(tmp_path: Path) -
     assert sentinel not in combined
     assert not output.exists()
     assert not Path(f"{output}.meta.json").exists()
+
+
+def test_cli_shares_one_total_budget_across_multiple_models(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    class DummyClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def __enter__(self) -> DummyClient:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            pass
+
+    class CliJudge(RecordingJudge):
+        def __init__(self, *_: object, **__: object) -> None:
+            super().__init__(usage=JudgeUsage(100, 20, 0.0003))
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-or-v1-SENTINEL-NOT-PRINTED")
+    monkeypatch.setattr(httpx, "Client", DummyClient)
+    monkeypatch.setattr(eval_cli, "OpenRouterJudge", CliJudge)
+    output = tmp_path / "judgments.jsonl"
+
+    result = eval_cli.main(
+        [
+            "--model",
+            "openai/gpt-5-nano",
+            "--model",
+            "openai/gpt-5-mini",
+            "--limit",
+            "1",
+            "--batch-size",
+            "1",
+            "--max-cost-usd",
+            "0.001",
+            "--allow-external-context",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert result == 0
+    first_meta = json.loads((tmp_path / "judgments-openai-gpt-5-nano.jsonl.meta.json").read_text())
+    second_meta = json.loads((tmp_path / "judgments-openai-gpt-5-mini.jsonl.meta.json").read_text())
+    assert Decimal(first_meta["max_cost_usd"]) == Decimal("0.001")
+    assert Decimal(second_meta["max_cost_usd"]) == Decimal("0.0007")
+    assert Decimal(first_meta["cost_usd"]) + Decimal(second_meta["cost_usd"]) <= Decimal("0.001")
+    plan_output = capsys.readouterr().out
+    assert '"total_configured_cost_cap_usd": "0.001"' in plan_output
+    assert '"combined_estimated_max_cost_usd":' in plan_output
 
 
 def test_approved_model_prices_are_the_reviewed_openrouter_estimates() -> None:

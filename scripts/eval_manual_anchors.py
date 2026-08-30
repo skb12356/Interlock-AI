@@ -116,8 +116,11 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_json(payload: object, *, stream: TextIO = sys.stdout) -> None:
-    print(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True), file=stream)
+def _print_json(payload: object, *, stream: TextIO | None = None) -> None:
+    print(
+        json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True),
+        file=stream or sys.stdout,
+    )
 
 
 def summary_payload(summary: RunSummary) -> dict[str, object]:
@@ -161,23 +164,30 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    for model, output, price, estimated in plans:
-        _print_json(
-            {
-                "case_count": len(selected),
-                "dataset_digest": digest,
-                "prompt_version": JUDGE_PROMPT_VERSION,
-                "model": model,
-                "output": str(output),
-                "estimated_max_cost_usd": str(estimated),
-                "configured_cost_cap_usd": str(args.max_cost_usd),
-                "input_price_per_million": str(price.input_per_million),
-                "output_price_per_million": str(price.output_per_million),
-                "pricing_as_of": PRICING_AS_OF,
-                "pricing_source": PRICE_SOURCE,
-                "network_calls": 0,
-            }
-        )
+    combined_estimated = sum((plan[3] for plan in plans), Decimal(0))
+    _print_json(
+        {
+            "case_count": len(selected),
+            "dataset_digest": digest,
+            "prompt_version": JUDGE_PROMPT_VERSION,
+            "total_configured_cost_cap_usd": str(args.max_cost_usd),
+            "combined_estimated_max_cost_usd": str(combined_estimated),
+            "estimated_max_cost_usd": str(combined_estimated),
+            "models": [
+                {
+                    "model": model,
+                    "output": str(output),
+                    "estimated_max_cost_usd": str(estimated),
+                    "input_price_per_million": str(price.input_per_million),
+                    "output_price_per_million": str(price.output_per_million),
+                }
+                for model, output, price, estimated in plans
+            ],
+            "pricing_as_of": PRICING_AS_OF,
+            "pricing_source": PRICE_SOURCE,
+            "network_calls": 0,
+        }
+    )
 
     if not args.allow_external_context:
         print(
@@ -207,12 +217,13 @@ def main(argv: list[str] | None = None) -> int:
             api_key=api_key,
             sleep=time.sleep,
         )
+        remaining_budget = args.max_cost_usd
         for model, output, price, _ in plans:
             config = RunConfig(
                 model=model,
                 limit=min(args.limit, len(rows)),
                 batch_size=args.batch_size,
-                max_cost_usd=args.max_cost_usd,
+                max_cost_usd=remaining_budget,
                 allow_external_context=True,
                 price=price,
             )
@@ -222,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"error: {exc}", file=sys.stderr)
                 return 1
             _print_json(summary_payload(summary))
+            remaining_budget = max(Decimal(0), remaining_budget - summary.cost_usd)
     return 0
 
 

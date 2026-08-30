@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import tempfile
@@ -36,6 +37,7 @@ __all__ = [
     "dataset_digest",
     "estimate_maximum_cost",
     "load_completed",
+    "run_id",
     "run_judgments",
     "stratified_prefix",
 ]
@@ -99,6 +101,7 @@ class RunSummary:
     model: str
     dataset_digest: str
     prompt_version: str
+    run_id: str
     selected: int
     completed: int
     resumed: int
@@ -142,6 +145,23 @@ def dataset_digest(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def run_id(
+    *,
+    model: str,
+    dataset_digest: str,
+    prompt_version: str = JUDGE_PROMPT_VERSION,
+) -> str:
+    """Return a stable identifier for one exact model/dataset/prompt run."""
+    encoded = _canonical_json(
+        {
+            "model": model,
+            "dataset_digest": dataset_digest,
+            "prompt_version": prompt_version,
+        }
+    ).encode("utf-8")
+    return f"run-{hashlib.sha256(encoded).hexdigest()}"
+
+
 def _slice_value(row: Mapping[str, Any], key: str) -> str:
     payload = row.get("payload")
     if not isinstance(payload, Mapping) or not isinstance(payload.get(key), str):
@@ -172,31 +192,36 @@ def stratified_prefix(rows: Sequence[dict[str, Any]], limit: int) -> list[dict[s
 
     mode_order = _ordered_values(modes, _MODE_ORDER)
     level_order = _ordered_values(levels, _LEVEL_ORDER)
+    cells = [
+        (mode, level_order[(mode_index + level_round) % len(level_order)])
+        for level_round in range(len(level_order))
+        for mode_index, mode in enumerate(mode_order)
+        if buckets[(mode, level_order[(mode_index + level_round) % len(level_order)])]
+    ]
     offsets: defaultdict[tuple[str, str], int] = defaultdict(int)
     selected: list[dict[str, Any]] = []
     while len(selected) < min(limit, len(rows)):
         made_progress = False
-        for level in level_order:
-            for mode in mode_order:
-                key = (mode, level)
-                offset = offsets[key]
-                if offset >= len(buckets[key]):
-                    continue
-                selected.append(buckets[key][offset])
-                offsets[key] += 1
-                made_progress = True
-                if len(selected) == min(limit, len(rows)):
-                    return selected
+        for key in cells:
+            offset = offsets[key]
+            if offset >= len(buckets[key]):
+                continue
+            selected.append(buckets[key][offset])
+            offsets[key] += 1
+            made_progress = True
+            if len(selected) == min(limit, len(rows)):
+                return selected
         if not made_progress:
             break
     return selected
 
 
-def _run_identity(record: Mapping[str, Any]) -> tuple[object, object, object]:
+def _run_identity(record: Mapping[str, Any]) -> tuple[object, object, object, object]:
     return (
         record.get("model"),
         record.get("dataset_digest"),
         record.get("prompt_version"),
+        record.get("run_id"),
     )
 
 
@@ -217,24 +242,157 @@ def _read_records(path: Path) -> list[dict[str, Any]]:
     return records
 
 
-def load_completed(path: Path, *, model: str, dataset_digest: str) -> set[str]:
-    """Load exact-identity results, refusing corrupt, duplicate, or mixed runs."""
-    expected_identity = (model, dataset_digest, JUDGE_PROMPT_VERSION)
+_VALID_RECORD_STATUSES = frozenset(
+    {
+        "valid",
+        "invalid_json",
+        "invalid_label",
+        "invalid_result",
+        "missing_item",
+        "refused",
+        "truncated",
+        "auth_error",
+        "rate_limited",
+        "provider_error",
+        "timeout",
+    }
+)
+_VALID_GOLD_LABELS = frozenset({"clean", "ungrounded", "contradicted"})
+
+
+def _required_nonnegative_int(value: object, *, field: str, positive: bool = False) -> int:
+    minimum = 1 if positive else 0
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ValueError(f"invalid output record: {field} must be an integer >= {minimum}")
+    return value
+
+
+def _required_nonnegative_decimal(value: object, *, field: str) -> Decimal:
+    if isinstance(value, bool) or value is None:
+        raise ValueError(f"invalid output record: {field} must be nonnegative")
+    try:
+        normalized = Decimal(str(value))
+    except (ValueError, ArithmeticError) as exc:
+        raise ValueError(f"invalid output record: {field} must be nonnegative") from exc
+    if not normalized.is_finite() or normalized < 0:
+        raise ValueError(f"invalid output record: {field} must be nonnegative")
+    return normalized
+
+
+def _finite_number(value: object, *, field: str, minimum: float = 0) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"invalid output record: {field} must be a finite number")
+    normalized = float(value)
+    if not math.isfinite(normalized) or normalized < minimum:
+        raise ValueError(f"invalid output record: {field} must be a finite number")
+    return normalized
+
+
+def _validate_record(
+    record: Mapping[str, Any],
+    *,
+    model: str,
+    digest: str,
+) -> None:
+    expected_identity = (
+        model,
+        digest,
+        JUDGE_PROMPT_VERSION,
+        run_id(model=model, dataset_digest=digest),
+    )
+    if _run_identity(record) != expected_identity:
+        raise ValueError("output contains an incompatible run identity")
+    for field in ("item_id", "batch_id"):
+        if not isinstance(record.get(field), str) or not str(record[field]).strip():
+            raise ValueError(f"invalid output record: {field} must be a nonblank string")
+    status = record.get("status")
+    if not isinstance(status, str) or status not in _VALID_RECORD_STATUSES:
+        raise ValueError("invalid output record: status is outside the judge taxonomy")
+    gold = record.get("gold")
+    if not isinstance(gold, str) or gold not in _VALID_GOLD_LABELS:
+        raise ValueError("invalid output record: gold is outside the grounding taxonomy")
+    judge_label = record.get("judge_label")
+    confidence = record.get("confidence")
+    rationale = record.get("rationale")
+    error = record.get("error")
+    if not isinstance(rationale, str):
+        raise ValueError("invalid output record: rationale must be text")
+    _finite_number(record.get("latency_ms"), field="latency_ms")
+    if status == "valid":
+        if not isinstance(judge_label, str) or judge_label not in _VALID_GOLD_LABELS:
+            raise ValueError("invalid output record: valid result requires a judge label")
+        normalized_confidence = _finite_number(confidence, field="confidence")
+        if normalized_confidence > 1:
+            raise ValueError("invalid output record: confidence must be at most 1")
+        if not rationale.strip() or error is not None:
+            raise ValueError("invalid output record: valid result has invalid text fields")
+    elif judge_label is not None or confidence is not None:
+        raise ValueError("invalid output record: failed result cannot contain a judgment")
+    elif not isinstance(error, str) or not error.strip():
+        raise ValueError("invalid output record: failed result requires an error")
+    usage = record.get("usage")
+    if not isinstance(usage, Mapping):
+        raise ValueError("invalid output record: usage must be an object")
+    _required_nonnegative_int(usage.get("prompt_tokens"), field="usage.prompt_tokens")
+    _required_nonnegative_int(usage.get("completion_tokens"), field="usage.completion_tokens")
+    if "cost_usd" not in usage:
+        raise ValueError("invalid output record: usage.cost_usd is required")
+    if usage["cost_usd"] is not None:
+        _required_nonnegative_decimal(usage["cost_usd"], field="usage.cost_usd")
+    _required_nonnegative_int(record.get("attempts"), field="attempts", positive=True)
+    _required_nonnegative_decimal(record.get("accounted_cost_usd"), field="accounted_cost_usd")
+
+
+def _batch_accounting(record: Mapping[str, Any]) -> tuple[object, ...]:
+    usage = record["usage"]
+    assert isinstance(usage, Mapping)
+    raw_provider_cost = usage["cost_usd"]
+    provider_cost = (
+        None
+        if raw_provider_cost is None
+        else _required_nonnegative_decimal(raw_provider_cost, field="usage.cost_usd")
+    )
+    return (
+        usage["prompt_tokens"],
+        usage["completion_tokens"],
+        provider_cost,
+        record["attempts"],
+        _required_nonnegative_decimal(record["accounted_cost_usd"], field="accounted_cost_usd"),
+    )
+
+
+def _validate_records(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    model: str,
+    digest: str,
+    expected_gold: Mapping[str, str] | None = None,
+) -> set[str]:
     completed: set[str] = set()
-    for record in _read_records(path):
-        if _run_identity(record) != expected_identity:
-            raise ValueError("output contains an incompatible run identity")
-        item_id = record.get("item_id")
-        if not isinstance(item_id, str) or not item_id:
-            raise ValueError("output record requires a nonblank item_id")
+    batches: dict[str, tuple[object, ...]] = {}
+    for record in records:
+        _validate_record(record, model=model, digest=digest)
+        item_id = str(record["item_id"])
+        if expected_gold is not None and (
+            item_id not in expected_gold or record["gold"] != expected_gold[item_id]
+        ):
+            raise ValueError(
+                f"invalid output record: item {item_id!r} is outside the dataset or has wrong gold"
+            )
         if item_id in completed:
             raise ValueError(f"duplicate completed item: {item_id}")
         completed.add(item_id)
+        batch_id = str(record["batch_id"])
+        accounting = _batch_accounting(record)
+        previous = batches.setdefault(batch_id, accounting)
+        if previous != accounting:
+            raise ValueError(f"invalid output record: inconsistent batch accounting for {batch_id}")
     return completed
 
 
-def _as_nonnegative_int(value: object) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+def load_completed(path: Path, *, model: str, dataset_digest: str) -> set[str]:
+    """Load exact-identity results, refusing corrupt, duplicate, or mixed runs."""
+    return _validate_records(_read_records(path), model=model, digest=dataset_digest)
 
 
 def _as_nonnegative_decimal(value: object) -> Decimal:
@@ -245,35 +403,33 @@ def _as_nonnegative_decimal(value: object) -> Decimal:
     return normalized if normalized.is_finite() and normalized >= 0 else Decimal(0)
 
 
-def _load_state(path: Path, *, model: str, digest: str, price: ModelPrice) -> _RunState:
+def _load_state(
+    path: Path, *, model: str, digest: str, expected_gold: Mapping[str, str]
+) -> _RunState:
     records = _read_records(path)
-    completed = load_completed(path, model=model, dataset_digest=digest)
+    completed = _validate_records(
+        records,
+        model=model,
+        digest=digest,
+        expected_gold=expected_gold,
+    )
     state = _RunState(completed=completed, batches=set())
     for record in records:
-        item_id = str(record["item_id"])
-        batch_id = record.get("batch_id")
-        if not isinstance(batch_id, str) or not batch_id:
-            batch_id = f"legacy-item:{item_id}"
+        batch_id = str(record["batch_id"])
         if batch_id in state.batches:
             continue
         state.batches.add(batch_id)
-        usage = record.get("usage")
-        usage = usage if isinstance(usage, Mapping) else {}
-        prompt_tokens = _as_nonnegative_int(usage.get("prompt_tokens"))
-        completion_tokens = _as_nonnegative_int(usage.get("completion_tokens"))
-        attempts = max(1, _as_nonnegative_int(record.get("attempts")))
+        usage = record["usage"]
+        assert isinstance(usage, Mapping)
+        prompt_tokens = int(usage["prompt_tokens"])
+        completion_tokens = int(usage["completion_tokens"])
+        attempts = int(record["attempts"])
         state.prompt_tokens += prompt_tokens
         state.completion_tokens += completion_tokens
         state.actual_attempts += attempts
-        if "accounted_cost_usd" in record:
-            state.cost_usd += _as_nonnegative_decimal(record["accounted_cost_usd"])
-        else:
-            raw_cost = usage.get("cost_usd")
-            state.cost_usd += (
-                _as_nonnegative_decimal(raw_cost)
-                if raw_cost is not None
-                else price.cost(prompt_tokens, completion_tokens) * attempts
-            )
+        state.cost_usd += _required_nonnegative_decimal(
+            record["accounted_cost_usd"], field="accounted_cost_usd"
+        )
     return state
 
 
@@ -378,34 +534,70 @@ def _accounted_cost(
     projected_single_attempt: Decimal,
 ) -> Decimal:
     if usage.cost_usd is not None:
-        return _as_nonnegative_decimal(usage.cost_usd)
+        return _as_nonnegative_decimal(usage.cost_usd) + projected_single_attempt * (attempts - 1)
     estimated_from_usage = price.cost(usage.prompt_tokens, usage.completion_tokens)
-    if estimated_from_usage > 0:
-        return estimated_from_usage * attempts
-    return projected_single_attempt * attempts
+    return max(estimated_from_usage, projected_single_attempt) * attempts
 
 
 def _metadata_path(output: Path) -> Path:
     return Path(f"{output}.meta.json")
 
 
-def _validate_metadata(path: Path, *, model: str, digest: str) -> Mapping[str, Any] | None:
+def _validate_metadata(
+    path: Path,
+    *,
+    output: Path,
+    model: str,
+    digest: str,
+    expected_gold: Mapping[str, str],
+) -> Mapping[str, Any] | None:
     if not path.exists():
         return None
     try:
         metadata = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError("run metadata is not valid JSON") from exc
-    if not isinstance(metadata, Mapping) or _run_identity(metadata) != (
+    expected_identity = (
         model,
         digest,
         JUDGE_PROMPT_VERSION,
-    ):
+        run_id(model=model, dataset_digest=digest),
+    )
+    if not isinstance(metadata, Mapping) or _run_identity(metadata) != expected_identity:
         raise ValueError("metadata contains an incompatible run identity")
-    if metadata.get("in_flight"):
-        raise ValueError(
-            "metadata contains an unresolved in-flight batch; reconcile it before resuming"
+    in_flight = metadata.get("in_flight")
+    if in_flight:
+        if not isinstance(in_flight, Mapping):
+            raise ValueError("metadata contains an unresolved in-flight batch")
+        batch_id = in_flight.get("batch_id")
+        item_ids = in_flight.get("item_ids")
+        if (
+            not isinstance(batch_id, str)
+            or not batch_id
+            or not isinstance(item_ids, list)
+            or not item_ids
+            or any(not isinstance(item_id, str) or not item_id for item_id in item_ids)
+            or len(set(item_ids)) != len(item_ids)
+        ):
+            raise ValueError("metadata contains an unresolved in-flight batch")
+        records = _read_records(output)
+        _validate_records(
+            records,
+            model=model,
+            digest=digest,
+            expected_gold=expected_gold,
         )
+        durable = [record for record in records if record["batch_id"] == batch_id]
+        durable_ids = [str(record["item_id"]) for record in durable]
+        if len(durable_ids) != len(item_ids) or set(durable_ids) != set(item_ids):
+            raise ValueError(
+                "metadata contains an unresolved in-flight batch; reconcile it before resuming"
+            )
+        reconciled = dict(metadata)
+        reconciled["in_flight"] = None
+        reconciled["reconciled_at"] = datetime.now(UTC).isoformat()
+        _write_metadata(path, reconciled)
+        return reconciled
     return metadata
 
 
@@ -421,6 +613,8 @@ def _summary_metadata(
         "model": summary.model,
         "dataset_digest": summary.dataset_digest,
         "prompt_version": summary.prompt_version,
+        "run_id": summary.run_id,
+        "external_context_authorized": True,
         "selected": summary.selected,
         "completed": summary.completed,
         "resumed": summary.resumed,
@@ -475,6 +669,7 @@ def _make_summary(
         model=config.model,
         dataset_digest=digest,
         prompt_version=JUDGE_PROMPT_VERSION,
+        run_id=run_id(model=config.model, dataset_digest=digest),
         selected=len(selected_ids),
         completed=len(selected_ids & state.completed),
         resumed=resumed,
@@ -505,20 +700,35 @@ def run_judgments(
 
     price = _price(config)
     digest = dataset_digest(rows)
+    expected_gold: dict[str, str] = {}
+    for row in rows:
+        item_id = row.get("item_id")
+        if not isinstance(item_id, str) or not item_id or item_id in expected_gold:
+            raise ValueError("anchor dataset requires unique nonblank item IDs")
+        expected_gold[item_id] = gold_label_from_anchor(row)
     selected = stratified_prefix(rows, min(config.limit, len(rows)))
     selected_ids = {str(row["item_id"]) for row in selected}
     if len(selected_ids) != len(selected):
         raise ValueError("selected anchor rows require unique item IDs")
 
     existing_metadata = _validate_metadata(
-        _metadata_path(output), model=config.model, digest=digest
+        _metadata_path(output),
+        output=output,
+        model=config.model,
+        digest=digest,
+        expected_gold=expected_gold,
     )
     started_at = (
         str(existing_metadata.get("started_at"))
         if existing_metadata and existing_metadata.get("started_at")
         else datetime.now(UTC).isoformat()
     )
-    state = _load_state(output, model=config.model, digest=digest, price=price)
+    state = _load_state(
+        output,
+        model=config.model,
+        digest=digest,
+        expected_gold=expected_gold,
+    )
     resumed = len(selected_ids & state.completed)
     pending = [row for row in selected if str(row["item_id"]) not in state.completed]
     new_attempts = 0
@@ -584,6 +794,7 @@ def run_judgments(
                     "model": config.model,
                     "dataset_digest": digest,
                     "prompt_version": JUDGE_PROMPT_VERSION,
+                    "run_id": run_id(model=config.model, dataset_digest=digest),
                     "batch_id": batch_id,
                     "gold": gold_by_id[result.item_id],
                     "status": result.status,
@@ -603,6 +814,7 @@ def run_judgments(
                 stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
                 stream.flush()
                 state.completed.add(result.item_id)
+            os.fsync(stream.fileno())
 
             state.batches.add(batch_id)
             state.prompt_tokens += usage.prompt_tokens

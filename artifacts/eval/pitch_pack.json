@@ -1,5 +1,5 @@
 {
-  "policy_version": "banking-v3@sha256:0aeb8a4b17fe218c",
+  "policy_version": "banking-v4@sha256:7ec7e04a45840eab",
   "metrics": [
     {
       "name": "Pre-Action Catch Rate",
@@ -43,21 +43,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 16.0,
+          "value": 0.40191600471735,
           "unit": "ms",
           "ci": null,
           "met": true
         },
         {
           "seed": 20260827,
-          "value": 16.0,
+          "value": 0.4236669987440109,
           "unit": "ms",
           "ci": null,
           "met": true
         },
         {
           "seed": 20260828,
-          "value": 16.0,
+          "value": 0.4125000014901161,
           "unit": "ms",
           "ci": null,
           "met": true
@@ -70,21 +70,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 0.05196078431372549,
+          "value": 0.0558252427184466,
           "unit": "%",
           "ci": null,
           "met": false
         },
         {
           "seed": 20260827,
-          "value": 0.05511182108626198,
+          "value": 0.05175718849840256,
           "unit": "%",
           "ci": null,
           "met": false
         },
         {
           "seed": 20260828,
-          "value": 0.0535031847133758,
+          "value": 0.0560126582278481,
           "unit": "%",
           "ci": null,
           "met": false
@@ -97,21 +97,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": -0.1895999999999998,
+          "value": -0.17799999999999983,
           "unit": "%",
           "ci": null,
           "met": false
         },
         {
           "seed": 20260827,
-          "value": -0.16733333333333322,
+          "value": -0.17013333333333316,
           "unit": "%",
           "ci": null,
           "met": false
         },
         {
           "seed": 20260828,
-          "value": -0.1658666666666665,
+          "value": -0.15813333333333318,
           "unit": "%",
           "ci": null,
           "met": false
@@ -160,31 +160,31 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 0.8535031847133758,
+          "value": 0.6305732484076433,
           "unit": "%",
           "ci": [
-            0.7897636779608116,
-            0.9003562910024417
+            0.552798011217552,
+            0.7021111665076135
           ],
           "met": false
         },
         {
           "seed": 20260827,
-          "value": 0.910828025477707,
+          "value": 0.6050955414012739,
           "unit": "%",
           "ci": [
-            0.8558916184304337,
-            0.946139696851185
+            0.5269971194558805,
+            0.6781736821277895
           ],
           "met": false
         },
         {
           "seed": 20260828,
-          "value": 0.9044585987261147,
+          "value": 0.6496815286624203,
           "unit": "%",
           "ci": [
-            0.8483521994308755,
-            0.9412445218153694
+            0.5722908022592801,
+            0.7199221575720074
           ],
           "met": false
         }
@@ -196,31 +196,31 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 0.7133757961783439,
+          "value": 0.6305732484076433,
           "unit": "%",
           "ci": [
-            0.6382107131583525,
-            0.7783481870266742
+            0.552798011217552,
+            0.7021111665076135
           ],
           "met": null
         },
         {
           "seed": 20260827,
-          "value": 0.732484076433121,
+          "value": 0.6050955414012739,
           "unit": "%",
           "ci": [
-            0.6582945988717948,
-            0.7955680834193537
+            0.5269971194558805,
+            0.6781736821277895
           ],
           "met": null
         },
         {
           "seed": 20260828,
-          "value": 0.7515923566878981,
+          "value": 0.6496815286624203,
           "unit": "%",
           "ci": [
-            0.6785358471561937,
-            0.8126306172410767
+            0.5722908022592801,
+            0.7199221575720074
           ],
           "met": null
         }
@@ -259,21 +259,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
         },
         {
           "seed": 20260827,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
         },
         {
           "seed": 20260828,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
@@ -286,21 +286,21 @@
       "measurements": [
         {
           "seed": 20260826,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
         },
         {
           "seed": 20260827,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
         },
         {
           "seed": 20260828,
-          "value": 1.0,
+          "value": 0.0,
           "unit": "%",
           "ci": null,
           "met": null
@@ -412,9 +412,9 @@
     "design_targets": "TODO.md and Implementation/Implementation02.md",
     "limitations": "docs/LIMITATIONS.md",
     "seed_reports": [
-      "artifacts\\eval\\report-seed-20260826.json",
-      "artifacts\\eval\\report-seed-20260827.json",
-      "artifacts\\eval\\report-seed-20260828.json"
+      "artifacts/eval/report-seed-20260826.json",
+      "artifacts/eval/report-seed-20260827.json",
+      "artifacts/eval/report-seed-20260828.json"
     ]
   }
 }

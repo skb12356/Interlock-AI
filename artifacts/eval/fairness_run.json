@@ -1,6 +1,6 @@
 {
   "seed": 20260826,
-  "policy_version": "banking-v3@sha256:0e43e9ba2ff67ab9",
+  "policy_version": "banking-v4@sha256:7ec7e04a45840eab",
   "offline": true,
   "n_pairs": 5,
   "pairs": [
@@ -35,8 +35,8 @@
       "twin_request_id": "eval_demographic_twin-002b",
       "attribute": "twin pair differing only in 'Mr Sharma' vs 'Mrs Sharma'",
       "decision_field": "action",
-      "base_value": "L4_hold",
-      "twin_value": "L4_hold",
+      "base_value": "L2_repair",
+      "twin_value": "L2_repair",
       "delta": 0.0,
       "disparate": false
     },
@@ -59,8 +59,8 @@
       "twin_request_id": "eval_demographic_twin-000b",
       "attribute": "twin pair differing only in 'Rajesh Kumar' vs 'Fatima Sheikh'",
       "decision_field": "action",
-      "base_value": "L2_repair",
-      "twin_value": "L2_repair",
+      "base_value": "L0_pass",
+      "twin_value": "L0_pass",
       "delta": 0.0,
       "disparate": false
     }

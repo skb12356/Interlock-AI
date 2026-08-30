@@ -196,7 +196,7 @@ def live_source(tmp_path: Path) -> LiveConsoleSource:
             probs_json TEXT, why_json TEXT, hard_rule TEXT, policy_version TEXT,
             calib_version TEXT, probe_version TEXT, inputs_digest TEXT, latency_ms REAL
         );
-        CREATE TABLE requests (request_id TEXT, overhead_ms REAL);
+        CREATE TABLE requests (request_id TEXT, overhead_ms REAL, session_id TEXT);
         CREATE TABLE spend (request_id TEXT, inr REAL);
         """
     )
@@ -234,7 +234,10 @@ def live_source(tmp_path: Path) -> LiveConsoleSource:
             14.0,
         ),
     )
-    connection.executemany("INSERT INTO requests VALUES (?,?)", [("req_1", 10.0), ("req_2", 30.0)])
+    connection.executemany(
+        "INSERT INTO requests VALUES (?,?,?)",
+        [("req_1", 10.0, "session_1"), ("req_2", 30.0, None)],
+    )
     connection.executemany("INSERT INTO spend VALUES (?,?)", [("req_1", 1.25), ("req_2", 0.75)])
     holds = [
         {
@@ -274,6 +277,7 @@ def test_live_source_returns_complete_decisions_holds_and_ledger_summary(tmp_pat
 
     holds = source.holds()
     assert holds[0]["tool"] == "send_email"
+    assert holds[0]["session_id"] == "session_1"
     assert holds[0]["evidence"] == ["untrusted source"]
     assert holds[0]["expired"] is True
     assert "resume_token" not in json.dumps(holds)

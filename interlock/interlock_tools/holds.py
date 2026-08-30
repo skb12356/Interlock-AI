@@ -190,7 +190,9 @@ class ToolInterlock:
                 return False, "approval requires the resume token"
             if not secrets.compare_digest(str(expected), str(resume_token)):
                 return False, "resume token does not match"
-            deadline = record.get("sla_deadline_ts")
+            deadline = _effective_deadline(
+                record, legacy_response_sla_minutes=self.policy.human_review.sla_minutes
+            )
             if deadline and wall_time() > float(deadline):
                 return False, "the review window has expired; re-submit the request"
 
@@ -218,8 +220,14 @@ class ToolInterlock:
                 "state": record.get("state"),
                 "reason": record.get("reason"),
                 "created_ts": record.get("created_ts"),
-                "sla_deadline_ts": record.get("sla_deadline_ts"),
-                "expired": _is_expired(record),
+                "sla_deadline_ts": _effective_deadline(
+                    record,
+                    legacy_response_sla_minutes=self.policy.human_review.sla_minutes,
+                ),
+                "expired": _is_expired(
+                    record,
+                    legacy_response_sla_minutes=self.policy.human_review.sla_minutes,
+                ),
             }
             for record in self.ledger.pending_holds()
         ]
@@ -232,7 +240,10 @@ class ToolInterlock:
         """
         expired: list[str] = []
         for record in self.ledger.pending_holds():
-            if not _is_expired(record):
+            if not _is_expired(
+                record,
+                legacy_response_sla_minutes=self.policy.human_review.sla_minutes,
+            ):
                 continue
             hold_id = str(record.get("hold_id"))
             if await self.ledger.resolve_hold(hold_id, state="expired", resolved_by="sweeper"):
@@ -240,12 +251,26 @@ class ToolInterlock:
         return expired
 
 
-def _is_expired(record: dict[str, Any]) -> bool:
+def _effective_deadline(
+    record: dict[str, Any], *, legacy_response_sla_minutes: int | None = None
+) -> float | None:
     deadline = record.get("sla_deadline_ts")
-    if deadline is None:
-        # No deadline means no expiry. A hold without an SLA waits forever rather than
-        # being swept, which is the safe direction: sweeping it would release nothing,
-        # but it would also make an un-triaged irreversible action disappear from the
-        # queue that was supposed to surface it.
-        return False
-    return wall_time() > float(deadline)
+    if deadline is not None:
+        return float(deadline)
+    # Early gateway builds persisted response holds without the SLA or aggregation
+    # metadata the review contract requires. They cannot be reviewed faithfully, so
+    # retire them immediately while retaining the audit row. Tool holds remain
+    # fail-closed and visible when their deadline is absent.
+    created = record.get("created_ts")
+    if (
+        record.get("kind") == "response"
+        and created is not None
+        and legacy_response_sla_minutes is not None
+    ):
+        return float(created)
+    return None
+
+
+def _is_expired(record: dict[str, Any], *, legacy_response_sla_minutes: int | None = None) -> bool:
+    deadline = _effective_deadline(record, legacy_response_sla_minutes=legacy_response_sla_minutes)
+    return deadline is not None and wall_time() > deadline

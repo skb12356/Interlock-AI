@@ -30,7 +30,7 @@ import logging
 import random
 import re
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -98,6 +98,22 @@ _STREAM_HEADERS = {
     "x-accel-buffering": "no",
 }
 
+_HOLD_SWEEP_INTERVAL_S = 30.0
+
+
+async def _sweep_holds_forever(interlock: ToolInterlock) -> None:
+    """Keep the durable queue honest while the gateway is running."""
+    while True:
+        await asyncio.sleep(_HOLD_SWEEP_INTERVAL_S)
+        try:
+            expired = await interlock.sweep_expired()
+            if expired:
+                _log.info("expired %d review holds", len(expired))
+        except Exception:
+            # Review maintenance must not take down the customer request path. The
+            # next sweep retries and the rows remain fail-closed in the meantime.
+            _log.exception("review hold expiry sweep failed")
+
 
 def _stream_options(header_value: str | None) -> StreamOptions:
     """Honour ``X-Interlock-Events: off`` (see the caveat in ``core/sse.py``)."""
@@ -159,6 +175,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             max_stakes_inr=policy.thresholds.buffer_above_impact_inr,
         )
         app.state.tool_interlock = ToolInterlock(policy=policy, ledger=ledger)
+        expired_on_start = await app.state.tool_interlock.sweep_expired()
+        if expired_on_start:
+            _log.info("expired %d stale review holds at startup", len(expired_on_start))
         app.state.governor = Governor(
             # One estimate, one threshold: 'high stakes' means the same thing to the
             # governor's fail-closed split as it does to buffering and to the router.
@@ -184,9 +203,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             deadline_ms=settings.lane_a_deadline_ms,
             retriever=app.state.retriever,
         )
+        app.state.hold_sweeper_task = asyncio.create_task(
+            _sweep_holds_forever(app.state.tool_interlock)
+        )
         try:
             yield
         finally:
+            app.state.hold_sweeper_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await app.state.hold_sweeper_task
             if app.state.shadow_tasks:
                 await asyncio.gather(*app.state.shadow_tasks, return_exceptions=True)
             app.state.retriever.close()
@@ -977,29 +1002,52 @@ async def _stream_response(
         if last_repair is not None:
             timer.add("repair", last_repair.latency_ms)
 
-        for decision in gate.decisions:
-            if decision.action in {"L3_reroute", "L4_hold"}:
-                hold_id = new_hold_id()
-                resume_token = new_resume_token()
-                await ledger.persist_hold(
-                    hold_id=hold_id,
-                    request_id=request_id,
-                    kind="response",
-                    payload={"action": decision.action, "decision_id": decision.decision_id},
-                    evidence=decision.why,
-                    reason=decision.hard_rule or decision.action,
-                    resume_token=resume_token,
-                )
-                hold_event = HoldEvent(
-                    hold_id=hold_id,
-                    kind="response",
-                    reason=decision.hard_rule or decision.action,
-                    sentence_idx=None,
-                    resume_token=resume_token,
-                )
-                _publish_console(app, EVENT_HOLD, hold_event, request_id=request_id)
-                if options.allows(EVENT_HOLD):
-                    yield format_event(EVENT_HOLD, hold_event)
+        held = [
+            (sentence_idx, decision)
+            for sentence_idx, decision in enumerate(gate.decisions)
+            if decision.action == "L4_hold"
+        ]
+        if held:
+            hold_id = new_hold_id()
+            resume_token = new_resume_token()
+            deadline = wall_time() + app.state.policy.human_review.sla_minutes * 60.0
+            evidence = list(dict.fromkeys(line for _, item in held for line in item.why))
+            sentence_indices = [sentence_idx for sentence_idx, _ in held]
+            held_count = len(held)
+            summary = (
+                f"{held_count} response sentence{'s' if held_count != 1 else ''} "
+                f"{'requires' if held_count == 1 else 'require'} human review"
+            )
+            reason = next((item.hard_rule for _, item in held if item.hard_rule), "L4_hold")
+            await ledger.persist_hold(
+                hold_id=hold_id,
+                request_id=request_id,
+                kind="response",
+                payload={
+                    "action": "L4_hold",
+                    "decision_ids": [item.decision_id for _, item in held],
+                    "sentence_indices": sentence_indices,
+                    "held_count": held_count,
+                    "summary": summary,
+                    "impact_inr": lane.stakes.impact_inr,
+                    "domain": lane.stakes.domain,
+                    **({"session_id": session_id} if session_id else {}),
+                },
+                evidence=evidence,
+                reason=reason,
+                resume_token=resume_token,
+                sla_deadline_ts=deadline,
+            )
+            hold_event = HoldEvent(
+                hold_id=hold_id,
+                kind="response",
+                reason=reason,
+                sentence_idx=sentence_indices[0],
+                resume_token=resume_token,
+            )
+            _publish_console(app, EVENT_HOLD, hold_event, request_id=request_id)
+            if options.allows(EVENT_HOLD):
+                yield format_event(EVENT_HOLD, hold_event)
 
         # A degraded Lane A is reported to the console rather than hidden: the reviewer
         # needs to know the answer was checked with fewer detectors than usual.
@@ -1527,10 +1575,13 @@ def _batch_from(
     row proves the two consumed the same estimate, which is what makes Contribution 1
     checkable rather than asserted.
     """
+    interlock_meta = body.get("interlock") if isinstance(body.get("interlock"), dict) else {}
+    session_id = str(body.get("session_id") or interlock_meta.get("session_id") or "").strip()
     batch = RequestBatch(
         request_id=request_id,
         trace_id=trace_id,
         tenant_id=settings.tenant_id,
+        session_id=session_id or None,
         model_requested=str(body.get("model") or ""),
         route_reason=lane.route_reason,
         stakes_id=lane.stakes_id,

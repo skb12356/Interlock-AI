@@ -726,6 +726,32 @@ def test_a_held_sentence_becomes_a_durable_hold(forcing_client: TestClient) -> N
     assert holds
     assert holds[0]["state"] == "pending"
     assert holds[0]["kind"] == "response"
+    projected = forcing_client.get("/console/holds").json()["holds"]
+    assert len(projected) == 1
+    assert projected[0]["sla_deadline_ts"] > projected[0]["created_ts"]
+    assert projected[0]["payload"] == {
+        "action": "L4_hold",
+        "decision_ids": [projected[0]["payload"]["decision_ids"][0]],
+        "domain": "prepayment",
+        "held_count": 1,
+        "impact_inr": 40000.0,
+        "sentence_indices": [0],
+        "summary": "1 response sentence requires human review",
+    }
+
+
+@respx.mock
+def test_a_response_hold_projects_the_originating_session(forcing_client: TestClient) -> None:
+    _, raws = load_fixture("prepayment_penalty")
+    respx.post(UPSTREAM).mock(return_value=httpx.Response(200, content=sse_bytes(raws)))
+    forcing_client.post(
+        "/v1/chat/completions",
+        json=_high_stakes_request(session_id="session_from_console"),
+        headers={"X-Interlock-Force": "unsafe_action@0"},
+    )
+
+    hold = forcing_client.get("/console/holds").json()["holds"][0]
+    assert hold["session_id"] == "session_from_console"
 
 
 @respx.mock

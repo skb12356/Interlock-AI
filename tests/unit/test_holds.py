@@ -193,6 +193,25 @@ async def test_the_sweeper_expires_rather_than_approves(
     assert [r["hold_id"] for r in ledger.pending_holds()] == ["hold_fresh"]
 
 
+async def test_legacy_response_holds_without_a_deadline_expire_immediately(
+    interlock: ToolInterlock, ledger: Ledger
+) -> None:
+    """Incomplete pre-migration cards leave the queue but retain their audit rows."""
+    await ledger.persist_hold(
+        hold_id="hold_legacy_response",
+        request_id="req_legacy",
+        kind="response",
+    )
+    assert await interlock.sweep_expired() == ["hold_legacy_response"]
+    assert ledger.pending_holds() == []
+    row = (
+        ledger._require_connection()
+        .execute("SELECT state, resolved_by FROM holds WHERE hold_id=?", ("hold_legacy_response",))
+        .fetchone()
+    )
+    assert tuple(row) == ("expired", "sweeper")
+
+
 async def test_the_review_queue_flags_expiry_without_hiding_it(
     interlock: ToolInterlock, ledger: Ledger
 ) -> None:

@@ -303,10 +303,22 @@ class LiveConsoleSource:
         for raw in self.app.state.ledger.pending_holds():
             payload = _json_object(raw.get("payload_json"))
             deadline = raw.get("sla_deadline_ts")
+            session_id = payload.get("session_id")
+            if not session_id:
+                request = (
+                    self._connection()
+                    .execute(
+                        "SELECT session_id FROM requests WHERE request_id=?",
+                        (raw["request_id"],),
+                    )
+                    .fetchone()
+                )
+                session_id = request[0] if request is not None else None
             cards.append(
                 {
                     "hold_id": raw["hold_id"],
                     "request_id": raw["request_id"],
+                    "session_id": session_id,
                     "kind": raw["kind"],
                     "reason": raw.get("reason") or "review required",
                     "tool": payload.get("name") or payload.get("tool"),

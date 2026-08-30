@@ -49,3 +49,6 @@ artifacts/eval/sensitivity.db*
 artifacts/eval/diag*.db*
 artifacts/eval/manual_anchor_judgments_*.jsonl
 artifacts/eval/person1_page*.png
+
+# Playwright output (console/playwright.config.ts writes ../tmp)
+tmp/

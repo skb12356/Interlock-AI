@@ -389,9 +389,9 @@ def _metadata_path(output: Path) -> Path:
     return Path(f"{output}.meta.json")
 
 
-def _validate_metadata(path: Path, *, model: str, digest: str) -> None:
+def _validate_metadata(path: Path, *, model: str, digest: str) -> Mapping[str, Any] | None:
     if not path.exists():
-        return
+        return None
     try:
         metadata = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -402,9 +402,21 @@ def _validate_metadata(path: Path, *, model: str, digest: str) -> None:
         JUDGE_PROMPT_VERSION,
     ):
         raise ValueError("metadata contains an incompatible run identity")
+    if metadata.get("in_flight"):
+        raise ValueError(
+            "metadata contains an unresolved in-flight batch; reconcile it before resuming"
+        )
+    return metadata
 
 
-def _summary_metadata(summary: RunSummary, *, price: ModelPrice) -> dict[str, object]:
+def _summary_metadata(
+    summary: RunSummary,
+    *,
+    price: ModelPrice,
+    started_at: str,
+    ended_at: str | None,
+    in_flight: Mapping[str, object] | None,
+) -> dict[str, object]:
     return {
         "model": summary.model,
         "dataset_digest": summary.dataset_digest,
@@ -415,6 +427,7 @@ def _summary_metadata(summary: RunSummary, *, price: ModelPrice) -> dict[str, ob
         "batches": summary.batches,
         "network_calls": summary.network_calls,
         "actual_attempts": summary.actual_attempts,
+        "request_count": summary.actual_attempts,
         "prompt_tokens": summary.prompt_tokens,
         "completion_tokens": summary.completion_tokens,
         "cost_usd": str(summary.cost_usd),
@@ -424,6 +437,9 @@ def _summary_metadata(summary: RunSummary, *, price: ModelPrice) -> dict[str, ob
         "price_output_per_million": str(price.output_per_million),
         "pricing_as_of": PRICING_AS_OF,
         "pricing_source": PRICE_SOURCE,
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "in_flight": in_flight,
         "updated_at": datetime.now(UTC).isoformat(),
     }
 
@@ -452,7 +468,6 @@ def _make_summary(
     selected_ids: set[str],
     resumed: int,
     state: _RunState,
-    new_batches: int,
     new_attempts: int,
     termination_reason: str,
 ) -> RunSummary:
@@ -495,11 +510,17 @@ def run_judgments(
     if len(selected_ids) != len(selected):
         raise ValueError("selected anchor rows require unique item IDs")
 
-    _validate_metadata(_metadata_path(output), model=config.model, digest=digest)
+    existing_metadata = _validate_metadata(
+        _metadata_path(output), model=config.model, digest=digest
+    )
+    started_at = (
+        str(existing_metadata.get("started_at"))
+        if existing_metadata and existing_metadata.get("started_at")
+        else datetime.now(UTC).isoformat()
+    )
     state = _load_state(output, model=config.model, digest=digest, price=price)
     resumed = len(selected_ids & state.completed)
     pending = [row for row in selected if str(row["item_id"]) not in state.completed]
-    new_batches = 0
     new_attempts = 0
     termination_reason = "complete"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -514,8 +535,34 @@ def run_judgments(
                 termination_reason = "budget_cap"
                 break
 
-            results = judge.judge(config.model, items)
             expected_ids = [item.item_id for item in items]
+            batch_id_seed = "|".join((config.model, digest, *expected_ids, str(len(state.batches))))
+            batch_id = f"batch-{hashlib.sha256(batch_id_seed.encode()).hexdigest()[:20]}"
+            before_dispatch = _make_summary(
+                config=config,
+                digest=digest,
+                selected_ids=selected_ids,
+                resumed=resumed,
+                state=state,
+                new_attempts=new_attempts,
+                termination_reason="in_progress",
+            )
+            _write_metadata(
+                _metadata_path(output),
+                _summary_metadata(
+                    before_dispatch,
+                    price=price,
+                    started_at=started_at,
+                    ended_at=None,
+                    in_flight={
+                        "batch_id": batch_id,
+                        "item_ids": expected_ids,
+                        "reserved_cost_usd": str(retry_reservation),
+                        "max_attempts": judge.max_attempts,
+                    },
+                ),
+            )
+            results = judge.judge(config.model, items)
             result_ids = [result.item_id for result in results]
             if result_ids != expected_ids:
                 raise ValueError(
@@ -529,11 +576,7 @@ def run_judgments(
                 attempts=attempts,
                 projected_single_attempt=projected_single,
             )
-            if state.cost_usd + accounted_cost > config.max_cost_usd:
-                raise RuntimeError("provider-reported batch cost exceeded the reserved cost cap")
-
-            batch_id_seed = "|".join((config.model, digest, *expected_ids, str(len(state.batches))))
-            batch_id = f"batch-{hashlib.sha256(batch_id_seed.encode()).hexdigest()[:20]}"
+            provider_cost_overrun = state.cost_usd + accounted_cost > config.max_cost_usd
             gold_by_id = {str(row["item_id"]): gold_label_from_anchor(row) for row in batch_rows}
             for result in results:
                 record = {
@@ -567,18 +610,30 @@ def run_judgments(
             state.cost_usd += accounted_cost
             state.actual_attempts += attempts
             new_attempts += attempts
-            new_batches += 1
             progress = _make_summary(
                 config=config,
                 digest=digest,
                 selected_ids=selected_ids,
                 resumed=resumed,
                 state=state,
-                new_batches=new_batches,
                 new_attempts=new_attempts,
-                termination_reason="in_progress",
+                termination_reason=(
+                    "provider_cost_overrun" if provider_cost_overrun else "in_progress"
+                ),
             )
-            _write_metadata(_metadata_path(output), _summary_metadata(progress, price=price))
+            _write_metadata(
+                _metadata_path(output),
+                _summary_metadata(
+                    progress,
+                    price=price,
+                    started_at=started_at,
+                    ended_at=(datetime.now(UTC).isoformat() if provider_cost_overrun else None),
+                    in_flight=None,
+                ),
+            )
+            if provider_cost_overrun:
+                termination_reason = "provider_cost_overrun"
+                break
 
     summary = _make_summary(
         config=config,
@@ -586,9 +641,17 @@ def run_judgments(
         selected_ids=selected_ids,
         resumed=resumed,
         state=state,
-        new_batches=new_batches,
         new_attempts=new_attempts,
         termination_reason=termination_reason,
     )
-    _write_metadata(_metadata_path(output), _summary_metadata(summary, price=price))
+    _write_metadata(
+        _metadata_path(output),
+        _summary_metadata(
+            summary,
+            price=price,
+            started_at=started_at,
+            ended_at=datetime.now(UTC).isoformat(),
+            in_flight=None,
+        ),
+    )
     return summary

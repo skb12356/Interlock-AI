@@ -11,6 +11,7 @@ from dataclasses import replace
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
+from typing import Any
 
 import pytest
 from scripts.eval_manual_anchors import _print_json, summary_payload
@@ -102,7 +103,7 @@ class RecordingJudge:
         ]
 
 
-def _config(**changes: object) -> RunConfig:
+def _config(**changes: Any) -> RunConfig:
     config = RunConfig(
         model="openai/gpt-5-nano",
         limit=12,
@@ -322,6 +323,77 @@ def test_resume_refuses_incompatible_metadata_even_when_jsonl_is_absent(tmp_path
     assert judge.calls == []
 
 
+def test_resume_refuses_an_unresolved_in_flight_paid_batch(tmp_path: Path) -> None:
+    output = tmp_path / "run.jsonl"
+    Path(f"{output}.meta.json").write_text(
+        json.dumps(
+            {
+                "model": "openai/gpt-5-nano",
+                "dataset_digest": dataset_digest(ROWS),
+                "prompt_version": JUDGE_PROMPT_VERSION,
+                "in_flight": {
+                    "item_ids": ["item-00"],
+                    "reserved_cost_usd": "0.001",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    judge = RecordingJudge()
+
+    with pytest.raises(ValueError, match="unresolved in-flight batch"):
+        run_judgments(_config(limit=1), ROWS, judge, output)
+
+    assert judge.calls == []
+
+
+def test_runner_journals_the_retry_reservation_before_dispatch(tmp_path: Path) -> None:
+    output = tmp_path / "run.jsonl"
+
+    class JournalCheckingJudge(RecordingJudge):
+        def judge(self, model: str, items: Sequence[JudgeItem]) -> list[JudgeResult]:
+            metadata = json.loads(Path(f"{output}.meta.json").read_text(encoding="utf-8"))
+            assert metadata["in_flight"]["item_ids"] == [item.item_id for item in items]
+            assert Decimal(metadata["in_flight"]["reserved_cost_usd"]) > 0
+            return super().judge(model, items)
+
+    summary = run_judgments(_config(limit=1), ROWS, JournalCheckingJudge(), output)
+
+    assert summary.completed == 1
+    assert json.loads(Path(f"{output}.meta.json").read_text())["in_flight"] is None
+
+
+def test_provider_cost_overrun_is_persisted_and_stops_without_redispatch(tmp_path: Path) -> None:
+    output = tmp_path / "run.jsonl"
+    judge = RecordingJudge(usage=JudgeUsage(100, 20, 0.01))
+
+    summary = run_judgments(
+        _config(limit=2, batch_size=1, max_cost_usd=Decimal("0.001")),
+        ROWS,
+        judge,
+        output,
+    )
+
+    assert summary.termination_reason == "provider_cost_overrun"
+    assert summary.completed == 1
+    assert summary.cost_usd == Decimal("0.01")
+    assert len(_jsonl(output)) == 1
+    metadata = json.loads(Path(f"{output}.meta.json").read_text(encoding="utf-8"))
+    assert metadata["cost_usd"] == "0.01"
+    assert metadata["in_flight"] is None
+
+
+def test_metadata_records_run_bounds_and_cumulative_requests(tmp_path: Path) -> None:
+    output = tmp_path / "run.jsonl"
+
+    run_judgments(_config(limit=1), ROWS, RecordingJudge(attempts=2), output)
+
+    metadata = json.loads(Path(f"{output}.meta.json").read_text(encoding="utf-8"))
+    assert metadata["started_at"]
+    assert metadata["ended_at"]
+    assert metadata["request_count"] == 2
+
+
 def test_cli_summary_payload_serializes_every_decimal(tmp_path: Path) -> None:
     summary = run_judgments(_config(limit=1), ROWS, RecordingJudge(), tmp_path / "run.jsonl")
     stream = StringIO()
@@ -331,6 +403,30 @@ def test_cli_summary_payload_serializes_every_decimal(tmp_path: Path) -> None:
     payload = json.loads(stream.getvalue())
     assert payload["cost_usd"] == str(summary.cost_usd)
     assert payload["max_cost_usd"] == str(summary.max_cost_usd)
+
+
+def test_authorized_run_artifacts_redact_provider_echoes_of_secret_shapes(tmp_path: Path) -> None:
+    sentinel = "sk-or-v1-SENTINEL-DO-NOT-LEAK"
+    canary = "IL-CANARY-TENANT-AABBCCDDEEFF0011"
+    output = tmp_path / "run.jsonl"
+
+    class SecretEchoJudge(RecordingJudge):
+        def judge(self, model: str, items: Sequence[JudgeItem]) -> list[JudgeResult]:
+            results = super().judge(model, items)
+            return [
+                replace(result, rationale=f"Provider echoed {sentinel} and {canary}.")
+                for result in results
+            ]
+
+    run_judgments(_config(limit=1), ROWS, SecretEchoJudge(), output)
+
+    persisted = output.read_text(encoding="utf-8") + Path(f"{output}.meta.json").read_text(
+        encoding="utf-8"
+    )
+    assert sentinel not in persisted
+    assert canary not in persisted
+    assert "[REDACTED-API-KEY]" in persisted
+    assert "[REDACTED-CANARY]" in persisted
 
 
 def test_cli_without_opt_in_is_a_safe_plan_and_redacts_the_key(tmp_path: Path) -> None:

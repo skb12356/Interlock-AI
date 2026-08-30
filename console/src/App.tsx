@@ -74,6 +74,7 @@ export function App() {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [resolvingHoldId, setResolvingHoldId] = useState<string | null>(null);
+  const [clearingReviews, setClearingReviews] = useState(false);
   const [evidence, setEvidence] = useState<EvidenceBundle>(emptyEvidence);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
@@ -179,6 +180,7 @@ export function App() {
 
       void runLiveTrace(engine, {
         prompt,
+        sessionId,
         replay: consoleStatus?.source !== "live",
         signal: controller.signal,
         vault: vault.current,
@@ -260,6 +262,29 @@ export function App() {
     }
   };
 
+  const clearPendingReviews = async () => {
+    const snapshot = [...holds];
+    setClearingReviews(true);
+    setReviewError(null);
+    try {
+      const results = await Promise.allSettled(
+        snapshot.map((hold) => resolveHold(hold.hold_id, "rejected", undefined)),
+      );
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") vault.current.delete(snapshot[index].hold_id);
+      });
+      await loadReviews();
+      const failures = results.filter((result) => result.status === "rejected").length;
+      if (failures > 0) {
+        setReviewError(
+          `${snapshot.length - failures} reviews were cleared; ${failures} could not be changed and the queue was refreshed.`,
+        );
+      }
+    } finally {
+      setClearingReviews(false);
+    }
+  };
+
   const health: GatewayHealth = consoleStatus
     ? consoleStatus.source === "live"
       ? "connected"
@@ -284,6 +309,14 @@ export function App() {
     });
     return origins;
   }, [sessions]);
+
+  const sessionOrigins = useMemo(
+    () => new Map(sessions.map((session) => [
+      session.id,
+      { sessionId: session.id, sessionTitle: session.title } satisfies HoldOrigin,
+    ])),
+    [sessions],
+  );
 
   const traceAvailable = state.phase === "run";
 
@@ -345,11 +378,18 @@ export function App() {
           <ScrollArea>
             <ReviewsPanel
               holds={holds.map((hold) =>
-                toHoldCard(hold, vault.current.get(hold.hold_id) !== undefined, holdOrigins.get(hold.hold_id) ?? null),
+                toHoldCard(
+                  hold,
+                  vault.current.get(hold.hold_id) !== undefined,
+                  (hold.session_id ? sessionOrigins.get(hold.session_id) : undefined)
+                    ?? holdOrigins.get(hold.hold_id)
+                    ?? null,
+                ),
               )}
               loading={reviewsLoading}
               error={reviewError}
               resolvingHoldId={resolvingHoldId}
+              clearing={clearingReviews}
               onApprove={(holdId) => void handleHold(holdId, "approved")}
               onReject={(holdId) => void handleHold(holdId, "rejected")}
               onRefresh={() => void loadReviews()}
@@ -357,6 +397,7 @@ export function App() {
                 setActiveSessionId(sessionId);
                 setView("chat");
               }}
+              onClearAll={() => void clearPendingReviews()}
             />
           </ScrollArea>
         ) : view === "about" ? (

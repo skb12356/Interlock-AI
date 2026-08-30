@@ -14,6 +14,7 @@ export interface HoldOrigin {
 
 export interface HoldCard {
   id: string;
+  requestId: string;
   origin: HoldOrigin | null;
   kind: "response" | "tool_call";
   title: string;
@@ -21,11 +22,24 @@ export interface HoldCard {
   tool: string;
   sentence: string;
   impact: string;
+  domain: string;
+  heldCount: number;
+  created: string;
   sla: string;
   slaExpired: boolean;
   evidence: string[];
   flaggedSpan: string | null;
   hasToken: boolean;
+}
+
+function formatCreated(createdTs: number): string {
+  const ageMs = Math.max(0, Date.now() - createdTs * 1000);
+  const minutes = Math.floor(ageMs / 60_000);
+  if (minutes < 1) return "Created just now";
+  if (minutes < 60) return `Created ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Created ${hours}h ago`;
+  return `Created ${Math.floor(hours / 24)}d ago`;
 }
 
 function formatSla(hold: HoldProjection): { text: string; expired: boolean } {
@@ -55,8 +69,11 @@ export function toHoldCard(
 ): HoldCard {
   const sla = formatSla(hold);
   const impact = hold.payload?.["impact_inr"];
+  const domain = hold.payload?.["domain"];
+  const heldCount = hold.payload?.["held_count"];
   return {
     id: hold.hold_id,
+    requestId: hold.request_id,
     origin,
     kind: hold.kind,
     title: hold.reason,
@@ -64,6 +81,9 @@ export function toHoldCard(
     tool: hold.tool ?? "—",
     sentence: hold.sentence_idx === null || hold.sentence_idx === undefined ? "—" : `idx ${hold.sentence_idx}`,
     impact: typeof impact === "number" ? `₹${impact.toLocaleString("en-IN")}` : "—",
+    domain: typeof domain === "string" ? domain : "—",
+    heldCount: typeof heldCount === "number" ? heldCount : 1,
+    created: formatCreated(hold.created_ts),
     sla: sla.text,
     slaExpired: sla.expired,
     evidence: hold.evidence,
@@ -77,20 +97,25 @@ export function ReviewsPanel({
   loading,
   error,
   resolvingHoldId,
+  clearing,
   onApprove,
   onReject,
   onRefresh,
   onOpenSession,
+  onClearAll,
 }: {
   holds: HoldCard[];
   loading: boolean;
   error: string | null;
   resolvingHoldId: string | null;
+  clearing: boolean;
   onApprove: (holdId: string) => void;
   onReject: (holdId: string) => void;
   onRefresh: () => void;
   onOpenSession: (sessionId: string) => void;
+  onClearAll: () => void;
 }) {
+  const [confirmClear, setConfirmClear] = useState(false);
   return (
     <section
       style={{
@@ -117,25 +142,83 @@ export function ReviewsPanel({
               : `${holds.length} hold${holds.length === 1 ? " is" : "s are"} waiting on a human. Approval uses the initiating stream token; rejection never requires it.`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onRefresh}
+        <span style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {holds.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setConfirmClear(true)}
+              disabled={clearing}
+              style={{
+                flex: "none",
+                padding: "9px 16px",
+                borderRadius: radius.button,
+                border: "1px solid rgba(217,112,95,.5)",
+                background: "transparent",
+                color: color.fail,
+                cursor: clearing ? "not-allowed" : "pointer",
+                font: `500 9px ${font.mono}`,
+                letterSpacing: ".14em",
+                textTransform: "uppercase",
+              }}
+            >
+              {clearing ? "Clearing…" : "Clear pending reviews"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onRefresh}
+            style={{
+              flex: "none",
+              padding: "9px 16px",
+              borderRadius: radius.button,
+              border: `1px solid ${color.line}`,
+              background: "transparent",
+              color: color.text,
+              cursor: "pointer",
+              font: `500 9px ${font.mono}`,
+              letterSpacing: ".14em",
+              textTransform: "uppercase",
+            }}
+          >
+            {loading ? "Refreshing…" : "Refresh queue"}
+          </button>
+        </span>
+      </div>
+
+      {confirmClear ? (
+        <div
+          role="alertdialog"
+          aria-label="Clear pending reviews confirmation"
           style={{
-            flex: "none",
-            padding: "9px 16px",
-            borderRadius: radius.button,
-            border: `1px solid ${color.line}`,
-            background: "transparent",
-            color: color.text,
-            cursor: "pointer",
-            font: `500 9px ${font.mono}`,
-            letterSpacing: ".14em",
-            textTransform: "uppercase",
+            padding: "16px 18px",
+            border: "1px solid rgba(217,112,95,.45)",
+            borderRadius: radius.card,
+            background: color.bgPanel,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+            flexWrap: "wrap",
           }}
         >
-          {loading ? "Refreshing…" : "Refresh queue"}
-        </button>
-      </div>
+          <span style={{ font: `400 13px/1.5 ${font.sans}`, color: color.textSoft }}>
+            Reject all {holds.length} pending review{holds.length === 1 ? "" : "s"}? Audit rows will be retained.
+          </span>
+          <span style={{ display: "flex", gap: "8px" }}>
+            <button type="button" onClick={() => setConfirmClear(false)}>Keep reviews</button>
+            <button
+              type="button"
+              aria-label="Confirm clearing pending reviews"
+              onClick={() => {
+                setConfirmClear(false);
+                onClearAll();
+              }}
+            >
+              Reject all
+            </button>
+          </span>
+        </div>
+      ) : null}
 
       {error ? (
         <p role="alert" style={{ margin: 0, font: `400 12px ${font.mono}`, color: color.fail }}>
@@ -183,7 +266,10 @@ function HoldCardView({
   const facts = [
     { label: "Tool", value: card.tool },
     { label: "Sentence", value: card.sentence },
+    { label: "Held scope", value: `${card.heldCount} sentence${card.heldCount === 1 ? "" : "s"}` },
+    { label: "Domain", value: card.domain },
     { label: "Impact", value: card.impact },
+    { label: "Age", value: card.created },
   ];
 
   return (
@@ -246,7 +332,7 @@ function HoldCardView({
             {shortHoldId(card.id)}
           </span>
         </span>
-        <CopyButton value={card.id} />
+        <CopyButton value={card.id} label="hold" />
         {card.origin ? (
           <button
             type="button"
@@ -268,9 +354,10 @@ function HoldCardView({
             Open chat session · {card.origin.sessionTitle} →
           </button>
         ) : (
-          <MicroLabel style={{ color: color.textMute }}>
-            no chat session for this hold in this browser
-          </MicroLabel>
+          <span style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <MicroLabel style={{ color: color.textMute }}>Chat unavailable in this browser</MicroLabel>
+            <CopyButton value={card.requestId} label="request" />
+          </span>
         )}
       </div>
 
@@ -375,7 +462,7 @@ function HoldCardView({
               font: `600 12px ${font.sans}`,
             }}
           >
-            {resolving ? "Working…" : "Approve release"}
+            {resolving ? "Working…" : "Approve review"}
           </button>
         </span>
       </footer>
@@ -384,7 +471,7 @@ function HoldCardView({
 }
 
 /** Copies the full id so an operator can search for this hold later. */
-function CopyButton({ value }: { value: string }) {
+function CopyButton({ value, label }: { value: string; label: "hold" | "request" }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
 
   const copy = async () => {
@@ -399,7 +486,7 @@ function CopyButton({ value }: { value: string }) {
     <button
       type="button"
       onClick={() => void copy()}
-      aria-label={`Copy hold id ${value}`}
+      aria-label={`Copy ${label} id ${value}`}
       style={{
         flex: "none",
         padding: "7px 12px",

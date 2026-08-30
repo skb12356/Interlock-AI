@@ -16,6 +16,7 @@ export async function runLiveTrace(
   engine: TraceEngine,
   options: {
     prompt: string;
+    sessionId?: string;
     replay: boolean;
     signal?: AbortSignal;
     vault?: ResumeTokenVault;
@@ -25,6 +26,7 @@ export async function runLiveTrace(
 
   const request: ChatRequest = {
     prompt: options.prompt,
+    sessionId: options.sessionId,
     replay: options.replay,
     signal: options.signal,
   };

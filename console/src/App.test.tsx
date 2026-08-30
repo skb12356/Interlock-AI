@@ -190,4 +190,50 @@ describe("console shell", () => {
     await user.click(screen.getByRole("button", { name: "Evidence" }));
     expect(await screen.findByRole("heading", { name: "Evidence ledger" })).toBeInTheDocument();
   });
+
+  it("clears pending reviews through audited rejection requests", async () => {
+    const user = userEvent.setup();
+    let holdReads = 0;
+    const holds = ["hld_1", "hld_2"].map((holdId) => ({
+      hold_id: holdId,
+      request_id: `req_${holdId}`,
+      session_id: null,
+      kind: "response",
+      reason: "L4_hold",
+      tool: null,
+      sentence_idx: 0,
+      payload: { held_count: 1, domain: "insurance", impact_inr: 10_000 },
+      evidence: ["unsupported high-impact statement"],
+      flagged_span: null,
+      state: "pending",
+      created_ts: Date.now() / 1000,
+      sla_deadline_ts: Date.now() / 1000 + 900,
+      expired: false,
+    }));
+    const fetcher = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/console/status")) {
+        return Promise.resolve(new Response(JSON.stringify({ source: "live", replay: false }), { status: 200 }));
+      }
+      if (url === "/console/holds") {
+        const body = holdReads++ === 0 ? holds : [];
+        return Promise.resolve(new Response(JSON.stringify({ holds: body }), { status: 200 }));
+      }
+      if (url.includes("/gateway/v1/holds/") && url.endsWith("/reject")) {
+        expect(init?.method).toBe("POST");
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}", { status: 404 }));
+    });
+    vi.stubGlobal("fetch", fetcher);
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Reviews" }));
+    expect(await screen.findByText("2 holds are waiting on a human. Approval uses the initiating stream token; rejection never requires it.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear pending reviews" }));
+    await user.click(screen.getByRole("button", { name: "Confirm clearing pending reviews" }));
+
+    expect(await screen.findByText("No pending holds.")).toBeInTheDocument();
+    expect(fetcher.mock.calls.filter(([input]) => String(input).endsWith("/reject"))).toHaveLength(2);
+  });
 });

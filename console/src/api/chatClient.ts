@@ -4,6 +4,8 @@ import { getDecisionDetail } from "./consoleClient";
 
 export interface ChatRequest {
   prompt: string;
+  /** Stable browser conversation id used to link durable reviews back to chat. */
+  sessionId?: string;
   /**
    * Only used against the replay server, which otherwise picks a recorded trace
    * from the prompt text. The real gateway ignores it.
@@ -34,6 +36,7 @@ export async function streamChat(
       model: "interlock",
       messages: [{ role: "user", content: request.prompt }],
       stream: true,
+      ...(request.sessionId ? { session_id: request.sessionId } : {}),
       ...(request.replay === false || !request.scenario ? {} : { scenario: request.scenario }),
       ...(request.fragments?.length ? { interlock: { retrieved: request.fragments } } : {}),
     }),

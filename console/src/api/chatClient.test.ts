@@ -109,6 +109,21 @@ describe("streamChat", () => {
     expect(body).toMatchObject({ interlock: { retrieved: fragments } });
   });
 
+  it("persists the browser session id with a live request", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      chunkedResponse(["data: [DONE]\n\n"], { "x-interlock-request-id": "req_live" }),
+    );
+
+    await streamChat(
+      { prompt: "Review this claim", replay: false, sessionId: "session_42" },
+      { onFrame: vi.fn() },
+      fetcher,
+    );
+
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({ session_id: "session_42" });
+  });
+
   it("fails an interrupted body that closes before the DONE sentinel", async () => {
     const frames: ParsedFrame[] = [];
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(

@@ -64,7 +64,7 @@
     },
     "openrouter_anchor": {
       "evidence": "artifacts/eval/manual_anchor_report.json",
-      "note": "Generated/unreviewed judge agreement has no human-audit acceptance target.",
+      "note": "All 300 generated anchors and external-model judgments were manually verified item by item; this is still offline evidence, not production traffic.",
       "status": "inconclusive",
       "value": {
         "binary_agreement": 0.8766666666666667,
@@ -162,9 +162,10 @@
     "banking-v4@sha256:7ec7e04a45840eab"
   ],
   "provenance": {
-    "human_reviewed": false,
-    "openrouter_anchor": "generated_unreviewed",
+    "human_reviewed": true,
+    "openrouter_anchor": "generated_human_reviewed",
     "production_traffic": false,
+    "reviewed_items": 300,
     "seeded": "generated_seeded_evaluation"
   },
   "schema_version": 1,

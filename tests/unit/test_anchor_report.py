@@ -144,6 +144,23 @@ def _fixture() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     return labels, judgments
 
 
+def _review_attestation() -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "review_status": "human_verified",
+        "reviewer_role": "project_author",
+        "reviewed_at": "2026-08-31",
+        "reviewed_items": 6,
+        "review_scope": ["ground_truth_labels", "openrouter_judgments"],
+        "labels_digest": "sha256:cc8e4cdbfd13268e00323720fcf2ba5137be79fee2ea2c78b74647f025e8d041",
+        "judgments_digest": "sha256:10f4d4f61fc077b64d0fbd1c063ec5cbf7079f33f62b2f9e1a69985ba6a9d81c",
+        "statement": (
+            "The project author manually verified the ground-truth label and "
+            "GPT-4o Mini judgment for every item."
+        ),
+    }
+
+
 def test_anchor_report_computes_strict_binary_validity_and_request_usage() -> None:
     labels, judgments = _fixture()
 
@@ -186,3 +203,47 @@ def test_anchor_report_keeps_slices_clusters_invalids_and_bounded_failures() -> 
     assert "NOT human-reviewed" in markdown
     assert "False intervention on clean anchors" in markdown
     assert "openai/gpt-4o-mini" in markdown
+
+
+def test_anchor_report_marks_only_digest_matched_attestations_as_human_reviewed() -> None:
+    """Catches a stale review attestation being applied to changed labels or judgments."""
+    labels, judgments = _fixture()
+
+    report = build_anchor_report(
+        labels,
+        judgments,
+        model="openai/gpt-4o-mini",
+        review_attestation=_review_attestation(),
+    )
+    markdown = render_anchor_markdown(report)
+
+    assert report["source"] == {
+        "kind": "human_reviewed_openrouter_judge_on_generated_anchor",
+        "human_reviewed": True,
+        "production_traffic": False,
+        "review_status": "human_verified",
+        "reviewer_role": "project_author",
+        "reviewed_at": "2026-08-31",
+        "reviewed_items": 6,
+        "review_scope": ["ground_truth_labels", "openrouter_judgments"],
+        "labels_digest": _review_attestation()["labels_digest"],
+        "judgments_digest": _review_attestation()["judgments_digest"],
+        "review_statement": _review_attestation()["statement"],
+        "taxonomy_warning": (
+            "These generated anchors and the external-model judgments were manually "
+            "verified item by item. This remains offline evidence, not production traffic "
+            "or the product's stakes-aware intervention rate."
+        ),
+    }
+    assert "Human-reviewed external-model audit" in markdown
+    assert "NOT human-reviewed" not in markdown
+
+    changed_labels = [dict(row) for row in labels]
+    changed_labels[0]["review_basis"] = "changed after the attested review"
+    with pytest.raises(ValueError, match="labels_digest"):
+        build_anchor_report(
+            changed_labels,
+            judgments,
+            model="openai/gpt-4o-mini",
+            review_attestation=_review_attestation(),
+        )

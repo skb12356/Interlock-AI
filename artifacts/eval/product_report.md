@@ -2,7 +2,7 @@
 
 Overall status: **MISS**
 
-> Evidence is generated/unreviewed unless its row says otherwise. No production traffic or human audit is claimed.
+> The 300-example OpenRouter anchor audit is human-reviewed. Other evidence is generated or offline unless its row says otherwise. No production traffic is claimed.
 
 | Check | Status | Value | Evidence |
 | --- | --- | --- | --- |

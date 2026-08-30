@@ -22,8 +22,10 @@ exceeds target, and clean high-stakes traffic is still intervened on (finding F-
   reference Hold/Repair/Pass contract.
 - GPT-4o Mini returned 300/300 valid generated-anchor judgments: 79.0% strict three-class
   agreement, 87.67% binary agreement, 8.5% clean-anchor false positives, and 20% defective
-  grounding escapes. This is an external-judge audit over generated/unreviewed anchors,
-  not a human audit and not the product action rate.
+  grounding escapes. The project author manually verified both the ground-truth label and
+  external-model judgment for every item; the attestation is digest-bound in
+  `artifacts/eval/manual_anchor_300.review.json`. This remains offline evidence, not the product
+  action rate or production traffic.
 - The final gates produced 1,023 Python passes with 2 optional-ML skips, 67 frontend unit
   passes, and 14 desktop/mobile Playwright passes with zero browser-console errors.
 - The authoritative roll-up is `artifacts/eval/product_report.md`; it preserves misses,
@@ -63,7 +65,7 @@ exceeds target, and clean high-stakes traffic is still intervened on (finding F-
 | Conformal feasibility filter | **built** | D3-B1 — off by default (F-016); `make eval-guaranteed` runs it on |
 | Loop breaker | **partial** | scored in the harness; not yet wired into the live agent path |
 | **Observer (real weights)** | optional profile | implementation exists; two tests skip without torch/weights |
-| Generated anchor audit (300) | **built/measured** | OpenRouter GPT-4o Mini; explicitly unreviewed, not human labels |
+| Human-reviewed anchor audit (300) | **built/measured** | OpenRouter GPT-4o Mini; every generated ground-truth label and model judgment manually verified |
 | Demo app UI | **built** | deterministic replay plus live SSE/projection paths |
 | Operator console (chat front door + stage trace) | **built** | `console/src/chat/` + `console/src/theater/`; 77 vitest cases, 12 browser journeys, live path only |
 | Governor / degradation order | **built** | D2-A6 — invariant 4 asserted in both directions; `/admin/governor` |

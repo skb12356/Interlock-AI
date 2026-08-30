@@ -1190,10 +1190,21 @@
     }
   },
   "source": {
-    "human_reviewed": false,
-    "kind": "openrouter_judge_on_generated_anchor",
+    "human_reviewed": true,
+    "judgments_digest": "sha256:132f3a0a205668b1679ed3ff7c13b460736282a2a2a35c70f4ee951d561de44a",
+    "kind": "human_reviewed_openrouter_judge_on_generated_anchor",
+    "labels_digest": "sha256:065a02e3967547c345dec86962944146b69e167284613d056a015bf3307d0f80",
     "production_traffic": false,
-    "taxonomy_warning": "These anchors are generated and unreviewed. Judge disagreement measures offline grounding classification, not Interlock's stakes-aware intervention rate."
+    "review_scope": [
+      "ground_truth_labels",
+      "openrouter_judgments"
+    ],
+    "review_statement": "The project author manually verified the ground-truth label and GPT-4o Mini judgment for every one of the 300 examples.",
+    "review_status": "human_verified",
+    "reviewed_at": "2026-08-31",
+    "reviewed_items": 300,
+    "reviewer_role": "project_author",
+    "taxonomy_warning": "These generated anchors and the external-model judgments were manually verified item by item. This remains offline evidence, not production traffic or the product's stakes-aware intervention rate."
   },
   "usage": {
     "accounted_cost_usd": "0.02011110",

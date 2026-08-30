@@ -97,6 +97,8 @@ def build_product_report(
     agreement = anchor.get("agreement")
     source = source if isinstance(source, Mapping) else {}
     agreement = agreement if isinstance(agreement, Mapping) else {}
+    human_reviewed = source.get("human_reviewed") is True
+    reviewed_items = source.get("reviewed_items")
     checks["openrouter_anchor"] = _check(
         "inconclusive",
         {
@@ -112,7 +114,13 @@ def build_product_report(
             ),
         },
         "artifacts/eval/manual_anchor_report.json",
-        "Generated/unreviewed judge agreement has no human-audit acceptance target.",
+        (
+            f"All {reviewed_items} generated anchors and external-model judgments were "
+            "manually verified item by item; this is still offline evidence, not production "
+            "traffic."
+            if human_reviewed
+            else "Generated/unreviewed judge agreement has no human-audit acceptance target."
+        ),
     )
 
     calibration = _artifact(artifacts, "calibration")
@@ -222,9 +230,12 @@ def build_product_report(
         "policy_versions": sorted(policy_versions),
         "provenance": {
             "seeded": "generated_seeded_evaluation",
-            "openrouter_anchor": "generated_unreviewed",
+            "openrouter_anchor": (
+                "generated_human_reviewed" if human_reviewed else "generated_unreviewed"
+            ),
             "production_traffic": False,
             "human_reviewed": bool(source.get("human_reviewed", False)),
+            "reviewed_items": reviewed_items if human_reviewed else None,
         },
         "policy_selection": {
             "selected": dict(selected),
@@ -245,13 +256,22 @@ def render_product_markdown(report: Mapping[str, Any]) -> str:
     metrics = report.get("seeded_metrics")
     if not isinstance(checks, Mapping) or not isinstance(metrics, Mapping):
         raise TypeError("product report requires checks and seeded_metrics")
+    provenance = report.get("provenance")
+    human_reviewed = isinstance(provenance, Mapping) and provenance.get("human_reviewed") is True
+    reviewed_items = provenance.get("reviewed_items") if isinstance(provenance, Mapping) else None
+    evidence_note = (
+        f"> The {reviewed_items}-example OpenRouter anchor audit is human-reviewed. Other evidence is "
+        "generated or offline unless its row says otherwise. No production traffic is claimed."
+        if human_reviewed
+        else "> Evidence is generated/unreviewed unless its row says otherwise. No production "
+        "traffic or human audit is claimed."
+    )
     lines = [
         "# Interlock release evidence",
         "",
         f"Overall status: **{str(report.get('overall_status')).upper()}**",
         "",
-        "> Evidence is generated/unreviewed unless its row says otherwise. No production "
-        "traffic or human audit is claimed.",
+        evidence_note,
         "",
         "| Check | Status | Value | Evidence |",
         "| --- | --- | --- | --- |",

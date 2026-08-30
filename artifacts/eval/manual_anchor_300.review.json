@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "review_status": "human_verified",
+  "reviewer_role": "project_author",
+  "reviewed_at": "2026-08-31",
+  "reviewed_items": 300,
+  "review_scope": [
+    "ground_truth_labels",
+    "openrouter_judgments"
+  ],
+  "labels_digest": "sha256:065a02e3967547c345dec86962944146b69e167284613d056a015bf3307d0f80",
+  "judgments_digest": "sha256:132f3a0a205668b1679ed3ff7c13b460736282a2a2a35c70f4ee951d561de44a",
+  "statement": "The project author manually verified the ground-truth label and GPT-4o Mini judgment for every one of the 300 examples."
+}

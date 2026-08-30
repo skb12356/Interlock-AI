@@ -97,3 +97,35 @@ def test_product_report_retains_provenance_failed_metrics_and_no_fake_zeroes() -
     assert "generated/unreviewed" in markdown
     assert "unavailable" in markdown
     assert "False interventions" in markdown
+
+
+def test_product_report_propagates_verified_human_review_provenance() -> None:
+    """Catches the combined report relabelling a verified audit as generated/unreviewed."""
+    report = build_product_report(
+        {
+            "source": {
+                "human_reviewed": True,
+                "production_traffic": False,
+                "reviewed_items": 300,
+            },
+            "agreement": {
+                "binary_grounding": {"rate": 0.8767},
+                "false_intervention_on_clean": {"rate": 0.085},
+                "grounding_escape": {"rate": 0.20},
+            },
+        },
+        [],
+        {"selected": {}, "candidates": []},
+        {},
+    )
+    markdown = render_product_markdown(report)
+
+    assert report["provenance"]["openrouter_anchor"] == "generated_human_reviewed"
+    assert report["provenance"]["human_reviewed"] is True
+    assert report["provenance"]["reviewed_items"] == 300
+    assert report["checks"]["openrouter_anchor"]["note"] == (
+        "All 300 generated anchors and external-model judgments were manually verified "
+        "item by item; this is still offline evidence, not production traffic."
+    )
+    assert "human-reviewed" in markdown.lower()
+    assert "generated/unreviewed" not in markdown

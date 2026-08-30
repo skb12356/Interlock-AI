@@ -2,7 +2,7 @@
 
 Model: **openai/gpt-4o-mini**
 
-> **NOT human-reviewed or production evidence.** These anchors are generated and unreviewed. Judge disagreement measures offline grounding classification, not Interlock's stakes-aware intervention rate.
+> **Human-reviewed external-model audit.** These generated anchors and the external-model judgments were manually verified item by item. This remains offline evidence, not production traffic or the product's stakes-aware intervention rate.
 
 | Measurement | Result |
 | --- | ---: |

@@ -42,6 +42,11 @@ def main() -> int:
         type=Path,
         default=REPO_ROOT / "artifacts/eval/manual_anchor_judgments_openai-gpt-4o-mini.jsonl",
     )
+    parser.add_argument(
+        "--review-attestation",
+        type=Path,
+        default=REPO_ROOT / "artifacts/eval/manual_anchor_300.review.json",
+    )
     parser.add_argument("--model", default="openai/gpt-4o-mini")
     parser.add_argument(
         "--json", type=Path, default=REPO_ROOT / "artifacts/eval/manual_anchor_report.json"
@@ -56,8 +61,9 @@ def main() -> int:
             _jsonl(args.labels),
             _jsonl(args.judgments),
             model=args.model,
+            review_attestation=json.loads(args.review_attestation.read_text(encoding="utf-8")),
         )
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     args.json.parent.mkdir(parents=True, exist_ok=True)

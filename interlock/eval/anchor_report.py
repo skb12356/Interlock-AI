@@ -6,6 +6,8 @@ It is deliberately kept separate from Interlock's stakes-aware action rate.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import statistics
 from collections import Counter, defaultdict
@@ -163,11 +165,77 @@ def _usage(judgments: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _rows_digest(rows: Sequence[Mapping[str, Any]]) -> str:
+    payload = b"".join(
+        (json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode(
+            "utf-8"
+        )
+        for row in rows
+    )
+    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+def _source(
+    labels: Sequence[Mapping[str, Any]],
+    judgments: Sequence[Mapping[str, Any]],
+    review_attestation: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if review_attestation is None:
+        return {
+            "kind": "openrouter_judge_on_generated_anchor",
+            "human_reviewed": False,
+            "production_traffic": False,
+            "taxonomy_warning": (
+                "These anchors are generated and unreviewed. Judge disagreement measures "
+                "offline grounding classification, not Interlock's stakes-aware intervention rate."
+            ),
+        }
+
+    required = {
+        "schema_version": 1,
+        "review_status": "human_verified",
+        "reviewer_role": "project_author",
+        "reviewed_items": len(labels),
+        "review_scope": ["ground_truth_labels", "openrouter_judgments"],
+        "labels_digest": _rows_digest(labels),
+        "judgments_digest": _rows_digest(judgments),
+    }
+    for field, expected in required.items():
+        if review_attestation.get(field) != expected:
+            raise ValueError(f"review attestation {field} does not match the reviewed evidence")
+    reviewed_at = review_attestation.get("reviewed_at")
+    statement = review_attestation.get("statement")
+    if not isinstance(reviewed_at, str) or not reviewed_at:
+        raise ValueError("review attestation reviewed_at must be a nonblank string")
+    if not isinstance(statement, str) or not statement:
+        raise ValueError("review attestation statement must be a nonblank string")
+
+    return {
+        "kind": "human_reviewed_openrouter_judge_on_generated_anchor",
+        "human_reviewed": True,
+        "production_traffic": False,
+        "review_status": "human_verified",
+        "reviewer_role": "project_author",
+        "reviewed_at": reviewed_at,
+        "reviewed_items": len(labels),
+        "review_scope": list(required["review_scope"]),
+        "labels_digest": required["labels_digest"],
+        "judgments_digest": required["judgments_digest"],
+        "review_statement": statement,
+        "taxonomy_warning": (
+            "These generated anchors and the external-model judgments were manually "
+            "verified item by item. This remains offline evidence, not production traffic "
+            "or the product's stakes-aware intervention rate."
+        ),
+    }
+
+
 def build_anchor_report(
     labels: Sequence[Mapping[str, Any]],
     judgments: Sequence[Mapping[str, Any]],
     *,
     model: str,
+    review_attestation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a complete report without conflating judge agreement and product actions."""
     by_label = _indexed(labels, source="label")
@@ -222,15 +290,7 @@ def build_anchor_report(
     return {
         "schema_version": 1,
         "model": model,
-        "source": {
-            "kind": "openrouter_judge_on_generated_anchor",
-            "human_reviewed": False,
-            "production_traffic": False,
-            "taxonomy_warning": (
-                "These anchors are generated and unreviewed. Judge disagreement measures "
-                "offline grounding classification, not Interlock's stakes-aware intervention rate."
-            ),
-        },
+        "source": _source(labels, judgments, review_attestation),
         "validity": {
             "total": len(by_label),
             "valid": len(valid_pairs),
@@ -277,13 +337,18 @@ def render_anchor_markdown(report: Mapping[str, Any]) -> str:
     false_intervention = agreement["false_intervention_on_clean"]
     escape = agreement["grounding_escape"]
     assert all(isinstance(row, Mapping) for row in (strict, binary, false_intervention, escape))
+    provenance = (
+        "> **Human-reviewed external-model audit.** "
+        if source.get("human_reviewed") is True
+        else "> **NOT human-reviewed or production evidence.** "
+    )
     return "\n".join(
         [
             "# OpenRouter grounding-anchor report",
             "",
             f"Model: **{report['model']}**",
             "",
-            "> **NOT human-reviewed or production evidence.** " + str(source["taxonomy_warning"]),
+            provenance + str(source["taxonomy_warning"]),
             "",
             "| Measurement | Result |",
             "| --- | ---: |",

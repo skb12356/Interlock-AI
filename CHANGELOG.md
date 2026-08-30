@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-08-30 (console polish)
+
+- Added an About workspace: what Interlock does in plain language, what happens to one
+  question, what it can do about a bad answer, what the published numbers mean, and the
+  research each mechanism comes from, cited.
+- Fixed scrolling in the Reviews, Evidence and About workspaces — the shell no longer
+  clips them.
+- Hold cards now show a middle-elided id with the full value on hover, a copy control
+  (with a selection-copy fallback), and a link to the chat session the hold came from
+  when this browser has it.
+
 ## 2026-08-30 (later)
 
 - Rebuilt the console front door as a chat workspace: sessions in a sidebar, one real

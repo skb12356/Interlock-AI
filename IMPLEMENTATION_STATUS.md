@@ -419,6 +419,21 @@ Finished traces are kept per turn in `localStorage` so the stage view can be reo
 without asking the backend to run the request again. That store is a convenience only —
 the authoritative record of any request is the trace the gateway wrote.
 
+### D-018 — The console explains itself, and cites what it is built on
+**Reality:** an About workspace was added. The first half is written for a reader with no
+technical background — the seven stages and the six-rung ladder in ordinary words, and
+what each headline number actually means. The second half lists every mechanism with its
+source, taken from the evidence table in `Interlock-v2.pdf`: semantic entropy (Farquhar
+et al., Nature 2024), the linear probe for it (Kossen et al., arXiv:2406.15927),
+token-level streaming probes (arXiv:2509.03531), the generator-agnostic observer
+(arXiv:2507.23221), MiniCheck (Tang, Laban et al., EMNLP 2024), verbal-vs-semantic
+uncertainty (arXiv:2503.14477), conformal factuality (Mohri & Hashimoto, ICML 2024),
+sentence-commit streaming (SentGuard), value-based safety forecasting, RouteLLM (ICLR
+2025) and FrugalGPT, cascaded human–AI decision-making (NeurIPS 2025), counterfactual
+twins (Tamkin et al., arXiv:2312.03689), always-valid inference (Johari et al., 2022),
+and CaMeL (Debenedetti et al., arXiv:2503.18813). Our own three contributions are
+labelled as ours and no further.
+
 ### D-017 — The transcript hides the model's `<think>` block
 **Reality:** some upstream models stream a `<think>` preamble. Stage 02 shows the raw
 generation verbatim, because that is the provider's own bytes, but the chat answer and

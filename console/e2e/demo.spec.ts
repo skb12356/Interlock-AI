@@ -9,117 +9,98 @@ function watchBrowserFailures(page: Page) {
   return failures;
 }
 
-/** Picks a seeded scene on the hero and starts the trace. */
-async function startScene(page: Page, label: string) {
+async function ask(page: Page, prompt: string) {
+  await page.getByLabel("Ask the bank assistant").fill(prompt);
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText(/checked in \d+\.\d+ s/).last()).toBeVisible({ timeout: 20_000 });
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
-  await page.getByRole("button", { name: new RegExp(label, "i") }).click();
-  await page.getByRole("button", { name: "Send through Interlock" }).click();
-  await expect(page.getByRole("heading", { name: "Pre-flight" })).toBeVisible();
-}
+});
 
-/**
- * Jumps with the keyboard: hovering the rail slides the expanded overlay over
- * the collapsed bars, so a pointer click would land on the overlay instead.
- */
-async function jumpToStage(page: Page, name: string) {
-  await page.getByRole("button", { name: new RegExp(`^Stage \\d+, ${name}$`) }).press("Enter");
-}
-
-test.describe("demo traces", () => {
-  test("a clean request is priced at L0 and released unchanged", async ({ page }, testInfo) => {
+test.describe("chat sessions", () => {
+  test("a prompt is answered with the seven stages that produced it", async ({ page }, testInfo) => {
     const failures = watchBrowserFailures(page);
-    await startScene(page, "Branch hours");
+    await ask(page, "What are the prepayment charges on my floating-rate home loan?");
 
-    await jumpToStage(page, "Pricing the ladder");
-    await expect(page.getByText("cheapest safe action wins")).toBeVisible();
-    await expect(page.getByText("₹2", { exact: true }).first()).toBeVisible();
-
-    await jumpToStage(page, "Release");
-    await expect(page.getByText("L0 PASS", { exact: true })).toBeVisible();
-    await expect(page.getByText("What would have shipped without Interlock")).toBeVisible();
-    const pageWidth = await page.evaluate(() => ({
-      viewport: window.innerWidth,
-      content: document.documentElement.scrollWidth,
-    }));
-    const configuredWidth = testInfo.project.name === "mobile" ? 390 : 1440;
-    expect(pageWidth).toEqual({ viewport: configuredWidth, content: configuredWidth });
-    await page.screenshot({ path: testInfo.outputPath("release-l0.png"), fullPage: true });
-    expect(failures).toEqual([]);
-  });
-
-  test("the repair scene keeps every priced alternative visible", async ({ page }) => {
-    const failures = watchBrowserFailures(page);
-    await startScene(page, "Invented loan clause");
-
-    await jumpToStage(page, "Pricing the ladder");
-    for (const level of ["L0", "L1", "L2", "L3", "L4", "L5"]) {
-      await expect(page.getByText(level, { exact: true }).first()).toBeVisible();
+    // The stage list is already open: it expands while the run is streaming.
+    for (const stage of ["Pre-flight", "Generation", "Pricing the ladder", "Commit gate", "Release"]) {
+      await expect(page.getByText(stage, { exact: true })).toBeVisible();
     }
-    await expect(page.getByText("Chosen", { exact: true })).toBeVisible();
-
-    await jumpToStage(page, "Release");
     await expect(page.getByText("L2 REPAIR", { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("chat-answer.png"), fullPage: true });
     expect(failures).toEqual([]);
   });
 
-  test("the held scene freezes the tool call at the gate", async ({ page }) => {
+  test("the session list keeps past chats and starts new ones", async ({ page }) => {
     const failures = watchBrowserFailures(page);
-    await startScene(page, "Untrusted claim");
+    await ask(page, "What time does the MG Road branch open tomorrow?");
 
-    await jumpToStage(page, "Commit gate");
-    await expect(page.getByText("frozen at the interlock")).toBeVisible();
-    await jumpToStage(page, "Release");
+    const sidebar = page.getByLabel("Chat sessions");
+    await expect(sidebar.getByRole("button", { name: /MG Road branch/ })).toBeVisible();
+
+    await sidebar.getByRole("button", { name: /New chat session/ }).click();
+    await expect(page.getByLabel("New session")).toBeVisible();
+    await expect(sidebar.getByRole("button", { name: /MG Road branch/ })).toBeVisible();
+    expect(failures).toEqual([]);
+  });
+
+  test("an irreversible request is held and releases nothing", async ({ page }) => {
+    const failures = watchBrowserFailures(page);
+    await ask(page, "Please forward confirmation that my insurance claim was paid in full.");
+
     await expect(page.getByText("L4 HOLD", { exact: true })).toBeVisible();
-    expect(failures).toEqual([]);
-  });
-
-  test("the canary scene blocks deterministically and releases nothing", async ({ page }) => {
-    const failures = watchBrowserFailures(page);
-    await startScene(page, "Canary leak");
-
-    await jumpToStage(page, "Pricing the ladder");
-    await expect(page.getByText(/hard rule: canary token present/i)).toBeVisible();
-    await jumpToStage(page, "Release");
-    await expect(page.getByText("L5 BLOCK", { exact: true })).toBeVisible();
-    await expect(page.getByText(/I cannot share internal payment references/)).toBeVisible();
-    expect(failures).toEqual([]);
-  });
-
-  test("stage navigation works from the keyboard and the footer", async ({ page }) => {
-    const failures = watchBrowserFailures(page);
-    await startScene(page, "Branch hours");
-
-    await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("heading", { name: "Generation" })).toBeVisible();
-    await page.keyboard.press("ArrowLeft");
-    await expect(page.getByRole("heading", { name: "Pre-flight" })).toBeVisible();
-
-    await page.getByRole("button", { name: "Pause" }).click();
-    await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+    await expect(page.getByText("— no content was released —")).toBeVisible();
     expect(failures).toEqual([]);
   });
 });
 
-test.describe("live backend", () => {
-  test("a live stream drives the same stages and never leaks a resume token", async ({ page, request, baseURL }) => {
+test.describe("trace view", () => {
+  test("see it live opens the stage machine and reports the time the request took", async ({ page }) => {
     const failures = watchBrowserFailures(page);
-    await page.goto("/");
-    await page.getByRole("button", { name: /Untrusted claim/i }).click();
-    await page.getByRole("button", { name: /demo trace/i }).click();
-    await expect(page.getByRole("button", { name: /live backend/i })).toBeVisible();
+    await ask(page, "What are the prepayment charges on my floating-rate home loan?");
 
-    await page.getByRole("button", { name: "Send through Interlock" }).click();
-    // The run has started; the stream may already have advanced past stage 01.
-    await expect(page.getByRole("button", { name: /^Stage 01/ })).toBeVisible();
+    await page.getByRole("button", { name: /See it live/ }).click();
+    await expect(page.getByRole("heading", { name: "Pre-flight" })).toBeVisible();
+    await expect(page.getByText("Time taken")).toBeVisible();
 
-    // The stream itself advances the stages; no fixture timeline is involved.
-    await expect(page.getByRole("heading", { name: /In-flight checks|Pricing the ladder|Commit gate|Release/ })).toBeVisible({
-      timeout: 20_000,
-    });
-    // Lane A latencies are not itemised in the stream contract, and the live
-    // view says so rather than showing invented per-check numbers.
-    await jumpToStage(page, "Pre-flight");
-    await expect(page.getByText("AGGREGATE ONLY", { exact: true })).toBeVisible();
+    // The clock is frozen once the run is over.
+    const reading = await page.getByText(/^\d+\.\d\d s$/).textContent();
+    await page.waitForTimeout(1_500);
+    await expect(page.getByText(/^\d+\.\d\d s$/)).toHaveText(reading ?? "");
+
+    await page.getByRole("button", { name: /^Stage 04/ }).press("Enter");
+    await expect(page.getByRole("heading", { name: "Pricing the ladder" })).toBeVisible();
+    await expect(page.getByText("Chosen", { exact: true })).toBeVisible();
+    expect(failures).toEqual([]);
+  });
+
+  test("has no playback controls and no demo switch", async ({ page }) => {
+    const failures = watchBrowserFailures(page);
+    await ask(page, "What time does the MG Road branch open tomorrow?");
+    await page.getByRole("button", { name: /See it live/ }).click();
+
+    await expect(page.getByRole("button", { name: "Pause" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Next stage" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Previous stage" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /demo trace/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /live backend/i })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Back to chat" }).click();
+    await expect(page.getByLabel("Session transcript")).toBeVisible();
+    expect(failures).toEqual([]);
+  });
+});
+
+test.describe("operator workspaces", () => {
+  test("the review queue and evidence ledger read the real projections", async ({ page, request, baseURL }) => {
+    const failures = watchBrowserFailures(page);
+    await ask(page, "Please forward confirmation that my insurance claim was paid in full.");
+
+    await page.getByRole("button", { name: "Reviews" }).click();
+    await expect(page.getByRole("heading", { name: "Pending reviews" })).toBeVisible();
 
     const projection = await request.get(`${baseURL}/console/holds`);
     expect(await projection.text()).not.toContain("resume_token");
@@ -127,20 +108,9 @@ test.describe("live backend", () => {
     expect(
       await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage })),
     ).not.toContain("replay-token-0001");
-    expect(failures).toEqual([]);
-  });
 
-  test("the review queue and evidence ledger read the real projections", async ({ page }) => {
-    const failures = watchBrowserFailures(page);
-    await page.goto("/");
-
-    await page.getByRole("button", { name: /Reviews/ }).click();
-    await expect(page.getByRole("heading", { name: "Pending reviews" })).toBeVisible();
-
-    await page.getByRole("button", { name: /Evidence/ }).click();
+    await page.getByRole("button", { name: "Evidence" }).click();
     await expect(page.getByRole("heading", { name: "Evidence ledger" })).toBeVisible();
-    await expect(page.getByText("Pre-action catch rate")).toBeVisible();
-    await expect(page.getByText("Per-signal AUROC")).toBeVisible();
     expect(failures).toEqual([]);
   });
 });

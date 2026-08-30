@@ -24,7 +24,7 @@ audit, and combined submission report are committed. The build remains an honest
   agreement, 87.67% binary agreement, 8.5% clean-anchor false positives, and 20% defective
   grounding escapes. This is an external-judge audit over generated/unreviewed anchors,
   not a human audit and not the product action rate.
-- The final gates produced 1,017 Python passes with 2 optional-ML skips, 67 frontend unit
+- The final gates produced 1,023 Python passes with 2 optional-ML skips, 67 frontend unit
   passes, and 14 desktop/mobile Playwright passes with zero browser-console errors.
 - The authoritative roll-up is `artifacts/eval/product_report.md`; it preserves misses,
   inconclusive results, unavailable economics, and not-run penetration testing.
@@ -69,7 +69,7 @@ audit, and combined submission report are committed. The build remains an honest
 | Governor / degradation order | **built** | D2-A6 — invariant 4 asserted in both directions; `/admin/governor` |
 | **Governor / Lane C / console** | **built** | live projections, offline fairness, evidence and operator workspaces |
 
-**Test count:** 1,017 Python + 67 frontend unit + 14 browser journeys passing; 2 optional-ML skips.
+**Test count:** 1,023 Python + 67 frontend unit + 14 browser journeys passing; 2 optional-ML skips.
 
 ### Sequencing change
 

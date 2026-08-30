@@ -133,7 +133,7 @@ Remaining backend/environment follow-up is narrower:
 
 The integration branch contains the complete Person 2 console and its live backend seam:
 
-- React 19, TypeScript, Vite, Vitest, Testing Library, Recharts, and Playwright tooling.
+- React 19, TypeScript, Vite, Vitest, Testing Library, and Playwright tooling.
 - Runtime-validated direct SSE and projection events, sentence-keyed state, partial-output
   preservation, eventually consistent decision-detail hydration, reconnect cursors, stream
   reset handling, duplicate suppression, and replay-gap buffering.
@@ -193,12 +193,17 @@ uv run pytest -q tests console/tests/python
 npm --prefix console run test:e2e
 ```
 
-The integration gate on 30 August 2026 produced 59 passing frontend unit tests and 10
-passing Playwright journeys across desktop 1440×900 and mobile 390×844. The clean core/dev
-Python gate produced 893 passing tests and 2 optional-ML skips. TypeScript,
+The final integration gate on 30 August 2026 produced 67 passing frontend unit tests and 14
+passing Playwright journeys across desktop 1440×900 and mobile 390×844. Visual QA found
+and fixed a mobile shrink-to-fit regression; the browser suite now pins both layout and
+content width to the configured viewport. The clean core/dev Python gate produced 1,017
+passing tests and 2 optional-ML skips. TypeScript,
 Vite build, Ruff lint/format, strict mypy, dependency locking, and the 36-test retrieval
 suite also passed. The Vite build emits a non-blocking bundle-size warning, and its
 development proxy can log `EPIPE` or `ECONNRESET` when Playwright closes a page.
+
+Person 2 implementation and integration are complete. Remaining items below are release
+evidence or environment follow-up, not missing console behavior.
 
 ## Known limits
 

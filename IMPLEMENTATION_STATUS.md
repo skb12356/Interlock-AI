@@ -5,10 +5,29 @@ Live record of what is **built**, what is **measured**, what is **stubbed**, and
 
 Task-level state lives in `TODO.md`; machine-readable resume state in `STATE_CHECKPOINT.json`.
 
-**Last updated:** 2026-08-26 · **Phase:** Day 3 complete — all four never-cut items are
-built, the real risk engine is on the hot path, and `make eval` produces six measured
-numbers. Five meet their target; one misses by a factor of forty-five, and that miss is
-the most informative result in the build so far (F-019).
+**Last updated:** 2026-08-30 · **Phase:** integrated release evidence complete. Person 2's
+console and live projection seam are complete; the policy comparison, OpenRouter anchor
+audit, and combined submission report are committed. The build remains an honest release
+**MISS** because false intervention and the saved load-latency run exceed target.
+
+### Current release evidence (supersedes the historical Day-3 snapshot below)
+
+- `banking-v4` applies the selected 0.015 probability deadband and 20× nuisance multiplier
+  only to probabilistic expected-loss pricing. Deterministic hard rules are unchanged.
+- Across seeds 20260826/27/28: catch is 100%, empirical grounding escapes are zero, and
+  false/disruptive intervention is 63.06%, 60.51%, and 64.97%. The fresh neutral worst seed
+  was 92.36%. All residual clean interventions are in the generated ₹10,000+ stakes band.
+- The raw lower-intervention candidate was rejected because it changed the reference
+  high-stakes action from L4 Hold to L2 Repair. The shipped candidate preserves the
+  reference Hold/Repair/Pass contract.
+- GPT-4o Mini returned 300/300 valid generated-anchor judgments: 79.0% strict three-class
+  agreement, 87.67% binary agreement, 8.5% clean-anchor false positives, and 20% defective
+  grounding escapes. This is an external-judge audit over generated/unreviewed anchors,
+  not a human audit and not the product action rate.
+- The final gates produced 1,017 Python passes with 2 optional-ML skips, 67 frontend unit
+  passes, and 14 desktop/mobile Playwright passes with zero browser-console errors.
+- The authoritative roll-up is `artifacts/eval/product_report.md`; it preserves misses,
+  inconclusive results, unavailable economics, and not-run penetration testing.
 
 ---
 
@@ -43,14 +62,14 @@ the most informative result in the build so far (F-019).
 | Real `RiskEngine` on the hot path | **built** | D3-B3/B4 — `INTERLOCK_RISK_ENGINE=real` is the default |
 | Conformal feasibility filter | **built** | D3-B1 — off by default (F-016); `make eval-guaranteed` runs it on |
 | Loop breaker | **partial** | scored in the harness; not yet wired into the live agent path |
-| **Observer (real weights)** | not started | D2-B4 — needs torch |
-| Hand-labelled anchor set (300) | not started | D2-B3 — calibration currently runs on induced data (D-010) |
-| Demo app UI | not started | D1-A5 remainder |
-| Operator console (stage-flow rebuild) | **built** | `console/src/theater/`; 66 vitest cases, demo + live paths |
+| **Observer (real weights)** | optional profile | implementation exists; two tests skip without torch/weights |
+| Generated anchor audit (300) | **built/measured** | OpenRouter GPT-4o Mini; explicitly unreviewed, not human labels |
+| Demo app UI | **built** | deterministic replay plus live SSE/projection paths |
+| Operator console (stage-flow rebuild) | **built** | `console/src/theater/`; 67 vitest cases, demo + live paths |
 | Governor / degradation order | **built** | D2-A6 — invariant 4 asserted in both directions; `/admin/governor` |
-| **Governor / Lane C / console** | not started | D2-A6, D4 |
+| **Governor / Lane C / console** | **built** | live projections, offline fairness, evidence and operator workspaces |
 
-**Test count:** 788 passing.
+**Test count:** 1,017 Python + 67 frontend unit + 14 browser journeys passing; 2 optional-ML skips.
 
 ### Sequencing change
 
@@ -61,7 +80,11 @@ better: the enforcement path is priced correctly from the first day rather than 
 placeholder numbers. The parts of D3-B1 that genuinely need calibration artefacts — the
 conformal feasibility filter — remain at D3-B1.
 
-## 2. What is measured
+## 2. Historical Day-3 measurement and analysis
+
+> This section preserves the 26 August investigation that motivated the measured policy
+> comparison. Its 91.08% single-seed figures are historical. Current three-seed
+> `banking-v4` results are in the release-evidence block above.
 
 All six now come from a run. `make eval` (200 seeded conversations, Interlock off vs on,
 paired generations) produces them, and it is re-run on demand rather than quoted from a

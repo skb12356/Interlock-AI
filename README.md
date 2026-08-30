@@ -246,7 +246,6 @@ starts three localhost-bound processes with health checks.
 
 - React 19 and React DOM
 - TypeScript 5.9 and Vite 7
-- Recharts for evidence visualizations
 - Vitest, Testing Library, jsdom, and Playwright
 
 ## Getting started
@@ -436,6 +435,9 @@ uv run python scripts/eval.py --conformal-filter \
   --json artifacts/eval/report-guaranteed.json
 uv run python scripts/sensitivity.py
 uv run python scripts/measure_action_latency.py
+uv run python scripts/compare_policy_methods.py
+uv run python scripts/report_manual_anchors.py
+uv run python scripts/build_product_report.py
 ```
 
 The console only serves an explicit artifact allowlist. Confidence intervals remain next to
@@ -448,7 +450,22 @@ Two results must always be read together:
 - The conformal artifact reports zero certified ungrounded escapes **and** a 100%
   intervention rate at the selected threshold.
 
+The current `banking-v4` policy was selected from 216 bounded policy candidates over
+three immutable seeds. It preserves the reference Hold/Repair/Pass behavior, keeps
+pre-action catch at 100% with zero empirical grounding escapes, and reduces worst-seed
+false/disruptive intervention from 92.36% under the fresh neutral comparison to 64.97%.
+The target remains missed: all residual seeded false interventions occur in the generated
+₹10,000+ stakes bucket.
+
+The separate GPT-4o Mini audit reports an 8.5% false-positive rate on 200 generated clean
+anchors and a 20% grounding-escape rate on 100 generated defective anchors. Those are
+offline judge-classification results, not product action rates, and the anchors are
+explicitly unreviewed rather than human labels.
+
 See [`artifacts/eval/report.json`](artifacts/eval/report.json),
+[`artifacts/eval/policy_comparison.json`](artifacts/eval/policy_comparison.json),
+[`artifacts/eval/manual_anchor_report.json`](artifacts/eval/manual_anchor_report.json),
+[`artifacts/eval/product_report.md`](artifacts/eval/product_report.md),
 [`artifacts/calibration/lambda.json`](artifacts/calibration/lambda.json), and
 [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) for the committed evidence and caveats.
 
@@ -523,7 +540,8 @@ rollback procedures.
   from forced live outcomes.
 - The default dense retrieval arm is a deterministic hashed vector; BM25 carries much of
   the current retrieval quality.
-- Calibration data is induced rather than a completed 300-item human anchor set.
+- Calibration data is induced. A 300-item generated/unreviewed anchor has been judged
+  through OpenRouter, but it is an external-model audit rather than human ground truth.
 - The real observer weights are optional; a clean CPU-only checkout runs deterministic
   signals and reports missing probe capability.
 - Lane C endpoints are implemented, but a fresh ledger has no production fairness pairs.

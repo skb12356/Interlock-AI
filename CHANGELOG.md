@@ -2,6 +2,20 @@
 
 ## 2026-08-30
 
+- Compared 216 policy adjustments over three immutable seeds, added catch/escape and
+  reference-action governance gates, and shipped `banking-v4` with a 0.015 probability
+  deadband plus 20× false-intervention nuisance pricing. Worst-seed false/disruptive
+  intervention fell from 92.36% to 64.97% while catch remained 100% and empirical
+  grounding escapes remained zero.
+- Added a request-deduplicated OpenRouter report over 300 generated/unreviewed anchors and
+  fixed shared resume budgeting across multiple judge models. GPT-4o Mini produced 8.5%
+  clean-anchor false positives and 20% grounding escapes for USD 0.02011 across 60 calls.
+- Added a combined failure-preserving submission report. It keeps load latency and false
+  intervention as misses, conformal/fairness as inconclusive, production economics as
+  unavailable, and penetration testing as not run.
+- Fixed the mobile console's 548 CSS px intrinsic width. The 390×844 project now renders
+  at the true viewport with no shrink-to-fit strip, pinned by Playwright on both projects.
+
 - Rebuilt the operator console as the animated stage-flow decision theatre from the
   design handoff: hero, seven-stage trace machine, split-flap stage board, priced
   intervention ladder, commit gate, release and Lane C, plus the Reviews and Evidence

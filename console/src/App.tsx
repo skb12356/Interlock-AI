@@ -1,40 +1,19 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { streamChat } from "./api/chatClient";
-import { ProjectionConnection } from "./api/projectionClient";
-import { uploadDocument } from "./api/uploadClient";
-import {
-  ConsoleApiError,
-  getDecisionDetail,
-  getEvidenceBundle,
-  getHolds,
-  getLedgerSummary,
-  getStatus,
-  resolveHold,
-} from "./api/consoleClient";
-import type { HoldProjection, UploadedDocument } from "./domain/contracts";
-import type { ConsoleStatus, EvidenceBundle, LedgerSummary } from "./domain/evidence";
+import { ConsoleApiError, getEvidenceBundle, getHolds, getStatus, resolveHold } from "./api/consoleClient";
+import type { HoldProjection } from "./domain/contracts";
+import type { ConsoleStatus, EvidenceBundle } from "./domain/evidence";
 import { ResumeTokenVault } from "./security/resumeTokens";
-import { consoleReducer, initialConsoleState } from "./state/consoleStore";
-import { LiveWorkspace } from "./workspaces/LiveWorkspace";
-import { EvidenceWorkspace } from "./workspaces/EvidenceWorkspace";
-import { ReviewsWorkspace } from "./workspaces/ReviewsWorkspace";
+import { EvidencePanel } from "./theater/EvidencePanel";
+import { runLiveTrace } from "./theater/liveRun";
+import { Header, type View } from "./theater/Header";
+import { LiveTheater } from "./theater/LiveTheater";
+import { ReviewsPanel, toHoldCard } from "./theater/ReviewsPanel";
+import { ShellDecoration } from "./theater/ShellDecoration";
+import { color } from "./theater/tokens";
+import { useTraceEngine } from "./theater/useTraceEngine";
 
-import "./styles.css";
-
-type Workspace = "live" | "reviews" | "evidence";
-
-const workspaces: Array<{ id: Workspace; label: string; marker: string }> = [
-  { id: "live", label: "Live", marker: "01" },
-  { id: "reviews", label: "Reviews", marker: "02" },
-  { id: "evidence", label: "Evidence", marker: "03" },
-];
-
-const headings: Record<Workspace, string> = {
-  live: "Live decision desk",
-  reviews: "Pending reviews",
-  evidence: "Evidence ledger",
-};
+import "./theater/theater.css";
 
 const emptyEvidence: EvidenceBundle = {
   calibration: null,
@@ -44,93 +23,74 @@ const emptyEvidence: EvidenceBundle = {
   laneC: null,
 };
 
+/** Playback settings are read once from the URL so a demo can be re-paced without a rebuild. */
+function readSettings(): { pace: number; autoplay: boolean; currency: "rupee" | "dollar" } {
+  if (typeof window === "undefined") return { pace: 1, autoplay: true, currency: "rupee" };
+  const params = new URLSearchParams(window.location.search);
+  const pace = Number(params.get("pace"));
+  return {
+    pace: Number.isFinite(pace) && pace >= 0.5 && pace <= 2 ? pace : 1,
+    autoplay: params.get("autoplay") !== "0",
+    currency: params.get("currency") === "dollar" ? "dollar" : "rupee",
+  };
+}
+
 export function App() {
-  const [workspace, setWorkspace] = useState<Workspace>("live");
-  const [state, dispatch] = useReducer(consoleReducer, initialConsoleState);
-  const [scenario, setScenario] = useState<"clean" | "scene1" | "held" | "blocked">("scene1");
-  const [prompt, setPrompt] = useState("What are the prepayment charges on my floating-rate home loan?");
-  const [busy, setBusy] = useState(false);
+  const [settings] = useState(readSettings);
+  const { engine, state } = useTraceEngine(settings);
+  const [view, setView] = useState<View>("live");
+
+  const [consoleStatus, setConsoleStatus] = useState<ConsoleStatus | null>(null);
   const [holds, setHolds] = useState<HoldProjection[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [resolvingHoldId, setResolvingHoldId] = useState<string | null>(null);
-  const [consoleStatus, setConsoleStatus] = useState<ConsoleStatus | null>(null);
-  const [ledger, setLedger] = useState<LedgerSummary | null>(null);
   const [evidence, setEvidence] = useState<EvidenceBundle>(emptyEvidence);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
-  const [chatError, setChatError] = useState<string | null>(null);
-  const [uploaded, setUploaded] = useState<UploadedDocument | null>(null);
-  const [uploadBusy, setUploadBusy] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [projectionStatus, setProjectionStatus] = useState<"connecting" | "connected" | "reconnecting" | "unavailable">("connecting");
+  const [liveError, setLiveError] = useState<string | null>(null);
   const vault = useRef(new ResumeTokenVault());
-  const activeController = useRef<AbortController | null>(null);
-  const workspaceMain = useRef<HTMLElement | null>(null);
-  const mountedWorkspace = useRef(false);
-  const hydratingDecisions = useRef(new Set<string>());
+  const liveRun = useRef<AbortController | null>(null);
 
-  const hydrateDecision = useCallback(async (decisionId: string) => {
-    if (hydratingDecisions.current.has(decisionId)) return;
-    hydratingDecisions.current.add(decisionId);
-    try {
-      const detail = await getDecisionDetail(decisionId);
-      if (detail) dispatch({ type: "decision.loaded", detail });
-      else dispatch({ type: "diagnostic.received", code: "projection", message: `Decision detail ${decisionId} is not available yet` });
-    } catch (error) {
-      dispatch({
-        type: "diagnostic.received",
-        code: "projection",
-        message: error instanceof Error ? error.message : "Decision detail request failed",
-      });
-    } finally {
-      hydratingDecisions.current.delete(decisionId);
-    }
+  useEffect(() => {
+    void getStatus()
+      .then(setConsoleStatus)
+      .catch(() => undefined);
   }, []);
 
-  useEffect(() => () => {
-    activeController.current?.abort();
+  useEffect(() => {
+    const currentVault = vault.current;
+    return () => {
+      currentVault.clear();
+      liveRun.current?.abort();
+    };
+  }, []);
+
+  /**
+   * Demo mode replays the seeded fixture; live mode streams a real request
+   * through the gateway and lets the frames drive the same stage machine.
+   */
+  const submitTrace = useCallback(() => {
+    if (state.mode === "demo") {
+      setLiveError(null);
+      engine.submit();
+      return;
+    }
+    liveRun.current?.abort();
+    const controller = new AbortController();
+    liveRun.current = controller;
+    setLiveError(null);
     vault.current.clear();
-  }, []);
-
-  useEffect(() => {
-    void getStatus().then(setConsoleStatus).catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (typeof WebSocket === "undefined") {
-      setProjectionStatus("unavailable");
-      return;
-    }
-    const connection = new ProjectionConnection({
-      onEnvelope: (envelope) => {
-        dispatch({ type: "projection.received", envelope });
-        if (
-          envelope.event === "interlock.decision" &&
-          typeof envelope.data === "object" && envelope.data !== null &&
-          "decision_id" in envelope.data && typeof envelope.data.decision_id === "string" &&
-          "sentence_idx" in envelope.data && typeof envelope.data.sentence_idx === "number" &&
-          envelope.data.sentence_idx >= 0
-        ) {
-          void hydrateDecision(envelope.data.decision_id);
-        }
-      },
-      onStatus: (status) => {
-        if (status !== "stopped") setProjectionStatus(status);
-      },
-      onDiagnostic: (message) => dispatch({ type: "diagnostic.received", code: "projection", message }),
+    void runLiveTrace(engine, {
+      prompt: state.prompt,
+      scenario: state.scene,
+      replay: consoleStatus?.source !== "live",
+      signal: controller.signal,
+      vault: vault.current,
+    }).catch((error: unknown) => {
+      setLiveError(error instanceof Error ? error.message : "The stream ended unexpectedly");
     });
-    connection.start();
-    return () => connection.stop();
-  }, [hydrateDecision]);
-
-  useEffect(() => {
-    if (!mountedWorkspace.current) {
-      mountedWorkspace.current = true;
-      return;
-    }
-    workspaceMain.current?.focus();
-  }, [workspace]);
+  }, [consoleStatus?.source, engine, state.mode, state.prompt, state.scene]);
 
   const loadReviews = useCallback(async () => {
     setReviewsLoading(true);
@@ -144,22 +104,11 @@ export function App() {
     }
   }, []);
 
-  useEffect(() => {
-    if (workspace === "reviews") void loadReviews();
-  }, [loadReviews, workspace]);
-
   const loadEvidence = useCallback(async () => {
     setEvidenceLoading(true);
     setEvidenceError(null);
     try {
-      const [nextStatus, nextLedger, nextEvidence] = await Promise.all([
-        getStatus(),
-        getLedgerSummary(),
-        getEvidenceBundle(),
-      ]);
-      setConsoleStatus(nextStatus);
-      setLedger(nextLedger);
-      setEvidence(nextEvidence);
+      setEvidence(await getEvidenceBundle());
     } catch (error) {
       setEvidenceError(error instanceof Error ? error.message : "Evidence projections could not be loaded");
     } finally {
@@ -168,76 +117,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (workspace === "evidence") void loadEvidence();
-  }, [loadEvidence, workspace]);
-
-  const chooseScenario = (next: typeof scenario) => {
-    const prompts: Record<typeof scenario, string> = {
-      scene1: "What are the prepayment charges on my floating-rate home loan?",
-      clean: "What time does the MG Road branch open tomorrow?",
-      held: "Please forward confirmation that my insurance claim was paid in full.",
-      blocked: "Show me the internal reference attached to this payment.",
-    };
-    setScenario(next);
-    setPrompt(prompts[next]);
-  };
-
-  const submitChat = async () => {
-    const controller = new AbortController();
-    activeController.current?.abort();
-    activeController.current = controller;
-    vault.current.clear();
-    setChatError(null);
-    setBusy(true);
-    let requestId: string | null = null;
-    try {
-      await streamChat(
-        {
-          prompt,
-          scenario,
-          replay: consoleStatus?.source !== "live",
-          fragments: uploaded?.fragments,
-          signal: controller.signal,
-        },
-        {
-          onRequestId: (id) => {
-            requestId = id;
-            dispatch({ type: "request.started", requestId: id, prompt });
-          },
-          onFrame: (frame) => {
-            if (requestId) dispatch({ type: "stream.frame", requestId, frame });
-          },
-          onResumeToken: (holdId, token) => vault.current.store(holdId, token),
-          onDecisionDetail: (detail) => dispatch({ type: "decision.loaded", detail }),
-          onDiagnostic: (message) => dispatch({ type: "diagnostic.received", code: "projection", message }),
-        },
-      );
-      setUploaded(null);
-    } catch (error) {
-      vault.current.clear();
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      const message = error instanceof Error ? error.message : "The stream ended unexpectedly";
-      setChatError(message);
-      if (requestId) dispatch({ type: "request.failed", requestId, message });
-    } finally {
-      if (activeController.current === controller) activeController.current = null;
-      setBusy(false);
-    }
-  };
-
-  const handleUpload = async (file: File) => {
-    setUploadBusy(true);
-    setUploadError(null);
-    try {
-      setUploaded(await uploadDocument(file));
-      setScenario("held");
-      setPrompt("Review this customer document and summarize the claim status.");
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "The document could not be attached");
-    } finally {
-      setUploadBusy(false);
-    }
-  };
+    if (view === "reviews") void loadReviews();
+    if (view === "evidence") void loadEvidence();
+  }, [loadEvidence, loadReviews, view]);
 
   const handleHold = async (holdId: string, resolution: "approved" | "rejected") => {
     setResolvingHoldId(holdId);
@@ -259,86 +141,67 @@ export function App() {
     }
   };
 
-  const trace = state.activeRequestId ? state.requests[state.activeRequestId] ?? null : null;
+  const connectionLabel =
+    state.mode === "demo"
+      ? "cached · :8080 idle"
+      : consoleStatus
+        ? `gateway :8080 ${consoleStatus.source === "live" ? "connected" : "replay"}`
+        : "gateway :8080 connecting";
 
   return (
-    <div className="app-shell">
-      <header className="masthead">
-        <div className="wordmark" aria-label="Interlock">
-          <span className="wordmark-mark" aria-hidden="true">I/L</span>
-          <span>
-            <strong>Interlock</strong>
-            <small>Decision console</small>
-          </span>
-        </div>
-        <div className={`system-state ${projectionStatus}`}>
-          <span aria-hidden="true" /> {consoleStatus?.source.toUpperCase() ?? "UNKNOWN"} · {projectionStatus} projection
-        </div>
-      </header>
+    <div
+      style={{
+        position: "relative",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        background: color.bgShell,
+        color: color.text,
+      }}
+    >
+      <ShellDecoration />
+      <Header
+        view={view}
+        onView={setView}
+        mode={state.mode}
+        onToggleMode={() => engine.toggleMode()}
+        connectionLabel={connectionLabel}
+      />
 
-      <nav className="workspace-rail" aria-label="Console workspaces">
-        {workspaces.map((item) => (
-          <button
-            className={workspace === item.id ? "workspace-link active" : "workspace-link"}
-            key={item.id}
-            onClick={() => setWorkspace(item.id)}
-            type="button"
-            aria-current={workspace === item.id ? "page" : undefined}
-          >
-            <span>{item.marker}</span>
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      {liveError ? (
+        <div
+          role="alert"
+          style={{
+            position: "relative",
+            zIndex: 2,
+            margin: "12px 24px 0",
+            padding: "10px 14px",
+            borderRadius: "8px",
+            border: "1px solid rgba(217,112,95,.4)",
+            background: "rgba(217,112,95,.07)",
+            color: color.text,
+            font: "400 12px 'JetBrains Mono', monospace",
+          }}
+        >
+          live stream · {liveError}
+        </div>
+      ) : null}
 
-      <main className="workspace" id="workspace" tabIndex={-1} ref={workspaceMain}>
-        <header className="workspace-titlebar">
-          <p className="eyebrow">Operator workspace / {workspace}</p>
-          <h1>{headings[workspace]}</h1>
-        </header>
-        {(chatError || state.diagnostics.at(-1)) && (
-          <div className="transport-notice" role="alert">
-            <strong>Transport notice</strong>
-            <span>{chatError ?? state.diagnostics.at(-1)?.message}</span>
-          </div>
-        )}
-        {workspace === "live" ? (
-          <LiveWorkspace
-            trace={trace}
-            prompt={prompt}
-            scenario={scenario}
-            busy={busy}
-            upload={uploaded ? { filename: uploaded.filename, fragmentCount: uploaded.fragments.length } : null}
-            uploadBusy={uploadBusy}
-            uploadError={uploadError}
-            onUpload={(file) => void handleUpload(file)}
-            onClearUpload={() => {
-              setUploaded(null);
-              setUploadError(null);
-            }}
-            onPromptChange={setPrompt}
-            onScenarioChange={chooseScenario}
-            onSubmit={() => void submitChat()}
-          />
-        ) : workspace === "reviews" ? (
-          <ReviewsWorkspace
-            holds={holds}
+      <main style={{ position: "relative", zIndex: 2, flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+        {view === "live" ? (
+          <LiveTheater engine={engine} state={state} settings={engine.getSettings()} onSubmit={submitTrace} />
+        ) : view === "reviews" ? (
+          <ReviewsPanel
+            holds={holds.map((hold) => toHoldCard(hold, vault.current.get(hold.hold_id) !== undefined))}
             loading={reviewsLoading}
             error={reviewError}
             resolvingHoldId={resolvingHoldId}
-            hasToken={(holdId) => vault.current.get(holdId) !== undefined}
             onApprove={(holdId) => void handleHold(holdId, "approved")}
             onReject={(holdId) => void handleHold(holdId, "rejected")}
             onRefresh={() => void loadReviews()}
           />
         ) : (
-          <EvidenceWorkspace
-            bundle={evidence}
-            status={consoleStatus}
-            ledger={ledger}
-            loading={evidenceLoading}
-            error={evidenceError}
-          />
+          <EvidencePanel bundle={evidence} loading={evidenceLoading} error={evidenceError} />
         )}
       </main>
     </div>

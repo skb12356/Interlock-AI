@@ -1,587 +1,473 @@
-# Interlock
+<div align="center">
+  <img src="docs/images/logo.svg" alt="Interlock" width="100%" />
+  <h3>Routing and guarding are the same decision.</h3>
+  <p><em>Estimate what a request is worth once, then spend both the compute budget and the checking budget out of that one number.</em></p>
 
 [![CI](https://github.com/skb12356/Interlock-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/skb12356/Interlock-AI/actions/workflows/ci.yml)
+[![Architecture](https://img.shields.io/badge/docs-architecture-c8b4a0)](docs/ARCHITECTURE.md)
+[![Evidence](https://img.shields.io/badge/evidence-artifacts%2F-9ad17f)](artifacts/)
+[![Limitations](https://img.shields.io/badge/read-limitations-d9705f)](docs/LIMITATIONS.md)
 
-**One stakes estimate. One routing decision. One guardrail budget.**
+</div>
 
-Interlock is an OpenAI-compatible AI control plane for high-consequence assistants. It
-combines model routing and output safety into one economic decision: estimate how much a
-request matters, price the expected loss of every available action, and choose the cheapest
-safe rung before a person or tool acts on defective output.
+---
 
-The reference implementation is a retail-banking assistant with a Python/FastAPI gateway,
-sentence-level streaming gate, durable SQLite ledger, offline evaluation lane, and a React
-operator console. It runs locally against Ollama without an API key and also includes a
-deterministic replay profile for UI development and demonstrations.
+## Contents
 
-> [!IMPORTANT]
-> Interlock is an evidence-oriented prototype, not a claim of production certification.
-> The committed evaluation catches the seeded defects but still misses verification-cost,
-> net-spend, and false-intervention targets. See [Known limitations](#known-limitations)
-> before interpreting the metrics.
+[The problem](#the-problem) · [The solution](#the-solution) · [What it looks like](#what-it-looks-like) ·
+[How one request travels](#how-one-request-travels) · [The ladder (L0–L5)](#the-ladder-l0l5) ·
+[The maths](#the-maths-surface-level) · [Results](#results) · [Run it](#run-it) ·
+[Repository map](#repository-map) · [Documentation](#documentation) · [Demo video](#demo-video) ·
+[Research foundations](#research-foundations) · [What is ours](#what-is-ours) ·
+[Known limitations](#known-limitations)
 
-## Why Interlock exists
+---
 
-Most AI stacks route requests and guard responses in separate systems. Interlock treats
-them as the same optimization problem:
+## The problem
 
-1. Estimate request stakes in INR from domain, monetary amounts, reversibility, and role.
-2. Calibrate defect probabilities from deterministic and observer signals.
-3. Compute the expected loss of every intervention using the same policy inputs.
-4. Route to an appropriate model tier and gate each sentence before release.
-5. Record the decision, evidence, spend, latency, holds, and later offline observations.
+A bank puts an AI assistant in front of customers. Most of what it is asked is harmless —
+branch timings, balances, how to reset a card. A few things are not: an invented penalty
+clause, a settlement date no document supports, an email that should never have been sent.
 
-The primary metric is **Pre-Action Catch Rate**: the fraction of defects stopped before a
-reader sees them or a tool executes them. That differs from model accuracy because it
-measures the complete control path.
+Both kinds arrive through the same endpoint, and you cannot tell which is which until the
+answer already exists. Today, teams respond by building two separate systems:
 
-## Solution architecture
+- a **router**, which asks *how much compute does this deserve?* — and optimises cost;
+- a **guardrail**, which asks *how hard should I check this?* — and optimises safety.
+
+They are tuned separately, budgeted separately, and argue with each other. The guardrail is
+a pure cost line, so it gets cut. And because checking usually runs *after* generation, the
+customer waits for it, which is the other reason it gets switched off.
+
+There is a third failure that neither system addresses: **a guardrail that emits a score
+does not make a decision.** "Groundedness 0.72" hands a human a threshold file. Somebody
+picks 0.7, everything above it is blocked, half the blocks are wrong, and in week two the
+whole thing is disabled.
+
+## The solution
+
+Both questions above are the same question — *how much does this request matter?* — so
+Interlock computes it **once**, as an amount of money, and spends both budgets from it.
+
+Interlock is an **OpenAI-compatible streaming proxy**. A client points `base_url` at it and
+changes nothing else; the model behind it is unmodified and never sees Interlock. Around
+every request it runs three lanes:
+
+- **Lane A (pre-flight)** — injection, PII and canary checks, retrieval, the stakes
+  estimate, the semantic cache, and the model routing decision.
+- **Lane B (in-flight)** — a small observer model with linear probes, plus claim-level
+  grounding, running **concurrently with generation** behind a one-sentence commit buffer.
+  The reader is always looking at sentence *n* while sentence *n+1* is checked.
+- **Lane C (offline)** — fairness twins, shadow replay, a ~1% deep-judge calibration
+  anchor, drift tests. Never on the critical path.
+
+Every calibrated signal is converted into **expected loss in rupees**, all six possible
+responses are priced, and the cheapest safe one is chosen. Money saved by not over-routing
+the cheap 80% pays for deep checking on the expensive 20%, so oversight funds itself instead
+of being a tax.
+
+The headline metric is the **Pre-Action Catch Rate**: the share of defects stopped *before*
+a person read them or a tool acted on them. It measures the whole control path, not model
+accuracy.
+
+## What it looks like
+
+The console is where a request becomes legible. Ask a question like any assistant:
+
+![The chat workspace: two turns, each with the seven Interlock stages and the action Interlock took](docs/images/console-chat-session.jpeg)
+
+Every answer carries the stages that produced it, and **see it live** opens the full trace.
+Stage 04 prices all six actions and keeps the losers on screen, because the point is not
+which rung won but *why*:
+
+![Stage 04: all six actions priced in rupees, L2 repair chosen at ₹494.36 against a runner-up of L4 hold](docs/images/console-trace-ladder.jpeg)
+
+Stage 06 shows what the customer actually saw, the stamp for what was done to it, and what
+would have shipped without Interlock:
+
+![Stage 06: the released answer, the L2 REPAIR stamp, and the counterfactual that would have shipped](docs/images/console-trace-release.jpeg)
+
+Holds wait for a human, with the evidence and the flagged span attached, and a link back to
+the conversation that caused them:
+
+![The reviews queue: pending holds with evidence, flagged span, SLA and resume-token state](docs/images/console-reviews.jpeg)
+
+The evidence ledger reads committed artifacts — including the target it currently misses:
+
+![The evidence ledger: calibration, target checks and measured action latency read from artifacts](docs/images/console-evidence.jpeg)
+
+<details>
+<summary>More screenshots</summary>
+
+![The empty chat workspace](docs/images/console-chat-empty.jpeg)
+
+![Stage 01, pre-flight: stakes, reversibility, gate mode and routing](docs/images/console-trace-preflight.jpeg)
+
+![The About workspace explaining the system in plain language with its citations](docs/images/console-about.jpeg)
+
+</details>
+
+## How one request travels
 
 ```mermaid
 flowchart LR
-    classDef edge fill:#eef5f1,stroke:#2d6257,color:#173936,stroke-width:1.5px
-    classDef control fill:#fff6e8,stroke:#b87624,color:#5a3512,stroke-width:1.5px
-    classDef data fill:#eef2f8,stroke:#416789,color:#18364c,stroke-width:1.5px
-    classDef human fill:#f9eef0,stroke:#a54c57,color:#58232a,stroke-width:1.5px
-
-    Client[OpenAI-compatible client]:::edge
-    UI[React operator console]:::edge
-    Host[Same-origin console host]:::edge
-    Gateway[FastAPI gateway]:::control
-    LaneA[Lane A: pre-flight]:::control
-    Router[Stakes router and cache]:::control
-    Provider[Ollama / OpenAI / Anthropic]:::edge
-    Gate[Lane B: sentence commit gate]:::control
-    Observer[Observer and verifier]:::control
-    Holds[Durable human review]:::human
-    Ledger[(SQLite ledger)]:::data
-    Hub[ConsoleHub projections]:::data
-    LaneC[Lane C: offline evidence]:::data
-
-    Client -->|POST /v1/chat/completions| Gateway
-    UI --> Host
-    Host -->|/gateway and /console| Gateway
-    Gateway --> LaneA --> Router --> Provider
-    Provider -->|token stream| Gate
-    Observer -. concurrent signals .-> Gate
-    Gate -->|committed SSE| Gateway --> Client
-    Gate -->|L4| Holds
-    LaneA --> Ledger
-    Gate --> Ledger
-    Holds --> Ledger
-    LaneC --> Ledger
-    Ledger --> Hub --> Host
+    Client[Client<br/>OpenAI-compatible] --> A[Lane A · pre-flight<br/>stakes · detectors · retrieval · routing]
+    A --> M[Upstream model<br/>unmodified]
+    M -- tokens --> Gate[Commit gate<br/>one sentence behind]
+    Gate --> Client
+    M -.runs concurrently.-> B[Lane B · in-flight<br/>observer probe + claim verifier]
+    B --> D[Control plane<br/>calibrate → price six actions → choose]
+    D --> Gate
+    D --> Ledger[(Ledger)]
+    Ledger --> C[Lane C · offline<br/>fairness · replay · drift]
 ```
 
-### Three control lanes
+1. **Estimate the stakes** from domain, the largest amount in the text, and who is asking.
+2. **Run the cheap deterministic checks**: injection, PII, canary.
+3. **Route** on stakes first, difficulty second — before paying any model.
+4. **Generate**, streaming one sentence behind so a bad sentence can still be repaired.
+5. **Check while generating**: observer probe plus claim-level grounding.
+6. **Calibrate** raw scores into probabilities, then **price all six actions** in rupees.
+7. **Act**: pass, annotate, repair, reroute, hold or block — cheapest safe rung wins.
+8. **Record** the decision, evidence, spend and latency; sample offline checks afterwards.
 
-| Lane | Runs | Responsibility | Critical path |
-| --- | --- | --- | --- |
-| **A — pre-flight** | Before the provider call | Retrieval, injection/PII/canary detection, stakes, hard rules, cache, model tier | Yes, deadline-bound |
-| **B — in-flight** | Concurrent with generation | Sentence segmentation, observer/grounding signals, expected-loss decision, annotate/repair/reroute/hold/block | Hidden behind the next sentence where possible |
-| **C — offline** | Sampled after requests | Shadow replay, fairness twins, anytime-valid e-values, drift, evaluation and calibration | No |
+> **Full detail, with every formula and its source: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
-Lane A drops detectors that exceed their deadline instead of stalling the request. Lane B
-streams one sentence behind the provider, which creates a commit point where unsafe text can
-still be repaired or withheld. Lane C never changes a live response; it produces evidence
-for later policy and model review.
+## The ladder (L0–L5)
 
-### Request lifecycle
+Blocking everything suspicious makes an assistant useless; blocking nothing makes it
+dangerous. So there are six rungs, and each one is **priced before one is chosen**.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Client
-    participant G as Gateway / Lane A
-    participant P as Model provider
-    participant B as Sentence gate / Lane B
-    participant O as Observer
-    participant L as Ledger + ConsoleHub
+| Rung | What it does | What it costs | When it wins |
+|---|---|---|---|
+| **L0 · Pass** | Release the sentence unchanged. | 0 ms | Calibrated risk is low. Most traffic ends here. |
+| **L1 · Annotate** | Add a citation, hedge or flag — deterministic text, no regeneration. | ~0 ms | Mild uncertainty: the reader should know which part to check. |
+| **L2 · Repair** | Regenerate **only the defective sentence**, with the evidence attached. | 13.7 s measured median | One localized factual defect, and the verifier returned the offending span. |
+| **L3 · Reroute** | Regenerate on the stronger tier, re-retrieving first. | 30.7 s measured median | The weak model or the retrieval was the problem, not one sentence. |
+| **L4 · Hold** | Freeze into a durable pending state and wait for a human. | ₹220 reviewer cost, SLA-bound | Irreversible action, or a cost of being wrong that exceeds a person's time. |
+| **L5 · Block** | Emit no unsafe content at all. | ₹220, and the interaction is lost | A deterministic rule fired — a canary token, or an injected instruction driving an irreversible action. **No model is in this loop.** |
 
-    C->>G: OpenAI chat request
-    par deadline-bound pre-flight
-        G->>G: retrieve + detect + estimate stakes
-    and console projection
-        G-->>L: stakes and signals
-    end
-    alt deterministic hard rule
-        G-->>C: block response
-    else cache hit
-        G-->>C: verified cached stream
-    else provider generation
-        G->>P: routed provider request
-        P-->>B: token chunks
-        loop each complete sentence
-            par observe concurrently
-                B->>O: sentence + evidence + stakes
-            and continue buffering
-                P-->>B: next tokens
-            end
-            O-->>B: calibrated defect signals
-            B->>B: price L0-L5 expected loss
-            B-->>L: decision and evidence
-            B-->>C: pass, annotate, repair, reroute, hold, or block
-        end
-    end
-    G-->>L: request, spend, latency, and final state
+Two properties matter more than the list:
+
+- **The ladder shrinks as the answer travels.** Before anything is sent, every rung is
+  available. Once a sentence has reached the reader, L2, L3 and L5 are gone — you cannot
+  un-say something, and the loss table says so explicitly instead of pretending.
+- **Hard rules run before the arithmetic.** A canary match or a tool-policy violation
+  short-circuits to L4/L5; the optimiser then picks the cheapest action among what is left.
+
+L2 and L3 medians are measured on `qwen3:8b` via Ollama, 3 runs each
+([`artifacts/action_latency.json`](artifacts/action_latency.json)) — the ladder prices those
+real latencies, which is why L3 rarely wins on cheap traffic.
+
+## The maths (surface level)
+
+Enough to follow the decision. Each block names the published work it comes from; the full
+derivations are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### 1. What is this request worth?
+
+```
+impact_inr = base_impact(domain) × monetary_multiplier(largest ₹ amount) × role_multiplier
 ```
 
-### Expected-loss ladder
+carried with `reversibility ∈ {reversible ×1.0, costly ×2.5, irreversible ×8.0}`. A branch
+timing is ₹50. A payment question is ₹25,000 and irreversible. Every number is in
+[`policies/banking.yaml`](policies/banking.yaml) — a reviewed file, not a constant in code.
 
-The optimizer evaluates all six actions in the policy currency. It combines residual harm,
-false-intervention nuisance, compute, and time cost; hard rules can make actions unavailable.
+### 2. How suspicious is the answer?
 
-| Action | Meaning | Typical use |
-| --- | --- | --- |
-| `L0_pass` | Release the sentence unchanged | Low calibrated risk |
-| `L1_annotate` | Add a deterministic qualification/citation | Mild uncertainty |
-| `L2_repair` | Regenerate only the defective sentence with evidence | Localized factual defect |
-| `L3_reroute` | Regenerate on the stronger tier | Weak-model or broad answer failure |
-| `L4_hold` | Persist and wait for human review | High-risk reversible response/tool decision |
-| `L5_block` | Emit no unsafe customer content | Deterministic prohibition or unacceptable loss |
+Six deterministic grounding signals (unsupported content, unsupported numbers, unsupported
+citations, context conflict, question drift, overconfidence) plus a linear probe on an
+observer model's residual stream:
 
-The policy is code-reviewed YAML at [`policies/banking.yaml`](policies/banking.yaml). Each
-decision records the policy/calibrator/probe versions, six-row loss table, runner-up, margin,
-rationale, hard rule, input digest, and latency.
-
-## Operator console
-
-The React console explains decisions; it does not tune thresholds or bypass audited hold
-routes.
-
-```mermaid
-flowchart TB
-    classDef browser fill:#eef5f1,stroke:#2d6257,color:#173936
-    classDef stream fill:#fff6e8,stroke:#b87624,color:#5a3512
-    classDef projection fill:#eef2f8,stroke:#416789,color:#18364c
-    classDef secret fill:#f9eef0,stroke:#a54c57,color:#58232a
-
-    Chat[Chat composer]:::browser --> SSE[Direct chat SSE]:::stream
-    SSE --> Reducer[Typed request/sentence reducer]:::stream
-    WS[Read-only WebSocket]:::projection --> Reducer
-    REST[Read-only REST projections]:::projection --> Hydration[Decision, hold, ledger and evidence hydration]:::projection
-    Hydration --> Reducer
-    Reducer --> Live[Live workspace]:::browser
-    Reducer --> Reviews[Reviews workspace]:::browser
-    Reducer --> Evidence[Evidence workspace]:::browser
-    SSE --> Vault[In-memory resume-token vault]:::secret
-    Vault -->|initiating browser only| Reviews
+```
+probe score = σ(wᵀ h_ℓ + b)      — one forward pass, one probe per layer, layer chosen on held-out AUROC
 ```
 
-- **Live** pairs the bank chat with stakes, signal probabilities, sentence timeline,
-  L0-L5 rail, full expected-loss table, hard-rule/degraded state, and counterfactual output.
-- **Reviews** shows durable response/tool holds, evidence, expiry/SLA state, reversibility,
-  tool arguments, and approve/reject actions.
-- **Evidence** shows calibration, confidence intervals, latency, action counts, ledger
-  economics, and Lane C observations without inventing unavailable data.
+*Source:* semantic entropy is the strongest published hallucination signal but needs ~10
+samples per question (Farquhar et al., *Nature* 630, 2024, "Detecting hallucinations… using
+semantic entropy"), so it is used **offline as a label generator only**. The deployable form
+is the single-pass probe of Kossen et al. (arXiv:2406.15927, §3, "Semantic Entropy Probes"),
+and running that probe on a **different** model from the generator is what keeps Interlock
+model-agnostic (O'Neill et al., arXiv:2507.23221).
 
-Immediate output comes from `/gateway/v1/chat/completions`. Full history and persisted
-details come from read-only projections:
+Claim-level grounding uses a MiniCheck-class verifier (Tang, Laban & Durrett, EMNLP 2024) —
+a 770M model reaching GPT-4-level fact-checking cheaply — and, crucially, it returns **the
+offending span**, which is what L2 repair aims at.
 
-| Interface | Purpose |
-| --- | --- |
-| `WS /console/ws` | Push-only, bounded process-lifetime event stream with reconnect replay |
-| `GET /console/recent` | Cursor recovery using `stream_id` and monotonic `seq` |
-| `GET /console/status` | Live/replay health and capability availability |
-| `GET /console/decisions/{id}` | Persisted six-row loss table and rationale |
-| `GET /console/holds` | Pending review cards with secrets removed |
-| `GET /console/ledger/summary` | Traffic, spend, action, latency, regret/rework/net-value projection |
-| `GET /console/lanec` | Fairness pair counts and anytime-valid e-value state |
-| `GET /console/artifacts/{name}` | Explicitly allowlisted JSON evidence artifacts |
+### 3. Turning a score into a probability
 
-## Repository map
+A raw score is not a probability, and pricing in rupees with an uncalibrated score is
+arithmetic that only looks rigorous. Two steps:
 
-```text
-interlock/
-├── core/              Frozen types, IDs, money, policy and SSE contracts
-├── gateway/           FastAPI proxy, providers, Lane A, router, cache and ConsoleHub
-├── gate/              Sentence segmenter, commit gate, action ladder and repair
-├── signals/           Injection, PII, canary, stakes, grounding and observer signals
-├── risk/              Calibration, conformal filter and expected-loss engine
-├── retrieval/         Corpus loading, chunking, hybrid retrieval and vector store
-├── observer/          Probe/encoder/verifier interfaces and mock observer service
-├── interlock_tools/   Provenance lattice, reversibility, tool holds and stream parsing
-├── ledger/            SQLite writer, pricing, regret, rework and evidence packs
-├── lanec/             Fairness twins, e-values, drift and deep-judge support
-├── eval/              Seeded cases, induced defects, splits, metrics and harness
-└── console/           Production static host and same-origin reverse proxy
-
-console/               React 19 app, Vitest tests and Playwright journeys
-policies/              Versioned policy-as-code
-migrations/            Idempotent SQLite schema migrations
-corpus/                Banking reference documents and poisoned/untrusted fixtures
-artifacts/             Calibration, evaluation and measured-latency outputs
-scripts/               Supervisor, replay, indexing, calibration, eval and rehearsal tools
-Implementation/        Original build plan, architecture, contracts and ADRs
-docs/                  Deployment runbook, contract index and limitations
-coordination/          Person 1/Person 2 integration notes
+```
+per signal:   g(s) = isotonic fit,  minimising Σ (g(sᵢ) − yᵢ)²  subject to monotonicity
+fused:        P(defect) = σ( β₀ + Σ_k β_k · g_k(s_k) )
+across defects: P(any) = 1 − Π_d (1 − P(d))
 ```
 
-## Dependencies
+Fitted with 5-fold stratified CV; **every reported number is out-of-fold**, because fitting
+and scoring on the same data drives calibration error to zero no matter how bad the model is.
 
-### Required tools
+*Source:* Zadrozny & Elkan (2002), "Transforming Classifier Scores into Accurate Multiclass
+Probability Estimates" — the isotonic step is §3 of that paper.
 
-| Tool | Version/role |
-| --- | --- |
-| Python | **3.12** (`pyproject.toml` intentionally excludes 3.13) |
-| [uv](https://docs.astral.sh/uv/) | Python environment, lockfile and command runner |
-| Node.js | **22** recommended; Vite 7 requires Node 20.19+ or 22.12+ |
-| npm | Installs the locked console dependencies |
-| PowerShell (`pwsh`) | Native three-service supervisor used by `make up` / `scripts/up.ps1` |
-| Ollama | Optional for live local generation; not needed for deterministic replay |
+### 4. Choosing the action
 
-Docker is deliberately not part of this build. The native supervisor replaces Compose and
-starts three localhost-bound processes with health checks.
+```
+E[L(a)] =  Σ_d P(d) · Impact_d · (1 − eff[a][d])     (1) harm that survives the action
+        +  (1 − P(any)) · Nuisance(a)                (2) the cost of a false alarm
+        +  tokens(a) · price + human_cost(a)         (3) compute, and a reviewer's time
+        +  λ_time · Δlatency(a) / 1000               (4) the customer's waiting, priced
 
-### Python dependency tiers
-
-- **Core runtime:** FastAPI/Uvicorn, HTTPX, Pydantic, PyYAML, OpenTelemetry, NumPy,
-  scikit-learn, DuckDB, pysbd, pypdf, pyahocorasick, and sqlite-vec.
-- **Development:** pytest, pytest-asyncio, Hypothesis, respx, Ruff, mypy, pre-commit, the
-  OpenAI SDK, and HTTPX test support.
-- **Optional ML extra:** PyTorch, Transformers, Sentence Transformers, ONNX Runtime,
-  Optimum, Presidio, and Matplotlib.
-
-### Console stack
-
-- React 19 and React DOM
-- TypeScript 5.9 and Vite 7
-- Vitest, Testing Library, jsdom, and Playwright
-
-## Getting started
-
-### 1. Clone and configure
-
-```bash
-git clone https://github.com/skb12356/Interlock-AI.git
-cd Interlock-AI
-cp .env.example .env
+Impact_d = impact_inr × defect_multiplier[d] × reversibility_multiplier
 ```
 
-The defaults use local Ollama and hash prompts before ledger storage. Do not commit `.env`,
-provider keys, tenant canaries, production ledgers, or hold resume tokens.
+with `λ_time = ₹0.40/s`, `price = ₹0.60 / 1k tokens`, `human_review = ₹220`. Choose
+`argmin_a E[L(a)]` over the actions that are still available.
 
-### 2. Install dependencies
+Term (2) is what stops over-blocking — and over-blocking is what gets guardrails switched
+off. Human cost is charged unconditionally on L4 and L5: the reviewer is paid whether or not
+the answer turns out to have been fine.
 
-For the complete local profile:
+*Source:* the reject option in selective classification (Geifman & El-Yaniv, 2017,
+"Selective Classification for Deep Neural Networks") — trade coverage against error instead
+of answering everything. Interlock's addition is pricing that trade in money, and putting
+"escalate to a stronger model" and "escalate to a human" on the same axis, as framed by
+*Cascaded Language Models for Cost-Effective Human–AI Decision-Making* (NeurIPS 2025).
 
-```bash
-uv sync --group dev --extra ml
-npm --prefix console ci
-```
+### 5. Turning a threshold into a promise
 
-For the lighter deterministic replay and standard test profile:
+Sweeping thresholds and quoting the best one is multiple testing: the winner is partly
+lucky, and the quoted rate is optimistic by an unstateable amount. Interlock selects the
+threshold with **Learn-then-Test**: each candidate λ is a hypothesis, its p-value comes from
+the **minimum of Hoeffding's and Bentkus's bounds** (Bentkus is far tighter in the rare-event
+regime), and **fixed-sequence testing** walks thresholds from strictest to loosest, spending
+no correction budget because the ordering itself carries information.
 
-```bash
-uv sync --group dev
-npm --prefix console ci
-```
+What comes out is a defensible sentence: *at most 1% ungrounded escapes, at 90% confidence,
+on n = 840 held-out items.*
 
-### 3A. Run the deterministic console demo
+*Source:* Angelopoulos et al. (2022), "Conformal Risk Control" — distribution-free risk
+control by threshold selection rather than eyeballing.
 
-This profile needs no model, provider key, corpus index, or observer weights. Run the two
-commands in separate terminals:
+### 6. Watching fairness without crying wolf
+
+Lane C compares counterfactual twins — the same request with protected attributes varied —
+and monitors the disparity continuously. Continuous monitoring with ordinary significance
+tests manufactures false alarms, so the monitor uses **e-values**, whose validity survives
+optional stopping.
+
+*Source:* Koolen & Grünwald (2022) on log-optimal anytime-valid e-values, and Henzinger et
+al. (2023) on monitoring algorithmic fairness at runtime.
+
+## Results
+
+All figures are read from committed artifacts, not typed into this file. Regenerate them
+with `make eval` / `make calibrate`.
+
+### The six targets
+
+| Metric | Measured | Target | Verdict |
+|---|---:|---|:--:|
+| Pre-Action Catch Rate | **100%** (43/43, CI 0.918–1.000) | ≥ 90% | ✅ |
+| Added p95 latency | **0.40 ms** (decision path, excludes generation) | ≤ 120 ms | ✅ |
+| Ungrounded escapes | **0.0%** (0/25, CI 0–0.133) | ≤ 1% @ 90% conf | ✅ |
+| Verification cost | **5.58%** of model spend (modelled) | ≤ 5% | ❌ |
+| Net spend change | **−17.8%** | ≈ −30% | ❌ |
+| False interventions | **63.06%** (99/157 clean cases, all 99 disruptive) | ≤ 2% | ❌ |
+
+Source: [`artifacts/eval/report.json`](artifacts/eval/report.json), 200 seeded conversations
+with 43 induced defects.
+
+**The false-intervention miss is the headline problem, and it is deliberately not hidden.**
+Its cause is diagnosed rather than shrugged at (finding F-019): at ₹40,000 impact with a
+2.5× reversibility multiplier, `L0_pass` only wins if `P(defect) < ~0.0001`, while the
+detector's floor on clean text is ~0.02. So nothing passes above ₹10,000 — the objective
+working correctly on an impact model that is too aggressive. The measured `banking-v4`
+policy adjustment, selected from 216 bounded candidates across three immutable seeds, cut
+worst-seed disruptive false intervention from 92.36% to 64.97% while preserving 100%
+pre-action catch and zero grounding escapes.
+
+Net spend is short of target for two stated reasons rather than one unknown: 57% of the
+seeded set is ₹10,000+ traffic that the stakes threshold forces to the strong tier, and **no
+cache hit is modelled at all** — the plan's conservative 20–45% range is deliberately not
+claimed, because nothing in this build has measured one.
+
+### Calibration
+
+| | Value | On |
+|---|---:|---|
+| ECE | 0.0037 | 10,000 items, 1,000 positives, 5-fold, out-of-fold |
+| Brier | 0.0207 | same |
+| AUROC | 0.909 | same |
+
+Per-signal AUROC is published including the weak signals — `citation_unsupported` 0.600,
+`context_conflict` 0.575, `question_drift` 0.536, `overconfidence` 0.504 — because a fusion
+layer that silently down-weights three near-chance signals should say so.
+
+### The conformal guarantee, and its price
+
+| λ | Escape rate | Intervention rate | p-value | Certified |
+|---:|---:|---:|---:|:--:|
+| 0.015 | 0.000 | **100%** | 0.00059 | ✅ |
+| 0.020 | 0.199 | 6.7% | 1.0 | ❌ |
+
+At α = 0.01, δ = 0.10, n = 840. The bound holds **and** the certified threshold intervenes
+on all traffic. Both halves are reported together; the filter is off by default and
+`make eval-guaranteed` runs it on.
+
+### Measured action latency
+
+`L2_repair` 13.7 s · `L3_reroute` 30.7 s — median of 3 runs each on `qwen3:8b` via Ollama
+([`artifacts/action_latency.json`](artifacts/action_latency.json)).
+
+## Run it
+
+Nothing below needs an API key.
+
+**Console only** (deterministic replay gateway, no model, no index):
 
 ```bash
 uv run python scripts/replay_console.py --port 8099
-```
-
-```bash
 npm --prefix console run dev -- --host 127.0.0.1
 ```
 
-Open <http://127.0.0.1:5173>. The replay server provides four repeatable journeys:
+Open <http://127.0.0.1:5173> and ask a question. The replay gateway picks a recorded trace
+from the prompt text, so `prepayment` reaches an L2 repair, `forward … claim` an L4 hold,
+`internal reference` an L5 canary block, and `branch … hours` a clean L0 pass.
 
-- `clean` — L0 pass
-- `scene1` — L2 sentence repair
-- `held` — L4 durable review
-- `blocked` — L5 with no assistant content
-
-### 3B. Run the live local stack
-
-Install and start Ollama, then make the two configured model tiers available:
+**Full local stack** (Ollama, two model tiers, real retrieval):
 
 ```bash
-ollama pull qwen3:4b
-ollama pull qwen3:8b
+ollama pull qwen3:4b && ollama pull qwen3:8b
 uv run python scripts/build_index.py
+make up        # gateway :8080 · observer :8081 · console :5173
 ```
 
-Start the gateway, mock observer contract, and compiled console:
-
-```powershell
-./scripts/up.ps1 -MockObserver -TimeoutSeconds 120
-```
-
-On a shell with PowerShell available, `make up` invokes the same supervisor. It builds the
-console on first start and exposes:
-
-| Service | URL |
-| --- | --- |
-| Gateway | <http://127.0.0.1:8080> |
-| Observer | <http://127.0.0.1:8081> |
-| Console | <http://127.0.0.1:5173> |
-
-Check health and stop the stack:
-
-```bash
-curl --fail http://127.0.0.1:8080/health
-curl --fail http://127.0.0.1:5173/health
-pwsh -NoProfile -File scripts/down.ps1
-```
-
-Logs are written beneath `logs/` by service.
-
-### 3C. Start services manually
-
-This is useful when debugging one process at a time:
-
-```bash
-# Terminal 1: observer contract
-uv run uvicorn interlock.observer.mock_server:app --host 127.0.0.1 --port 8081
-
-# Terminal 2: gateway
-uv run uvicorn interlock.gateway.app:app --host 127.0.0.1 --port 8080
-
-# Terminal 3: production same-origin console
-npm --prefix console run build
-INTERLOCK_GATEWAY_URL=http://127.0.0.1:8080 \
-  uv run uvicorn interlock.console.app:app --host 127.0.0.1 --port 5173
-```
-
-For Vite live-gateway development instead of the compiled console host:
-
-```bash
-CONSOLE_BACKEND_URL=http://127.0.0.1:8080 \
-  npm --prefix console run dev -- --host 127.0.0.1
-```
-
-## Use the API
-
-Point any OpenAI-compatible client at the gateway:
+**Point any OpenAI client at it:**
 
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="local")
-response = client.chat.completions.create(
-    model="interlock-auto",
-    messages=[
-        {"role": "user", "content": "Can I prepay my floating-rate home loan?"}
-    ],
+client = OpenAI(base_url="http://127.0.0.1:8080/v1", api_key="not-needed")
+stream = client.chat.completions.create(
+    model="interlock",
+    messages=[{"role": "user", "content": "What are the prepayment charges on my home loan?"}],
+    stream=True,
 )
-print(response.choices[0].message.content)
 ```
 
-The gateway supports standard OpenAI `data:` chunks plus named SSE events for stakes,
-signals, decisions, and holds. Clients that need those events can read the raw stream;
-ordinary OpenAI clients continue to consume assistant content.
+The interlock events (`interlock.stakes`, `.signal`, `.decision`, `.hold`) arrive on the same
+SSE stream alongside the standard OpenAI chunks.
 
-Key routes:
+Full setup, configuration and troubleshooting: [`docs/REFERENCE.md`](docs/REFERENCE.md) and
+[`docs/05_deploy_runbook.md`](docs/05_deploy_runbook.md).
 
-| Route | Description |
-| --- | --- |
-| `POST /v1/chat/completions` | OpenAI-compatible chat completion, streaming or buffered |
-| `GET /v1/models` | Available Interlock/provider model view |
-| `POST /v1/uploads` | Text/PDF extraction as explicitly untrusted fragments |
-| `GET /v1/holds` | Pending durable holds |
-| `POST /v1/holds/{id}/approve` | Resolve a hold; approval requires its resume token |
-| `POST /v1/holds/{id}/reject` | Reject a hold without requiring the release secret |
-| `GET /health` | Provider, observer, policy, calibration and retrieval health |
-| `GET /admin/latency` | Gateway latency histogram |
-| `GET /admin/governor` | Current degradation/governor state |
-| `GET /admin/economics` | Ledger economics projection with provenance |
-| `GET /admin/lanec` | Lane C evidence projection |
-| `GET /admin/evidence/{request_id}.zip` | Request evidence pack |
+## Repository map
 
-> [!WARNING]
-> Uploaded fragments participate in Interlock's risk/provenance analysis. Sending their
-> extracted text onward as provider prompt context is intentionally deferred pending an
-> explicit sensitive-data egress decision. Do not assume an uploaded document currently
-> grounds the provider's generated answer.
+| Path | What lives there |
+|---|---|
+| `interlock/gateway/` | FastAPI proxy, Lane A, router, cache, console projections |
+| `interlock/risk/` | expected-loss objective, calibration, conformal thresholds, risk engine |
+| `interlock/signals/` | stakes model, grounding signals, injection, PII, canary |
+| `interlock/observer/` | observer service, linear probes, MiniCheck-class verifier |
+| `interlock/gate/` | sentence commit gate and the intervention ladder |
+| `interlock/interlock_tools/` | provenance tracking and the tool-call interlock |
+| `interlock/eval/` | seeded evaluation, induced defects, metrics, anchors |
+| `console/` | React operator console (chat, trace, reviews, evidence, about) |
+| `policies/` | versioned policy — the governance artefact |
+| `artifacts/` | committed evidence: evaluation, calibration, latency |
+| `corpus/` | 45-document banking corpus, including one poisoned and one benign-untrusted doc |
+| `docs/` | architecture, runbook, limitations |
 
-## Configuration
+## Documentation
 
-Copy [`.env.example`](.env.example) and adjust only what the deployment needs.
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — the whole system in detail, with the
+  maths and the paper each mechanism comes from.
+- [docs/REFERENCE.md](docs/REFERENCE.md) — operator and developer reference: dependencies,
+  every start-up path, the API surface, configuration, the test gate, security model and
+  deployment shape.
+- [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — what this build does not do.
+- [docs/05_deploy_runbook.md](docs/05_deploy_runbook.md) — running it.
+- [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — what is built, what is measured,
+  what is stubbed, and every recorded deviation with its reason.
+- [artifacts/](artifacts/) — the evidence behind every number above.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `INTERLOCK_OLLAMA_BASE_URL` | `http://127.0.0.1:11434/v1` | Local OpenAI-compatible provider |
-| `INTERLOCK_CHEAP_PROVIDER` / `INTERLOCK_CHEAP_MODEL` | `ollama` / `qwen3:4b` | Low-stakes tier |
-| `INTERLOCK_STRONG_PROVIDER` / `INTERLOCK_STRONG_MODEL` | `ollama` / `qwen3:8b` | High-stakes tier |
-| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | unset | Optional hosted providers |
-| `INTERLOCK_OBSERVER_URL` | `http://127.0.0.1:8081` | Lane B observer service |
-| `INTERLOCK_LANE_A_DEADLINE_MS` | `120` | Pre-flight detector deadline |
-| `INTERLOCK_OBSERVE_DEADLINE_MS` | `800` | Per-sentence observer budget |
-| `INTERLOCK_SENTENCE_WATCHDOG_S` | `8` | Flush stalled partial sentences |
-| `INTERLOCK_SHADOW_SAMPLE_RATE` | `0` | Explicit opt-in fraction for approved cheap-tier shadow replay |
-| `INTERLOCK_DB_PATH` | `data/interlock.db` | Append-oriented ledger |
-| `INTERLOCK_CORPUS_INDEX_PATH` | `data/corpus.db` | Read-only retrieval index |
-| `INTERLOCK_POLICY_PATH` | `policies/banking.yaml` | Versioned governance policy |
-| `INTERLOCK_RISK_ENGINE` | `real` | `real` for traffic; `stub` only for tests/rehearsal |
-| `INTERLOCK_CONFORMAL_FILTER` | `0` | Optional guaranteed mode; costly at current threshold |
-| `INTERLOCK_VERIFIER` | `0` | Enable the heavier claim verifier |
-| `INTERLOCK_STORE_PROMPTS` | `0` | Store raw prompts instead of hashes |
-| `INTERLOCK_GATEWAY_URL` | `http://127.0.0.1:8080` | Console host's gateway upstream |
-| `INTERLOCK_CONSOLE_ORIGINS` | unset | Comma-separated browser origins for an intentional direct-gateway console |
-| `CONSOLE_BACKEND_URL` | `http://127.0.0.1:8099` | Vite development proxy target |
+The screenshots in this file are regenerated from a live console against the replay gateway
+with `node console/scripts/capture-screenshots.mjs` — none of them is a mock-up.
 
-## Evaluation and evidence
+## Demo video
 
-The repository keeps claims attached to generated artifacts rather than README snapshots:
+<!-- Replace with the recorded walkthrough before submission. -->
+_TODO: add the demo video link._
 
-```bash
-uv run python scripts/calibrate.py
-uv run python scripts/eval.py --json artifacts/eval/report.json
-uv run python scripts/eval.py --conformal-filter \
-  --json artifacts/eval/report-guaranteed.json
-uv run python scripts/sensitivity.py
-uv run python scripts/measure_action_latency.py
-uv run python scripts/compare_policy_methods.py
-uv run python scripts/report_manual_anchors.py
-uv run python scripts/build_product_report.py
-```
+## Research foundations
 
-The console only serves an explicit artifact allowlist. Confidence intervals remain next to
-their estimates, replay evidence is labelled, and an empty ledger reports unavailable or
-zero-observation state rather than fabricated economics.
+Almost every mechanism here is somebody else's published result, re-implemented and pointed
+at this problem. The wording below distinguishes what is **implemented** from what is
+**inspiration**.
 
-Two results must always be read together:
+| Research paper | Concept used | Where it appears in Interlock |
+|---|---|---|
+| [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401), Lewis et al., 2020 | Combining model knowledge with retrieved external documents and preserving evidence provenance. | Retrieval pipeline, grounded answers, trusted/untrusted document handling. |
+| [The Probabilistic Relevance Framework: BM25 and Beyond](https://doi.org/10.1561/1500000019), Robertson & Zaragoza, 2009 | BM25-style probabilistic lexical retrieval. | `interlock/retrieval/` and the corpus search index. |
+| [Detecting Hallucinations in Large Language Models Using Semantic Entropy](https://www.nature.com/articles/s41586-024-07421-0), Farquhar et al., 2024 | Measuring uncertainty over meaning rather than only token probabilities. | Inspiration for semantic uncertainty and hallucination detection. **The full multi-sample semantic-entropy method is not used on the hot path.** |
+| [Semantic Entropy Probes: Robust and Cheap Hallucination Detection in LLMs](https://arxiv.org/abs/2406.15927), Kossen et al., 2024 | Approximating semantic uncertainty using a single hidden-state pass and a lightweight probe. | Observer model and residual-stream probe design. |
+| [A Single Direction of Truth: An Observer Model's Linear Residual Probe Exposes and Steers Contextual Hallucinations](https://arxiv.org/abs/2507.23221), O'Neill et al., 2025 | A generator-independent observer can detect contextual hallucinations from its own residual activations. | Lane B observer, layer-wise linear probes, generator-agnostic monitoring. |
+| [MiniCheck: Efficient Fact-Checking of LLMs on Grounding Documents](https://arxiv.org/abs/2404.10774), Tang, Laban & Durrett, 2024 | Lightweight claim-level grounding verification instead of expensive LLM judging for every claim. | MiniCheck-class claim verification, unsupported-claim detection, synthetic defect generation. |
+| [Transforming Classifier Scores into Accurate Multiclass Probability Estimates](https://doi.org/10.1145/775047.775151), Zadrozny & Elkan, 2002 | Converting raw classifier scores into meaningful probabilities for cost-sensitive decisions. | Per-signal isotonic calibration, calibrated defect probabilities, risk-based action selection. |
+| [Conformal Risk Control](https://arxiv.org/abs/2208.02814), Angelopoulos et al., 2022 | Choosing thresholds with statistical risk guarantees instead of tuning them by eye. | Conformal threshold selection and the ungrounded-escape guarantee in `interlock/risk/conformal.py`. |
+| [Selective Classification for Deep Neural Networks](https://arxiv.org/abs/1705.08500), Geifman & El-Yaniv, 2017 | The reject option: trade prediction coverage against error risk. | Pass, annotate, repair, reroute, hold and block form a risk–coverage control ladder. |
+| [Defeating Prompt Injections by Design](https://arxiv.org/abs/2503.18813), Debenedetti et al., 2025 | Separating trusted control flow from untrusted data flow and enforcing tool capabilities outside the language model. | Provenance tracking, reversibility-aware tool policies, deterministic tool-call holds/blocks. **Interlock uses a simplified heuristic rather than a CaMeL-complete interpreter.** |
+| Monitoring Algorithmic Fairness, Henzinger et al., 2023 | Monitoring fairness properties continuously during system operation. | Lane C counterfactual fairness twins and decision-level disparity monitoring. |
+| Log-optimal Anytime-valid E-values, Koolen & Grünwald, 2022 | Evidence measures that remain valid under sequential monitoring and optional stopping. | Anytime-valid e-value monitoring for Lane C fairness observations. |
 
-- The seeded set reports a high Pre-Action Catch Rate **and** a false-intervention miss.
-- The conformal artifact reports zero certified ungrounded escapes **and** a 100%
-  intervention rate at the selected threshold.
+> **Disclaimer.** Interlock is research-informed software. It adapts ideas from hallucination
+> detection, retrieval, calibration, conformal risk control, selective prediction, fairness
+> monitoring and secure agent design. The implementation is an engineering adaptation and
+> does not claim to reproduce the guarantees or benchmark results of the cited papers.
 
-The current `banking-v4` policy was selected from 216 bounded policy candidates over
-three immutable seeds. It preserves the reference Hold/Repair/Pass behavior, keeps
-pre-action catch at 100% with zero empirical grounding escapes, and reduces worst-seed
-false/disruptive intervention from 92.36% under the fresh neutral comparison to 64.97%.
-The target remains missed: all residual seeded false interventions occur in the generated
-₹10,000+ stakes bucket.
+## What is ours
 
-The separate GPT-4o Mini audit reports an 8.5% false-positive rate on 200 generated clean
-anchors and a 20% grounding-escape rate on 100 generated defective anchors. Those are
-offline judge-classification results, not product action rates, and the anchors are
-explicitly unreviewed rather than human labels.
+The papers above support individual mechanisms. These are Interlock's own system
+contributions rather than copied research results:
 
-See [`artifacts/eval/report.json`](artifacts/eval/report.json),
-[`artifacts/eval/policy_comparison.json`](artifacts/eval/policy_comparison.json),
-[`artifacts/eval/manual_anchor_report.json`](artifacts/eval/manual_anchor_report.json),
-[`artifacts/eval/product_report.md`](artifacts/eval/product_report.md),
-[`artifacts/calibration/lambda.json`](artifacts/calibration/lambda.json), and
-[`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) for the committed evidence and caveats.
-
-## Testing and quality gates
-
-The implementation uses contract tests for frozen seams, property tests for the sentence
-commit gate, unit/HTTP tests for the Python services, Vitest for the reducer/UI, and
-Playwright for all four replay journeys at desktop and mobile viewports.
-
-Run the complete non-network gate:
-
-```bash
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy --strict interlock/core interlock/retrieval interlock/interlock_tools
-uv run pytest -q --ignore=tests/chaos -m "not slow" tests console/tests/python
-
-npm --prefix console run test:unit -- --run
-npm --prefix console run typecheck
-npm --prefix console run build
-npm --prefix console run test:e2e
-```
-
-Slow verifier/probe tests require the cached or downloadable
-`cross-encoder/nli-distilroberta-base` weights. The deterministic replay tests do not.
-
-## Security and privacy model
-
-- The gateway, observer, and console bind to localhost in the supplied runbook. Put TLS,
-  authentication, tenant authorization, rate limits, and request-size enforcement at the
-  deployment edge before exposing them beyond a trusted host.
-- Prompts are hashed by default. Raw storage requires `INTERLOCK_STORE_PROMPTS=1` and an
-  explicit deployment decision.
-- Retrieved/uploaded content is conservatively labelled untrusted and flows through the
-  provenance lattice.
-- Hold resume tokens appear only in the initiating browser's SSE event, live only in an
-  in-memory vault, and are recursively removed from console projections and diagnostics.
-- Semantic-cache hits require the same canonical full prompt/options, tenant, and trusted
-  role scope as well as the question, retrieval context, stakes ceiling, clean prior
-  decision, and policy version.
-- Browser WebSockets enforce same-origin or an explicit origin allowlist. Hold mutations
-  require JSON, preventing cross-site HTML forms while preserving tokenless rejection.
-- Shadow replay is disabled by default because enabling it may create a second provider
-  data-egress boundary; opt in only after provider/region authorization.
-- Approval needs the secret token; rejection remains possible without it so losing a secret
-  can never force execution.
-- Evidence artifact paths are allowlisted and resolved beneath the artifact root.
-- The React console does not render raw HTML and never stores secrets in browser storage,
-  URLs, logs, or rendered state.
-- Policy thresholds and action prices are reviewable files, not console controls.
-
-## Deployment shape
-
-The supported production shape is a single VM/process group behind a TLS reverse proxy:
-
-```text
-Browser ──TLS──> reverse proxy ──> console host :5173
-                                   ├── static React assets
-                                   ├── /gateway/* ──> gateway :8080
-                                   └── /console/* ──> gateway :8080
-Gateway :8080 ──> observer :8081
-              ├──> configured model providers
-              ├──> read-only corpus index
-              └──> append-oriented ledger
-```
-
-Keep the browser on the console origin; do not expose a second browser-facing gateway
-origin. The console proxy preserves streaming responses and WebSocket upgrades. Refer to
-[`docs/05_deploy_runbook.md`](docs/05_deploy_runbook.md) for rehearsal, health, load, and
-rollback procedures.
+- **One stakes estimate shared by routing and guardrails** — the thesis of the whole build.
+- **Expected-loss action selection in a common currency**, so "block, edit or escalate" is
+  arithmetic a risk officer can review rather than an engineer's threshold.
+- **The L0–L5 intervention ladder**, and the rule that it shrinks as the answer travels.
+- **Cost, regret, rework and net-value accounting** — reporting what was *wasted*, not only
+  what was spent.
+- **ConsoleHub operational event publishing**, so the console explains decisions instead of
+  asking humans to make them.
+- **Sentence-level streaming holds with resume tokens.**
+- **The combined F-019 probability floor and relative-action-gain policy.**
+- **A 300-item project-specific calibration-anchor dataset.**
 
 ## Known limitations
 
-- The banking policy, corpus, calibrator, and evaluation set do not generalize to other
-  verticals without rebuilding their evidence.
-- False interventions remain well above target on high-stakes traffic because the current
-  impact model prices the full request impact at each sentence.
-- The committed efficacy matrix is partly policy-backed rather than entirely re-measured
-  from forced live outcomes.
-- The default dense retrieval arm is a deterministic hashed vector; BM25 carries much of
-  the current retrieval quality.
-- Calibration data is induced. A 300-item generated/unreviewed anchor has been judged
-  through OpenRouter, but it is an external-model audit rather than human ground truth.
-- The real observer weights are optional; a clean CPU-only checkout runs deterministic
-  signals and reports missing probe capability.
-- Lane C endpoints are implemented, but a fresh ledger has no production fairness pairs.
-- PDF upload extraction handles conservative printable text, not arbitrary layout, OCR, or
-  encrypted documents.
-- Provider-bound use of uploaded text is deferred pending explicit sensitive-data egress
-  authorization.
-- The last local integration rehearsal used a deterministic OpenAI-compatible fixture
-  because Ollama was unavailable; this validates control flow, not live-model quality.
+Read these before quoting any number above.
 
-The authoritative, current list is [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md).
+- **False interventions are far above target**: 99 of 157 clean cases were intervened on,
+  and the artifact records **all 99 as disruptive** — that sub-metric excludes L1 annotate,
+  so these are repairs, reroutes, holds and blocks on answers that were fine. Cause
+  diagnosed as F-019; partially reduced, not solved.
+- **The certified conformal threshold intervenes on 100% of traffic.** The guarantee is real
+  and, at this detector quality, operationally expensive.
+- **Verification cost and net spend are modelled**, from policy token prices and measured
+  action latencies — not observed billing. No cache saving is modelled at all.
+- **Calibration is fitted on induced failures**, not human labels (deviation D-010).
+- **The dense retrieval arm is a lexical stand-in**, not a trained sentence encoder (D-009).
+- **The router is a deterministic difficulty heuristic**, not RouteLLM's trained controller.
+- **Three of six grounding signals are near chance** on this set and are weighted accordingly.
+- Interlock is an **evidence-oriented prototype**, not a production-certified system.
 
-## Design and implementation documents
+Full list with measurements: [docs/LIMITATIONS.md](docs/LIMITATIONS.md) and
+[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
-| Document | Purpose |
-| --- | --- |
-| [`Interlock-v2.pdf`](Interlock-v2.pdf) | Product rationale, evidence base and target outcomes |
-| [`Implementation/Implementation01.md`](Implementation/Implementation01.md) | Delivery plan and sequencing |
-| [`Implementation/Implementation02.md`](Implementation/Implementation02.md) | Detailed system design |
-| [`Implementation/Implementation03.md`](Implementation/Implementation03.md) | Five frozen interface contracts |
-| [`Implementation/Implementation04.md`](Implementation/Implementation04.md) | Architecture decision records |
-| [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) | Built/measured/stubbed/deviation ledger |
-| [`coordination/PERSON2_NOTES.md`](coordination/PERSON2_NOTES.md) | Console design and backend integration handoff |
-| [`docs/05_deploy_runbook.md`](docs/05_deploy_runbook.md) | Local, rehearsal and single-VM operations |
-| [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Release misses and claim boundaries |
-| [`docs/contracts/README.md`](docs/contracts/README.md) | Contract index |
+---
 
-## Guiding principle
-
-Interlock does not hide judgement behind a single opaque safety threshold. Stakes,
-probabilities, action efficacy, nuisance, compute, latency, hard rules, policy versions,
-confidence intervals, and unavailable evidence are all made inspectable. The goal is not
-to promise that an AI system is safe; it is to make every consequential control decision
-auditable before anyone acts on it.
+<div align="center">
+  <sub>Built for the Accenture Innovation Challenge 2026 · Problem Statement 1 — ControlPlane.AI</sub>
+</div>

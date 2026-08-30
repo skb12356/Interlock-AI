@@ -11,6 +11,10 @@ export interface CalibrationReport {
   brier: number;
   auroc: number;
   reliability: ReliabilityBin[];
+  /** Per-signal discrimination, present in the committed calibration artifact. */
+  signal_auroc?: Record<string, number>;
+  n_items?: number;
+  folds?: number;
 }
 
 export interface ConformalReport {

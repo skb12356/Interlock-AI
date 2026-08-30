@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { InterlockLockup } from "../theater/InterlockMark";
 import { deriveLiveScene, releasedText } from "../theater/liveScene";
 import { MicroLabel } from "../theater/primitives";
 import { color, font, radius, TONE } from "../theater/tokens";
@@ -134,7 +135,8 @@ export function ChatPage({
         }}
         aria-label="Empty session"
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", alignItems: "center" }}>
+          <InterlockLockup />
           <h1 style={{ margin: 0, font: `300 34px/1.15 ${font.sans}`, letterSpacing: "-.02em" }}>
             How can I help, {OPERATOR_NAME}?
           </h1>

@@ -10,6 +10,7 @@ import {
   loadSessions,
   patchTurn,
   persistableOverlay,
+  removeSession,
   saveSessions,
   sortSessions,
   upsertSession,
@@ -118,6 +119,19 @@ export function App() {
       return sortSessions(upsertSession(current, mutate(session)));
     });
   }, []);
+
+  /** Deleting is local and final; the caller has already confirmed it. */
+  const deleteSession = useCallback(
+    (sessionId: string) => {
+      setSessions((current) => {
+        const next = removeSession(current, sessionId);
+        setActiveSessionId((active) => (active === sessionId ? (next[0]?.id ?? null) : active));
+        return next;
+      });
+      setChatError(null);
+    },
+    [],
+  );
 
   const startSession = useCallback(() => {
     const session = createSession();
@@ -306,6 +320,7 @@ export function App() {
                 setActiveSessionId(id);
                 setChatError(null);
               }}
+              onDelete={deleteSession}
             />
             <ChatPage
               session={activeSession}

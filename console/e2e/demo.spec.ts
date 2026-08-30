@@ -39,11 +39,27 @@ test.describe("chat sessions", () => {
     await ask(page, "What time does the MG Road branch open tomorrow?");
 
     const sidebar = page.getByLabel("Chat sessions");
-    await expect(sidebar.getByRole("button", { name: /MG Road branch/ })).toBeVisible();
+    const row = sidebar.getByRole("button", { name: /^What time does the MG Road branch/ });
+    await expect(row).toBeVisible();
 
     await sidebar.getByRole("button", { name: /New chat session/ }).click();
-    await expect(page.getByLabel("New session")).toBeVisible();
-    await expect(sidebar.getByRole("button", { name: /MG Road branch/ })).toBeVisible();
+    await expect(page.getByLabel("Empty session")).toBeVisible();
+    await expect(row).toBeVisible();
+    expect(failures).toEqual([]);
+  });
+
+  test("a session can be deleted, once it has been confirmed", async ({ page }) => {
+    const failures = watchBrowserFailures(page);
+    await ask(page, "What time does the MG Road branch open tomorrow?");
+
+    const sidebar = page.getByLabel("Chat sessions");
+    const row = sidebar.getByRole("button", { name: /^What time does the MG Road branch/ });
+    await sidebar.getByRole("button", { name: /Delete session/ }).click();
+    await expect(row).toBeVisible();
+
+    await sidebar.getByRole("button", { name: /Confirm deleting/ }).click();
+    await expect(row).toHaveCount(0);
+    await expect(page.getByLabel("Empty session")).toBeVisible();
     expect(failures).toEqual([]);
   });
 

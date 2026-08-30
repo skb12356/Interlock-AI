@@ -78,7 +78,7 @@ describe("console shell", () => {
 
   it("opens on an empty chat session with no mode switch", async () => {
     render(<App />);
-    expect(await screen.findByLabelText("New session")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Empty session")).toBeInTheDocument();
     expect(screen.getByLabelText("Ask the bank assistant")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /demo trace/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /live backend/i })).not.toBeInTheDocument();
@@ -133,7 +133,7 @@ describe("console shell", () => {
     expect(within(sidebar).getByRole("button", { name: "branch hours please" })).toBeInTheDocument();
 
     await user.click(within(sidebar).getByRole("button", { name: /New chat session/ }));
-    expect(await screen.findByLabelText("New session")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Empty session")).toBeInTheDocument();
     expect(localStorage.getItem(SESSION_STORAGE_KEY)).toContain("branch hours please");
   });
 
@@ -142,6 +142,30 @@ describe("console shell", () => {
     render(<App />);
     await user.type(screen.getByLabelText("Ask the bank assistant"), "branch hours please{Enter}");
     expect(await screen.findByText(/checked in \d+\.\d+ s/)).toBeInTheDocument();
+  });
+
+  it("deletes a session after asking first", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(screen.getByLabelText("Ask the bank assistant"), "branch hours please");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(screen.getByText(/checked in \d+\.\d+ s/)).toBeInTheDocument());
+
+    const sidebar = screen.getByLabelText("Chat sessions");
+    await user.click(within(sidebar).getByRole("button", { name: /Delete session branch hours please/ }));
+    // Nothing is gone yet: the bin asks once.
+    expect(within(sidebar).getByRole("button", { name: "branch hours please" })).toBeInTheDocument();
+
+    await user.click(within(sidebar).getByRole("button", { name: "Keep session" }));
+    expect(within(sidebar).getByRole("button", { name: "branch hours please" })).toBeInTheDocument();
+
+    await user.click(within(sidebar).getByRole("button", { name: /Delete session branch hours please/ }));
+    await user.click(within(sidebar).getByRole("button", { name: /Confirm deleting branch hours please/ }));
+
+    expect(within(sidebar).queryByRole("button", { name: "branch hours please" })).not.toBeInTheDocument();
+    expect(await screen.findByLabelText("Empty session")).toBeInTheDocument();
+    await waitFor(() => expect(localStorage.getItem(SESSION_STORAGE_KEY)).not.toContain("branch hours please"));
   });
 
   it("explains itself in plain language and cites its sources", async () => {

@@ -129,7 +129,7 @@ export function ChatPage({
           padding: "40px 26px",
           textAlign: "center",
         }}
-        aria-label="New session"
+        aria-label="Empty session"
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
           <MicroLabel tone={color.accent}>Banking assistant · every request traced</MicroLabel>

@@ -67,6 +67,10 @@ export function upsertSession(sessions: ChatSession[], session: ChatSession): Ch
   return next;
 }
 
+export function removeSession(sessions: ChatSession[], sessionId: string): ChatSession[] {
+  return sessions.filter((session) => session.id !== sessionId);
+}
+
 /** Newest first, which is the order the sidebar shows them in. */
 export function sortSessions(sessions: ChatSession[]): ChatSession[] {
   return sessions.slice().sort((a, b) => b.updatedAt - a.updatedAt);

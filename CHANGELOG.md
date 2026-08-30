@@ -7,6 +7,8 @@
   research each mechanism comes from, cited.
 - Fixed scrolling in the Reviews, Evidence and About workspaces — the shell no longer
   clips them.
+- Chat sessions can be deleted from the sidebar with a bin control that confirms once
+  before removing the session and its stored traces.
 - Hold cards now show a middle-elided id with the full value on hover, a copy control
   (with a selection-copy fallback), and a link to the chat session the hold came from
   when this browser has it.

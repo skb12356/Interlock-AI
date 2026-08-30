@@ -6,6 +6,7 @@ import {
   createTurn,
   loadSessions,
   patchTurn,
+  removeSession,
   saveSessions,
   sortSessions,
   titleFor,
@@ -67,4 +68,11 @@ describe("chat sessions", () => {
     storage.setItem(SESSION_STORAGE_KEY, "{not json");
     expect(loadSessions(storage)).toEqual([]);
   });
+  it("removes one session and leaves the rest alone", () => {
+    const keep = createSession();
+    const drop = createSession();
+    expect(removeSession([keep, drop], drop.id)).toEqual([keep]);
+    expect(removeSession([keep], "missing")).toEqual([keep]);
+  });
+
 });

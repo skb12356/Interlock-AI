@@ -97,7 +97,8 @@ def test_openrouter_payload_uses_chat_completions_and_never_ollama_fields() -> N
         seen["body"] = json.loads(request.content)
         return openai_response(results=[valid_result("a")])
 
-    results = judge_with(handler).judge("openai/gpt-5-nano", [ITEM_A])
+    judge = judge_with(handler)
+    results = judge.judge("openai/gpt-5-nano", [ITEM_A])
 
     body = seen["body"]
     assert isinstance(body, dict)
@@ -110,8 +111,10 @@ def test_openrouter_payload_uses_chat_completions_and_never_ollama_fields() -> N
     assert "format" not in body
     assert "options" not in body
     assert "stream" not in body
+    assert judge.max_attempts == 3
     assert results[0].status == "valid"
     assert results[0].label == "clean"
+    assert results[0].attempts == 1
 
 
 def test_prompt_limits_the_judge_to_supplied_evidence() -> None:
@@ -214,6 +217,71 @@ def test_unknown_labels_are_invalid_and_rationale_is_bounded() -> None:
     assert len(result.rationale) == 800
 
 
+@pytest.mark.parametrize("label", [["clean"], {"label": "clean"}, 1, None])
+def test_untrusted_non_string_labels_are_invalid_instead_of_raising(label: object) -> None:
+    # Catches hashing provider-controlled list/dict labels during taxonomy membership.
+    raw = valid_result("a")
+    raw["label"] = label
+
+    result = judge_with(lambda _: openai_response(results=[raw])).judge(
+        "openai/gpt-5-nano", [ITEM_A]
+    )[0]
+
+    assert result.status == "invalid_label"
+    assert result.label is None
+
+
+def test_valid_string_labels_are_normalized_before_taxonomy_membership() -> None:
+    # Catches rejecting a semantically valid label solely due to casing or outer spacing.
+    raw = valid_result("a")
+    raw["label"] = "  Contradicted  "
+
+    result = judge_with(lambda _: openai_response(results=[raw])).judge(
+        "openai/gpt-5-nano", [ITEM_A]
+    )[0]
+
+    assert result.status == "valid"
+    assert result.label == "contradicted"
+
+
+_MISSING = object()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("confidence", _MISSING),
+        ("confidence", None),
+        ("confidence", "0.9"),
+        ("confidence", True),
+        ("confidence", -0.01),
+        ("confidence", 1.01),
+        ("confidence", float("nan")),
+        ("rationale", _MISSING),
+        ("rationale", None),
+        ("rationale", 7),
+        ("rationale", "   \n"),
+    ],
+)
+def test_incomplete_or_wrong_typed_judge_fields_are_invalid_results(
+    field: str, value: object
+) -> None:
+    # Catches scoring an incomplete provider result as a valid grounding judgment.
+    raw = valid_result("a")
+    if value is _MISSING:
+        del raw[field]
+    else:
+        raw[field] = value
+
+    result = judge_with(lambda _: openai_response(results=[raw])).judge(
+        "openai/gpt-5-nano", [ITEM_A]
+    )[0]
+
+    assert result.status == "invalid_result"
+    assert result.label is None
+    assert result.confidence is None
+
+
 def test_results_are_matched_by_stable_item_id_and_missing_items_are_reported() -> None:
     # Catches positional result matching and silently dropping a paid batch item.
     response = openai_response(results=[valid_result("b", "contradicted")])
@@ -281,6 +349,7 @@ def test_authentication_errors_are_not_retried_or_leaked() -> None:
 
     assert attempts == 1
     assert result.status == "auth_error"
+    assert result.attempts == 1
     assert result.error is not None
     assert "test-secret" not in result.error
     assert len(result.error) <= 500
@@ -303,6 +372,7 @@ def test_retryable_status_then_success_retries_once(first_status: int) -> None:
 
     assert attempts == 2
     assert result.status == "valid"
+    assert result.attempts == 2
     assert sleeps == [30.0]
 
 
@@ -319,6 +389,7 @@ def test_repeated_rate_limit_stops_after_three_total_attempts() -> None:
 
     assert attempts == 3
     assert result.status == "rate_limited"
+    assert result.attempts == 3
 
 
 def test_timeout_is_retried_then_normalized() -> None:
@@ -334,6 +405,7 @@ def test_timeout_is_retried_then_normalized() -> None:
 
     assert attempts == 3
     assert result.status == "timeout"
+    assert result.attempts == 3
     assert result.error == "provider request timed out"
 
 

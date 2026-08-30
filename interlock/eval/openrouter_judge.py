@@ -2,7 +2,9 @@
 
 Judge responses are untrusted provider data.  This module converts every outcome into
 one result per requested item so reporting code never mistakes malformed output for a
-clean label and never has to inspect HTTP exceptions or response bodies.
+clean label and never has to inspect HTTP exceptions or response bodies. Paid callers
+must reserve projected batch cost multiplied by ``OpenRouterJudge.max_attempts`` before
+dispatch because transient failures may consume provider work on every attempt.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ JudgeStatus = Literal[
     "valid",
     "invalid_json",
     "invalid_label",
+    "invalid_result",
     "missing_item",
     "refused",
     "truncated",
@@ -40,7 +43,6 @@ JudgeStatus = Literal[
 ]
 
 _VALID_LABELS = frozenset({"clean", "ungrounded", "contradicted"})
-_MAX_ATTEMPTS = 3
 _MAX_RATIONALE_CHARS = 800
 _MAX_ERROR_CHARS = 500
 
@@ -66,7 +68,10 @@ class JudgeItem:
 
 @dataclass(frozen=True, slots=True)
 class JudgeUsage:
-    """Normalized OpenRouter usage for the request containing a result."""
+    """Normalized usage for one batch request, repeated on each item result.
+
+    Consumers must count this request-level usage once per batch, never once per item.
+    """
 
     prompt_tokens: int
     completion_tokens: int
@@ -75,7 +80,7 @@ class JudgeUsage:
 
 @dataclass(frozen=True, slots=True)
 class JudgeResult:
-    """Normalized judgment or explicit operational/parser failure for one item."""
+    """Normalized judgment or explicit failure with the total HTTP dispatch count."""
 
     item_id: str
     status: JudgeStatus
@@ -85,6 +90,7 @@ class JudgeResult:
     usage: JudgeUsage
     latency_ms: float
     error: str | None
+    attempts: int
 
 
 def gold_label_from_anchor(row: Mapping[str, Any]) -> str:
@@ -103,7 +109,14 @@ def gold_label_from_anchor(row: Mapping[str, Any]) -> str:
 
 
 class OpenRouterJudge:
-    """OpenAI chat-completions boundary with bounded transient retries."""
+    """OpenAI chat-completions boundary with a visible paid retry ceiling.
+
+    Paid runners must reserve projected batch cost times ``max_attempts`` before a
+    dispatch. Provider usage in returned item results is request-level and must be
+    counted once for the batch.
+    """
+
+    max_attempts: int = 3
 
     def __init__(
         self,
@@ -129,7 +142,8 @@ class OpenRouterJudge:
         terminal_status: JudgeStatus | None = None
         terminal_error: str | None = None
 
-        for attempt in range(_MAX_ATTEMPTS):
+        for attempt in range(self.max_attempts):
+            dispatches = attempt + 1
             try:
                 response = self._client.post(
                     self._url,
@@ -139,7 +153,7 @@ class OpenRouterJudge:
             except httpx.TimeoutException:
                 terminal_status = "timeout"
                 terminal_error = "provider request timed out"
-                if attempt + 1 < _MAX_ATTEMPTS:
+                if dispatches < self.max_attempts:
                     self._sleep(self._backoff_delay(attempt, None))
                     continue
                 return self._failure_results(
@@ -147,6 +161,7 @@ class OpenRouterJudge:
                     status=terminal_status,
                     error=terminal_error,
                     started=started,
+                    attempts=dispatches,
                 )
             except httpx.TransportError:
                 return self._failure_results(
@@ -154,6 +169,7 @@ class OpenRouterJudge:
                     status="provider_error",
                     error="provider transport failed",
                     started=started,
+                    attempts=dispatches,
                 )
 
             status_code = response.status_code
@@ -163,6 +179,7 @@ class OpenRouterJudge:
                     status="auth_error",
                     error="provider authentication failed",
                     started=started,
+                    attempts=dispatches,
                 )
             if status_code == 429:
                 terminal_status = "rate_limited"
@@ -176,11 +193,17 @@ class OpenRouterJudge:
                     status="provider_error",
                     error=f"provider returned HTTP {status_code}",
                     started=started,
+                    attempts=dispatches,
                 )
             else:
-                return self._parse_response(response, batch, started=started)
+                return self._parse_response(
+                    response,
+                    batch,
+                    started=started,
+                    attempts=dispatches,
+                )
 
-            if attempt + 1 < _MAX_ATTEMPTS:
+            if dispatches < self.max_attempts:
                 self._sleep(self._backoff_delay(attempt, response.headers.get("Retry-After")))
                 continue
             return self._failure_results(
@@ -188,6 +211,7 @@ class OpenRouterJudge:
                 status=terminal_status,
                 error=terminal_error,
                 started=started,
+                attempts=dispatches,
             )
 
         return self._failure_results(
@@ -195,6 +219,7 @@ class OpenRouterJudge:
             status="provider_error",
             error="provider request failed",
             started=started,
+            attempts=self.max_attempts,
         )
 
     @staticmethod
@@ -229,6 +254,7 @@ class OpenRouterJudge:
         items: Sequence[JudgeItem],
         *,
         started: float,
+        attempts: int,
     ) -> list[JudgeResult]:
         elapsed_ms = self._elapsed_ms(started)
         try:
@@ -247,6 +273,7 @@ class OpenRouterJudge:
                 status="provider_error",
                 error="provider returned an invalid chat-completion envelope",
                 latency_ms=elapsed_ms,
+                attempts=attempts,
             )
 
         usage = self._usage(envelope.get("usage"))
@@ -257,6 +284,7 @@ class OpenRouterJudge:
                 error="judge response reached its token limit",
                 usage=usage,
                 latency_ms=elapsed_ms,
+                attempts=attempts,
             )
 
         refusal = message.get("refusal")
@@ -268,6 +296,7 @@ class OpenRouterJudge:
                 error="judge refused the evaluation",
                 usage=usage,
                 latency_ms=elapsed_ms,
+                attempts=attempts,
             )
 
         parsed = self._parse_content(content)
@@ -278,6 +307,7 @@ class OpenRouterJudge:
                 error="judge response was not valid result JSON",
                 usage=usage,
                 latency_ms=elapsed_ms,
+                attempts=attempts,
             )
 
         by_id: dict[str, Mapping[str, Any]] = {}
@@ -296,12 +326,14 @@ class OpenRouterJudge:
                         usage=usage,
                         latency_ms=elapsed_ms,
                         error="judge response omitted the requested item",
+                        attempts=attempts,
                     )
                 )
                 continue
 
-            rationale = self._bounded_text(raw.get("rationale"), _MAX_RATIONALE_CHARS)
-            label = raw.get("label")
+            rationale = self._bounded_text(raw.get("rationale"), _MAX_RATIONALE_CHARS).strip()
+            raw_label = raw.get("label")
+            label = raw_label.strip().lower() if isinstance(raw_label, str) else None
             if label not in _VALID_LABELS:
                 results.append(
                     self._result(
@@ -311,6 +343,22 @@ class OpenRouterJudge:
                         usage=usage,
                         latency_ms=elapsed_ms,
                         error="judge returned a label outside the grounding taxonomy",
+                        attempts=attempts,
+                    )
+                )
+                continue
+
+            confidence = self._confidence(raw.get("confidence"))
+            if confidence is None or not rationale:
+                results.append(
+                    self._result(
+                        item.item_id,
+                        status="invalid_result",
+                        rationale=rationale,
+                        usage=usage,
+                        latency_ms=elapsed_ms,
+                        error="judge result requires finite confidence and nonblank rationale",
+                        attempts=attempts,
                     )
                 )
                 continue
@@ -320,10 +368,11 @@ class OpenRouterJudge:
                     item.item_id,
                     status="valid",
                     label=label,
-                    confidence=self._confidence(raw.get("confidence")),
+                    confidence=confidence,
                     rationale=rationale,
                     usage=usage,
                     latency_ms=elapsed_ms,
+                    attempts=attempts,
                 )
             )
         return results
@@ -423,6 +472,7 @@ class OpenRouterJudge:
         usage: JudgeUsage | None = None,
         latency_ms: float = 0,
         error: str | None = None,
+        attempts: int,
     ) -> JudgeResult:
         return JudgeResult(
             item_id=item_id,
@@ -433,6 +483,7 @@ class OpenRouterJudge:
             usage=usage or JudgeUsage(0, 0, None),
             latency_ms=latency_ms,
             error=cls._bounded_text(error, _MAX_ERROR_CHARS) or None,
+            attempts=attempts,
         )
 
     @classmethod
@@ -445,6 +496,7 @@ class OpenRouterJudge:
         started: float | None = None,
         usage: JudgeUsage | None = None,
         latency_ms: float | None = None,
+        attempts: int,
     ) -> list[JudgeResult]:
         if latency_ms is None:
             latency_ms = cls._elapsed_ms(started) if started is not None else 0
@@ -455,6 +507,7 @@ class OpenRouterJudge:
                 usage=usage,
                 latency_ms=latency_ms,
                 error=error,
+                attempts=attempts,
             )
             for item in items
         ]

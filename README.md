@@ -414,6 +414,7 @@ Copy [`.env.example`](.env.example) and adjust only what the deployment needs.
 | `INTERLOCK_LANE_A_DEADLINE_MS` | `120` | Pre-flight detector deadline |
 | `INTERLOCK_OBSERVE_DEADLINE_MS` | `800` | Per-sentence observer budget |
 | `INTERLOCK_SENTENCE_WATCHDOG_S` | `8` | Flush stalled partial sentences |
+| `INTERLOCK_SHADOW_SAMPLE_RATE` | `0` | Explicit opt-in fraction for approved cheap-tier shadow replay |
 | `INTERLOCK_DB_PATH` | `data/interlock.db` | Append-oriented ledger |
 | `INTERLOCK_CORPUS_INDEX_PATH` | `data/corpus.db` | Read-only retrieval index |
 | `INTERLOCK_POLICY_PATH` | `policies/banking.yaml` | Versioned governance policy |
@@ -422,6 +423,7 @@ Copy [`.env.example`](.env.example) and adjust only what the deployment needs.
 | `INTERLOCK_VERIFIER` | `0` | Enable the heavier claim verifier |
 | `INTERLOCK_STORE_PROMPTS` | `0` | Store raw prompts instead of hashes |
 | `INTERLOCK_GATEWAY_URL` | `http://127.0.0.1:8080` | Console host's gateway upstream |
+| `INTERLOCK_CONSOLE_ORIGINS` | unset | Comma-separated browser origins for an intentional direct-gateway console |
 | `CONSOLE_BACKEND_URL` | `http://127.0.0.1:8099` | Vite development proxy target |
 
 ## Evaluation and evidence
@@ -503,6 +505,12 @@ Slow verifier/probe tests require the cached or downloadable
   provenance lattice.
 - Hold resume tokens appear only in the initiating browser's SSE event, live only in an
   in-memory vault, and are recursively removed from console projections and diagnostics.
+- Semantic-cache hits require the same canonical full prompt/options scope as well as the
+  question, retrieval context, stakes ceiling, clean prior decision, and policy version.
+- Browser WebSockets enforce same-origin or an explicit origin allowlist. Hold mutations
+  require JSON, preventing cross-site HTML forms while preserving tokenless rejection.
+- Shadow replay is disabled by default because enabling it may create a second provider
+  data-egress boundary; opt in only after provider/region authorization.
 - Approval needs the secret token; rejection remains possible without it so losing a secret
   can never force execution.
 - Evidence artifact paths are allowlisted and resolved beneath the artifact root.

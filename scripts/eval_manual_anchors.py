@@ -33,6 +33,7 @@ from interlock.eval.judge_run import (  # noqa: E402
     RunSummary,
     dataset_digest,
     estimate_maximum_cost,
+    load_run_cost,
     run_judgments,
     stratified_prefix,
 )
@@ -210,6 +211,21 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 2
 
+    try:
+        existing_costs = {
+            model: load_run_cost(output, model=model, rows=rows) for model, output, _, _ in plans
+        }
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    existing_total = sum(existing_costs.values(), Decimal(0))
+    if existing_total > args.max_cost_usd:
+        print(
+            "error: resumed runs already exceed the shared configured cost cap",
+            file=sys.stderr,
+        )
+        return 1
+
     with httpx.Client(timeout=180) as client:
         judge = OpenRouterJudge(
             client,
@@ -217,13 +233,14 @@ def main(argv: list[str] | None = None) -> int:
             api_key=api_key,
             sleep=time.sleep,
         )
-        remaining_budget = args.max_cost_usd
+        remaining_new_budget = args.max_cost_usd - existing_total
         for model, output, price, _ in plans:
+            existing_cost = existing_costs[model]
             config = RunConfig(
                 model=model,
                 limit=min(args.limit, len(rows)),
                 batch_size=args.batch_size,
-                max_cost_usd=remaining_budget,
+                max_cost_usd=existing_cost + remaining_new_budget,
                 allow_external_context=True,
                 price=price,
             )
@@ -233,7 +250,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"error: {exc}", file=sys.stderr)
                 return 1
             _print_json(summary_payload(summary))
-            remaining_budget = max(Decimal(0), remaining_budget - summary.cost_usd)
+            new_cost = max(Decimal(0), summary.cost_usd - existing_cost)
+            remaining_new_budget = max(Decimal(0), remaining_new_budget - new_cost)
     return 0
 
 

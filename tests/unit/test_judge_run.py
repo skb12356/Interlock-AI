@@ -754,6 +754,93 @@ def test_cli_shares_one_total_budget_across_multiple_models(
     assert '"combined_estimated_max_cost_usd":' in plan_output
 
 
+def test_cli_preloads_every_resumed_model_cost_before_first_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Catches later-model sunk cost being invisible to the first resumed model."""
+
+    class DummyClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def __enter__(self) -> DummyClient:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            pass
+
+    class CliJudge(RecordingJudge):
+        def __init__(self, *_: object, **__: object) -> None:
+            super().__init__()
+
+    events: list[str] = []
+    configured_caps: list[Decimal] = []
+
+    def load_cost(output: Path, *, model: str, rows: Sequence[dict[str, Any]]) -> Decimal:
+        assert output.exists()
+        assert rows
+        events.append(f"load:{model}")
+        return Decimal("0.30")
+
+    def run(
+        config: RunConfig,
+        rows: Sequence[dict[str, Any]],
+        judge: object,
+        output: Path,
+    ) -> object:
+        del rows, judge, output
+        events.append(f"run:{config.model}")
+        configured_caps.append(config.max_cost_usd)
+        return eval_cli.RunSummary(
+            model=config.model,
+            dataset_digest="digest",
+            prompt_version=JUDGE_PROMPT_VERSION,
+            run_id="run",
+            selected=1,
+            completed=1,
+            resumed=1,
+            batches=1,
+            network_calls=0,
+            actual_attempts=1,
+            prompt_tokens=1,
+            completion_tokens=1,
+            cost_usd=Decimal("0.30"),
+            max_cost_usd=config.max_cost_usd,
+            termination_reason="complete",
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-or-v1-SENTINEL-NOT-PRINTED")
+    monkeypatch.setattr(httpx, "Client", DummyClient)
+    monkeypatch.setattr(eval_cli, "OpenRouterJudge", CliJudge)
+    monkeypatch.setattr(eval_cli, "load_run_cost", load_cost)
+    monkeypatch.setattr(eval_cli, "run_judgments", run)
+    base = tmp_path / "judgments.jsonl"
+    for model in ("openai-gpt-5-nano", "openai-gpt-5-mini"):
+        (tmp_path / f"judgments-{model}.jsonl").write_text("", encoding="utf-8")
+
+    result = eval_cli.main(
+        [
+            "--model",
+            "openai/gpt-5-nano",
+            "--model",
+            "openai/gpt-5-mini",
+            "--limit",
+            "1",
+            "--max-cost-usd",
+            "1.50",
+            "--allow-external-context",
+            "--resume",
+            "--output",
+            str(base),
+        ]
+    )
+
+    assert result == 0
+    assert events[:2] == ["load:openai/gpt-5-nano", "load:openai/gpt-5-mini"]
+    assert events[2].startswith("run:")
+    assert configured_caps[0] - Decimal("0.30") == Decimal("0.90")
+
+
 def test_approved_model_prices_are_the_reviewed_openrouter_estimates() -> None:
     assert {
         "openai/gpt-5-nano": ModelPrice(Decimal("0.05"), Decimal("0.40")),

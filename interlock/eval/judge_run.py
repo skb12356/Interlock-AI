@@ -37,6 +37,7 @@ __all__ = [
     "dataset_digest",
     "estimate_maximum_cost",
     "load_completed",
+    "load_run_cost",
     "run_id",
     "run_judgments",
     "stratified_prefix",
@@ -393,6 +394,35 @@ def _validate_records(
 def load_completed(path: Path, *, model: str, dataset_digest: str) -> set[str]:
     """Load exact-identity results, refusing corrupt, duplicate, or mixed runs."""
     return _validate_records(_read_records(path), model=model, digest=dataset_digest)
+
+
+def load_run_cost(
+    path: Path,
+    *,
+    model: str,
+    rows: Sequence[dict[str, Any]],
+) -> Decimal:
+    """Validate a resumable run and return its request-deduplicated durable cost."""
+    digest = dataset_digest(rows)
+    expected_gold: dict[str, str] = {}
+    for row in rows:
+        item_id = row.get("item_id")
+        if not isinstance(item_id, str) or not item_id or item_id in expected_gold:
+            raise ValueError("anchor dataset requires unique nonblank item IDs")
+        expected_gold[item_id] = gold_label_from_anchor(row)
+    _validate_metadata(
+        _metadata_path(path),
+        output=path,
+        model=model,
+        digest=digest,
+        expected_gold=expected_gold,
+    )
+    return _load_state(
+        path,
+        model=model,
+        digest=digest,
+        expected_gold=expected_gold,
+    ).cost_usd
 
 
 def _as_nonnegative_decimal(value: object) -> Decimal:

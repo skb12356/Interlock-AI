@@ -26,6 +26,25 @@ def anchor_rows() -> list[dict[str, Any]]:
     return build_labels(300, seed=20260829)
 
 
+def grounding_signature(row: dict[str, Any]) -> str:
+    payload = row["payload"]
+    return json.dumps(
+        {
+            "answer": payload["answer"],
+            "context": payload["context"],
+            "gold": [
+                row["gold_ungrounded"],
+                row["gold_contradicted"],
+                row["gold_unsafe"],
+            ],
+            "failure_mode": payload["failure_mode"],
+            "challenge_level": payload["challenge_level"],
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
+
 def test_manual_anchor_has_the_approved_200_100_mode_matrix(
     anchor_rows: list[dict[str, Any]],
 ) -> None:
@@ -172,15 +191,16 @@ def test_the_committed_anchor_artifact_matches_the_approved_matrix() -> None:
         assert payload["domain"]
 
 
-def test_every_committed_payload_is_semantically_unique() -> None:
+def test_every_committed_grounding_case_is_independent() -> None:
     path = REPO_ROOT / "data" / "labels" / "manual_anchor_300.jsonl"
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
-    signatures = []
-    for row in rows:
-        payload = dict(row["payload"])
-        payload.pop("triple_id")
-        signatures.append(json.dumps(payload, ensure_ascii=False, sort_keys=True))
-    assert len(set(signatures)) == 300
+    assert len({grounding_signature(row) for row in rows}) == 300
+
+
+@pytest.mark.parametrize("seed", [39, 86])
+def test_anchor_builds_independent_cases_across_seeds(seed: int) -> None:
+    rows = build_labels(300, seed=seed)
+    assert len({grounding_signature(row) for row in rows}) == 300
 
 
 def test_committed_contradictions_follow_manifest_direction() -> None:

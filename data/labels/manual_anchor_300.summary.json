@@ -21,13 +21,13 @@
     "L3_conflict": 96
   },
   "domains": {
-    "branch_info": 25,
-    "claims": 62,
-    "fees": 19,
-    "general": 76,
-    "loan_terms": 63,
-    "payments": 34,
-    "prepayment": 21
+    "branch_info": 19,
+    "claims": 58,
+    "fees": 24,
+    "general": 77,
+    "loan_terms": 64,
+    "payments": 40,
+    "prepayment": 18
   },
   "audit_distribution_note": "Diagnostic audit distribution: 200 clean and 100 defective rows. It does not replace the 10% production defect base-rate assumption used to fit calibration."
 }

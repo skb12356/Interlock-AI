@@ -61,6 +61,11 @@ _UNANSWERABLE_QUESTION_TEMPLATES: tuple[str, ...] = (
     "What exact amount is charged for two defaults in one quarter under {title}?",
 )
 
+# A cell is small (67 rows at most), while the calibration corpus offers thousands of
+# source/answer/context combinations once distractors are considered. Keep retrying
+# collisions, but never hang if a reduced corpus genuinely cannot satisfy a quota.
+MAX_ANCHOR_CELL_ATTEMPTS = 20_000
+
 
 @dataclass(frozen=True, slots=True)
 class AnchorTriple:
@@ -90,11 +95,9 @@ def _vary_question(triple: LabelledTriple, *, title: str, occurrence: int) -> La
         if triple.failure_mode == "unanswerable"
         else _QUESTION_TEMPLATES
     )
-    if occurrence >= len(templates):
-        raise ValueError(f"not enough semantic question variants for {triple.triple_id}")
     return LabelledTriple(
         triple_id=triple.triple_id,
-        question=templates[occurrence].format(title=title),
+        question=templates[occurrence % len(templates)].format(title=title),
         answer=triple.answer,
         context=triple.context,
         defect=triple.defect,
@@ -102,6 +105,36 @@ def _vary_question(triple: LabelledTriple, *, title: str, occurrence: int) -> La
         provenance_note=triple.provenance_note,
         source_doc_id=triple.source_doc_id,
         offending_span=triple.offending_span,
+    )
+
+
+def _grounding_signature(anchor: AnchorTriple) -> tuple[object, ...]:
+    triple = anchor.triple
+    return (
+        triple.answer,
+        tuple((fragment.text, fragment.doc_id, fragment.provenance) for fragment in triple.context),
+        triple.defect,
+        triple.failure_mode,
+        anchor.challenge_level,
+    )
+
+
+def _with_triple_id(anchor: AnchorTriple, triple_id: str) -> AnchorTriple:
+    triple = anchor.triple
+    return AnchorTriple(
+        triple=LabelledTriple(
+            triple_id=triple_id,
+            question=triple.question,
+            answer=triple.answer,
+            context=triple.context,
+            defect=triple.defect,
+            failure_mode=triple.failure_mode,
+            provenance_note=triple.provenance_note,
+            source_doc_id=triple.source_doc_id,
+            offending_span=triple.offending_span,
+        ),
+        challenge_level=anchor.challenge_level,
+        domain=anchor.domain,
     )
 
 
@@ -152,67 +185,66 @@ def _enrich_context(
 def build_anchor(chunks: Sequence[Chunk], *, seed: int) -> list[AnchorTriple]:
     """Build the approved mode/level matrix without changing calibration priors."""
     chunk_list = list(chunks)
-    triples = TripleGenerator(chunks=chunk_list, seed=seed).generate_exact(ANCHOR_MODE_COUNTS)
-    levels_by_mode = {mode: _level_plan(count) for mode, count in ANCHOR_MODE_COUNTS.items()}
-    mode_indices: defaultdict[str, int] = defaultdict(int)
+    generator = TripleGenerator(chunks=chunk_list, seed=seed)
     domains = {chunk.doc_id: chunk.domain for chunk in chunk_list}
     titles = {chunk.doc_id: chunk.title for chunk in chunk_list}
     question_occurrences: defaultdict[tuple[object, ...], int] = defaultdict(int)
     rng = random.Random(seed)
     anchors: list[AnchorTriple] = []
-    for triple in triples:
-        mode_index = mode_indices[triple.failure_mode]
-        level = levels_by_mode[triple.failure_mode][mode_index]
-        mode_indices[triple.failure_mode] += 1
-        try:
-            domain = domains[triple.source_doc_id]
-        except KeyError as exc:
-            raise ValueError(f"source document missing for {triple.triple_id}") from exc
-        question_key = (
-            triple.failure_mode,
-            triple.source_doc_id,
-            triple.answer,
-            tuple(fragment.doc_id for fragment in triple.context),
-            level,
-        )
-        occurrence = question_occurrences[question_key]
-        question_occurrences[question_key] += 1
-        triple = _vary_question(
-            triple,
-            title=titles[triple.source_doc_id],
-            occurrence=occurrence,
-        )
-        anchors.append(
-            AnchorTriple(
-                triple=_enrich_context(
+    signatures: set[tuple[object, ...]] = set()
+    for mode, count in ANCHOR_MODE_COUNTS.items():
+        level_plan = _level_plan(count)
+        for level in CHALLENGE_LEVELS:
+            quota = level_plan.count(level)
+            cell: list[AnchorTriple] = []
+            for _ in range(MAX_ANCHOR_CELL_ATTEMPTS):
+                if len(cell) == quota:
+                    break
+                try:
+                    triple = generator.generate_exact({mode: 1})[0]
+                except ValueError:
+                    continue
+                try:
+                    domain = domains[triple.source_doc_id]
+                except KeyError as exc:
+                    raise ValueError(f"source document missing for {triple.triple_id}") from exc
+                enriched = _enrich_context(
                     triple,
                     level,
                     chunks=chunk_list,
                     rng=rng,
                     source_domain=domain,
-                ),
-                challenge_level=level,
-                domain=domain,
-            )
-        )
-    signatures = {
-        (
-            anchor.triple.question,
-            anchor.triple.answer,
-            tuple(
-                (fragment.text, fragment.doc_id, fragment.provenance)
-                for fragment in anchor.triple.context
-            ),
-            anchor.triple.defect,
-            anchor.triple.failure_mode,
-            anchor.triple.provenance_note,
-            anchor.triple.source_doc_id,
-            anchor.triple.offending_span,
-            anchor.challenge_level,
-            anchor.domain,
-        )
-        for anchor in anchors
-    }
-    if len(signatures) != len(anchors):
-        raise ValueError("anchor contains duplicate semantic payloads")
-    return anchors
+                )
+                candidate = AnchorTriple(
+                    triple=enriched,
+                    challenge_level=level,
+                    domain=domain,
+                )
+                signature = _grounding_signature(candidate)
+                if signature in signatures:
+                    continue
+                question_key = (
+                    enriched.failure_mode,
+                    enriched.source_doc_id,
+                )
+                occurrence = question_occurrences[question_key]
+                question_occurrences[question_key] += 1
+                candidate = AnchorTriple(
+                    triple=_vary_question(
+                        enriched,
+                        title=titles[enriched.source_doc_id],
+                        occurrence=occurrence,
+                    ),
+                    challenge_level=level,
+                    domain=domain,
+                )
+                signatures.add(signature)
+                cell.append(candidate)
+            if len(cell) != quota:
+                raise ValueError(
+                    f"cannot satisfy independent anchor quota for {mode}/{level}: "
+                    f"built {len(cell)} of {quota} after {MAX_ANCHOR_CELL_ATTEMPTS} attempts"
+                )
+            anchors.extend(cell)
+    rng.shuffle(anchors)
+    return [_with_triple_id(anchor, f"t{index:05d}") for index, anchor in enumerate(anchors)]

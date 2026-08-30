@@ -109,7 +109,8 @@ The merged integration now completes the browser/backend seam:
    WebSocket traffic on one origin, and is supervised by `scripts/up.ps1`.
 4. Live ledger projections supply economics and Lane C data. The semantic-cache path also
    records rework attribution.
-5. The upload endpoint and UI connect Scene 2 with explicitly untrusted retrieved text.
+5. The upload endpoint remains available, but the rebuilt console intentionally removed the
+   upload control; provider-bound uploaded-text egress remains deferred.
 6. Pre-provider hard blocks and agent-loop cuts publish request-scoped live decisions, and
    the UI explains request-level L5 outcomes even when no sentence or customer content exists.
 7. Custom gateway ports propagate to the production console, and CI runs console Python
@@ -145,12 +146,17 @@ The integration branch contains the complete Person 2 console and its live backe
   declared winner, runner-up, and margin.
 - Recursive server-side token redaction, an allowlisted JSON artefact surface, no browser
   storage of secrets, no unsafe HTML injection, and no WebSocket mutation commands.
-- Text/PDF upload, explicit untrusted-context attachment, a compiled same-origin production
-  host, and frontend unit/type/build/browser CI.
+- A compiled same-origin production host and frontend unit/type/build/browser CI. The upload
+  API remains backend-only until the deferred egress authorization is approved.
+- Projection history is mounted in the production React tree, empty review/evidence states
+  never substitute demo values, and tokenless rejection remains available through JSON POST.
+- Full-prompt cache scoping, WebSocket Origin checks, JSON-only hold mutation, and opt-in
+  shadow replay close the high-confidence pre-authorization security findings.
 
 Standards, specification, bug, dependency, and security reviews were run over the complete
-`master...console-master-integration` diff. Verified findings received regression tests and
-the focused `fix(console): preserve ordered and honest projections` commit.
+`002e860...console-master-integration` diff. Verified findings received regression tests in
+the focused `fix(console): restore honest operator projections` and
+`fix(security): isolate cache and browser control paths` commits.
 
 ## Runbook
 
@@ -193,10 +199,10 @@ uv run pytest -q tests console/tests/python
 npm --prefix console run test:e2e
 ```
 
-The final integration gate on 30 August 2026 produced 67 passing frontend unit tests and 14
+The final integration gate on 30 August 2026 produced 73 passing frontend unit tests and 14
 passing Playwright journeys across desktop 1440×900 and mobile 390×844. Visual QA found
 and fixed a mobile shrink-to-fit regression; the browser suite now pins both layout and
-content width to the configured viewport. The clean core/dev Python gate produced 1,023
+content width to the configured viewport. The clean core/dev Python gate produced 1,027
 passing tests and 2 optional-ML skips. TypeScript,
 Vite build, Ruff lint/format, strict mypy, dependency locking, and the 36-test retrieval
 suite also passed. The Vite build emits a non-blocking bundle-size warning, and its
@@ -220,6 +226,8 @@ evidence or environment follow-up, not missing console behavior.
   and does not substitute replay values.
 - Provider-bound use of uploaded text remains deferred until the separate sensitive-data
   egress authorization step is approved.
+- End-user authentication/authorization remains the explicitly deferred deployment step;
+  the completed Origin and JSON/CSRF boundaries do not replace identity-aware access control.
 
 ## Acceptance
 
